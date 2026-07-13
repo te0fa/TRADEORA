@@ -72,7 +72,12 @@ def parse_boubyan_pdf(pdf_path: str) -> list[dict]:
                         "name_ar": arb_name_cleaned,
                         "is_shariah_compliant": True,
                         "currency": "EGP",
-                        "listing_status": "listed"
+                        "listing_status": "listed",
+                        "market": "EGX",
+                        "country": "Egypt",
+                        "exchange": "EGX",
+                        "asset_type": "stock",
+                        "status": "active"
                     })
                     
     logger.info(f"Successfully parsed {len(companies)} Shariah companies.")
@@ -125,7 +130,12 @@ def seed_database():
                 company_id = res.data[0]["id"]
                 updates = {
                     "is_shariah_compliant": True,
-                    "name_en": c["name_en"]
+                    "name_en": c["name_en"],
+                    "market": "EGX",
+                    "country": "Egypt",
+                    "exchange": "EGX",
+                    "asset_type": "stock",
+                    "status": "active"
                 }
                 if c["name_ar"]:
                     updates["name_ar"] = c["name_ar"]

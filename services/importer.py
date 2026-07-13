@@ -169,8 +169,13 @@ class DataImporter:
                 "isin": None,
                 "name_en": r.get("name_en"),
                 "market_type": None,
-                "currency": "EGP",  # Default to EGP for Egyptian stocks
-                "listing_status": "listed"
+                "currency": "EGP",
+                "listing_status": "listed",
+                "market": "EGX",
+                "country": "Egypt",
+                "exchange": "EGX",
+                "asset_type": "stock",
+                "status": "active"
             }
             new_company = db.insert_company(company_data)
             if new_company:
@@ -191,6 +196,18 @@ class DataImporter:
             new_name_en = r.get("name_en")
             if new_name_en and (not company.get("name_en") or company.get("name_en") != new_name_en):
                 updates["name_en"] = new_name_en
+                
+            # Populate new market context columns if missing
+            for field, default_val in [
+                ("market", "EGX"),
+                ("country", "Egypt"),
+                ("currency", "EGP"),
+                ("exchange", "EGX"),
+                ("asset_type", "stock"),
+                ("status", "active")
+            ]:
+                if not company.get(field):
+                    updates[field] = default_val
                 
             if updates:
                 db.update_company(company_id, updates)
