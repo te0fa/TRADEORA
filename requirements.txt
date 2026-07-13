@@ -9,3 +9,4 @@ beautifulsoup4>=4.14.3
 requests>=2.33.1
 selenium>=4.46.0
 playwright>=1.61.0
+pdfplumber>=0.11.10
