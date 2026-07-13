@@ -1,0 +1,33 @@
+name: Weekly Shariah Review
+
+on:
+  schedule:
+    # Runs at 15:00 UTC (6:00 PM Cairo Time / GMT+3) every Friday
+    - cron: '0 15 * * 5'
+  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+
+jobs:
+  review-shariah:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Shariah Review Script
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python scripts/weekly_shariah_review.py
