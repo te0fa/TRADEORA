@@ -1,0 +1,21 @@
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Data and Logs
+logs/
+data/
+*.pdf
+*.xlsx
+*.xls
+*.csv
+C:\Users\mosta\.gemini\antigravity\brain\*
