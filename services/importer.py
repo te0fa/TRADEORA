@@ -3,6 +3,7 @@ import json
 import logging
 import traceback
 from datetime import datetime
+import pytz
 from config import settings
 from database import db
 
@@ -35,6 +36,9 @@ class DataImporter:
         start_time = datetime.now()
         self.stats["started_at"] = start_time.isoformat()
         self.stats["rows_read"] = len(records)
+        
+        cairo_tz = pytz.timezone('Africa/Cairo')
+        fetched_at = datetime.now(cairo_tz).isoformat()
         
         logger.info(f"Starting import process for {len(records)} records.")
         
@@ -84,6 +88,7 @@ class DataImporter:
                     "value_traded": r.get("value_traded"),
                     "source": self.stats["source"],
                     "price_date": r.get("price_date"),
+                    "fetched_at": fetched_at,
                     "data_quality_flag": quality_flag
                 }
                 valid_prices_to_upsert.append(price_data)
