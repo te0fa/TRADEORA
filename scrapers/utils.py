@@ -1,0 +1,59 @@
+import datetime
+import re
+import pytz
+
+class MarketClosedException(Exception):
+    """Custom exception raised when the market is closed and scraping is guarded."""
+    pass
+
+def is_market_open() -> bool:
+    """
+    Checks if the Egyptian Exchange (EGX) is currently open.
+    Trading Days: Sunday to Thursday (weekday 0, 1, 2, 3, 6)
+    Trading Hours: 10:00 AM to 02:30 PM Cairo Time (GMT+2 or GMT+3 depending on DST)
+    """
+    try:
+        cairo_tz = pytz.timezone('Africa/Cairo')
+        now = datetime.datetime.now(cairo_tz)
+        
+        # Weekday: Monday=0, Tuesday=1, Wednesday=2, Thursday=3, Friday=4, Saturday=5, Sunday=6
+        # EGX trading days are Sunday to Thursday
+        if now.weekday() not in [0, 1, 2, 3, 6]:
+            return False
+            
+        start_time = now.replace(hour=10, minute=0, second=0, microsecond=0)
+        end_time = now.replace(hour=14, minute=30, second=0, microsecond=0)
+        
+        return start_time <= now <= end_time
+    except Exception as e:
+        print(f"Error checking market status: {e}")
+        # Default to False in case of errors to be safe
+        return False
+
+def normalize_arabic(text: str) -> str:
+    """
+    Normalizes Arabic text to standard format for reliable comparisons:
+    - Removes diacritics (Harakat)
+    - Replaces variant alefs (أ, إ, آ) with standard alef (ا)
+    - Replaces teh marbuta (ة) with heh (ه)
+    - Replaces yeh barree (ى) with standard yeh (ي)
+    - Removes non-alphanumeric/non-arabic-character symbols and extra spacing
+    """
+    if not text:
+        return ""
+    text = str(text).strip().lower()
+    # Remove Arabic diacritics
+    text = re.sub(r'[\u064b-\u0652]', '', text)
+    # Normalize alef
+    text = re.sub(r'[أإآ]', 'ا', text)
+    # Normalize teh marbuta
+    text = re.sub(r'ة', 'ه', text)
+    # Normalize yeh
+    text = re.sub(r'ى', 'ي', text)
+    # Replace 'ابو ' with 'ابو' (normalize spacing for Abu/أبو)
+    text = re.sub(r'\bابو\s+', 'ابو', text)
+    # Replace any punctuation and non-alphanumeric chars with space
+    text = re.sub(r'[^\w\s]', ' ', text)
+    # Normalize multiple spaces to single space
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text

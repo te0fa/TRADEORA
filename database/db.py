@@ -89,6 +89,29 @@ def get_company_by_symbol(symbol: str) -> dict | None:
         logger.error(f"Error fetching company by symbol {symbol}: {e}")
     return None
 
+def get_all_companies() -> list[dict]:
+    """Fetches all companies from the database."""
+    if is_dry_run():
+        return []
+    client = get_db_client()
+    try:
+        res = client.table("companies").select("*").execute()
+        return res.data if res.data else []
+    except Exception as e:
+        logger.error(f"Error fetching all companies: {e}")
+        return []
+
+def upsert_market_sources(sources: list[dict]):
+    """Upserts market sources into the database."""
+    if is_dry_run():
+        return
+    client = get_db_client()
+    try:
+        client.table("market_sources").upsert(sources, on_conflict="id").execute()
+    except Exception as e:
+        logger.error(f"Error upserting market sources: {e}")
+
+
 def insert_company(company_data: dict) -> dict | None:
     """Inserts a new company into the database."""
     logger.info(f"Inserting new company: {company_data['symbol']}")
