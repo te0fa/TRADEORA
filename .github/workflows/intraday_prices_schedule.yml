@@ -8,6 +8,10 @@ on:
         required: false
         default: 'dynamic'
 
+concurrency:
+  group: intraday-ingestion
+  cancel-in-progress: true
+
 jobs:
   ingest-intraday-prices:
     runs-on: ubuntu-latest
