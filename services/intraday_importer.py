@@ -66,16 +66,26 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
         resolved_price = valid_p[resolved_source]
         quality_flag = "single_source_warning"
     elif len(valid_p) == 2:
-        sources_list = list(valid_p.keys())
-        p0, p1 = valid_p[sources_list[0]], valid_p[sources_list[1]]
+        sources_list = sorted(list(valid_p.keys()))
+        src0, src1 = sources_list[0], sources_list[1]
+        p0, p1 = valid_p[src0], valid_p[src1]
         diff = abs(p0 - p1) / min(p0, p1) * 100
+        
         if diff <= 1.5:
             resolved_price = (p0 + p1) / 2
-            # Determine source for extra fields based on priority
+            # Find priority source for extra fields (tv > mub > inv)
             for src in ["tv", "mub", "inv"]:
                 if src in valid_p:
                     resolved_source = src
                     break
+            
+            # Label based on which source is missing
+            if "inv" not in valid_p:
+                quality_flag = "2_source_consensus_investing_unavailable"
+            elif "mub" not in valid_p:
+                quality_flag = "2_source_consensus_mubasher_unavailable"
+            else:
+                quality_flag = "2_source_consensus_tradingview_unavailable"
         else:
             # Large difference: use higher priority source
             for src in ["tv", "mub", "inv"]:
@@ -85,11 +95,9 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
                     break
             
             # Set quality flag for unresolved conflict without a 3rd source
-            if "mub" not in valid_p:
-                quality_flag = "conflict_over_1.5_no_source3"
-            else:
-                quality_flag = "conflict_resolved_via_mubasher"
-    else: # len(valid_p) == 3
+            quality_flag = "conflict_over_1.5_no_source3"
+            
+    else: # len(valid_p) == 3 (All 3 sources are valid!)
         # Calculate median
         vals = sorted(list(valid_p.values()))
         median = vals[1]
@@ -101,16 +109,23 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
             if diff <= 1.5:
                 non_outliers[src] = p
                 
-        if len(non_outliers) >= 2:
+        if len(non_outliers) == 3:
+            # Perfect consensus among all 3 sources
+            resolved_price = (vals[0] + vals[1] + vals[2]) / 3
+            # Find priority source among all
+            for src in ["tv", "mub", "inv"]:
+                if src in valid_p:
+                    resolved_source = src
+                    break
+            quality_flag = None # None represents perfect 3-source consensus
+        elif len(non_outliers) == 2:
             resolved_price = sum(non_outliers.values()) / len(non_outliers)
             # Find priority source among non-outliers
             for src in ["tv", "mub", "inv"]:
                 if src in non_outliers:
                     resolved_source = src
                     break
-                    
-            if len(non_outliers) == 2:
-                quality_flag = "outlier_discarded"
+            quality_flag = "outlier_discarded"
         else:
             # Fallback to median
             resolved_price = median
@@ -185,7 +200,7 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
             
         # 5. Fetch Prices from 3 Providers
         tv_provider = TradingViewProvider()
-        mub_provider = MubasherProvider(max_concurrency=5)  # Concurrency optimized to 5
+        mub_provider = MubasherProvider(max_concurrency=15)  # Concurrency optimized to 15 for fast threaded requests
         inv_provider = InvestingProvider(mapping_dir="data")
         
         logger.info("Fetching prices from TradingView...")
@@ -207,22 +222,27 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
             logger.info("Light Run: Skipping Mubasher completely.")
             mub_map = {}
         elif run_type == "dynamic":
-            conflicting_symbols = []
-            for sym in symbols:
-                tv_p = tv_map.get(sym, {}).get("price")
-                inv_p = inv_map.get(sym, {}).get("price")
-                if tv_p is not None and inv_p is not None and tv_p > 0 and inv_p > 0:
-                    diff = abs(tv_p - inv_p) / min(tv_p, inv_p) * 100
-                    if diff > 1.5:
-                        conflicting_symbols.append(sym)
-            
-            if conflicting_symbols:
-                logger.info(f"Dynamic Run: Found {len(conflicting_symbols)} conflicting symbols (>1.5% discrepancy). Fetching from Mubasher: {conflicting_symbols}")
-                mub_results = await mub_provider.fetch_prices(conflicting_symbols, bypass_session_guard=True)
+            if not inv_map:
+                logger.warning("Investing.com is completely unavailable (likely due to Cloudflare block). Upgrading dynamic run to fetch all symbols from Mubasher to maintain a 2-source consensus baseline.")
+                mub_results = await mub_provider.fetch_prices(symbols, bypass_session_guard=True)
                 mub_map = {r["symbol"]: r for r in mub_results}
             else:
-                logger.info("Dynamic Run: No price discrepancies found between TradingView and Investing. Skipping Mubasher.")
-                mub_map = {}
+                conflicting_symbols = []
+                for sym in symbols:
+                    tv_p = tv_map.get(sym, {}).get("price")
+                    inv_p = inv_map.get(sym, {}).get("price")
+                    if tv_p is not None and inv_p is not None and tv_p > 0 and inv_p > 0:
+                        diff = abs(tv_p - inv_p) / min(tv_p, inv_p) * 100
+                        if diff > 1.5:
+                            conflicting_symbols.append(sym)
+                
+                if conflicting_symbols:
+                    logger.info(f"Dynamic Run: Found {len(conflicting_symbols)} conflicting symbols (>1.5% discrepancy). Fetching from Mubasher: {conflicting_symbols}")
+                    mub_results = await mub_provider.fetch_prices(conflicting_symbols, bypass_session_guard=True)
+                    mub_map = {r["symbol"]: r for r in mub_results}
+                else:
+                    logger.info("Dynamic Run: No price discrepancies found between TradingView and Investing. Skipping Mubasher.")
+                    mub_map = {}
         
         # 6. Apply Cross-validation & Outlier Filtering Consensus
         logger.info("Applying Outlier-Filtering Consensus Cross-validation...")
@@ -281,7 +301,15 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
                 "fetched_at": fetched_at,
                 "data_quality_flag": q_flag
             })
-            
+        # Check conflict rate warning
+        if consensus_records:
+            conflict_count = sum(1 for r in consensus_records if r["data_quality_flag"] == "conflict_over_1.5_no_source3")
+            conflict_pct = (conflict_count / len(consensus_records)) * 100
+            if conflict_pct > 10.0:
+                msg = f"[CRITICAL WARNING] Discrepancy rate is high: {conflict_pct:.2f}% (>10%) of symbols have price conflicts without a 3rd source!"
+                logger.critical(msg)
+                warnings_list.append(msg)
+
         # 7. Database storage
         inserted_count = 0
         if consensus_records:
