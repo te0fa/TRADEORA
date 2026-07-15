@@ -44,7 +44,7 @@ def setup_logging():
         ]
     )
 
-def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes: dict) -> tuple[float, float, float, int]:
+def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes: dict, run_type: str = "dynamic") -> tuple[float, float, float, int, str | None]:
     """
     Outlier-Filtering Consensus Cross-validation Algorithm.
     Resolves the final price, change, change_percent, and volume based on:
@@ -55,14 +55,16 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
     """
     valid_p = {k: v for k, v in prices.items() if v is not None and v > 0}
     if not valid_p:
-        return None, None, None, None
+        return None, None, None, None, None
         
     resolved_source = None
     resolved_price = None
+    quality_flag = None
     
     if len(valid_p) == 1:
         resolved_source = list(valid_p.keys())[0]
         resolved_price = valid_p[resolved_source]
+        quality_flag = "single_source_warning"
     elif len(valid_p) == 2:
         sources_list = list(valid_p.keys())
         p0, p1 = valid_p[sources_list[0]], valid_p[sources_list[1]]
@@ -81,6 +83,12 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
                     resolved_source = src
                     resolved_price = valid_p[src]
                     break
+            
+            # Set quality flag for unresolved conflict without a 3rd source
+            if "mub" not in valid_p:
+                quality_flag = "conflict_over_1.5_no_source3"
+            else:
+                quality_flag = "conflict_resolved_via_mubasher"
     else: # len(valid_p) == 3
         # Calculate median
         vals = sorted(list(valid_p.values()))
@@ -100,25 +108,29 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
                 if src in non_outliers:
                     resolved_source = src
                     break
+                    
+            if len(non_outliers) == 2:
+                quality_flag = "outlier_discarded"
         else:
             # Fallback to median
             resolved_price = median
             resolved_source = "tv"
+            quality_flag = "low_consensus_fallback_to_median"
             
     # Extract fields from the resolved source
     change = changes.get(resolved_source) or 0.0
     change_pct = change_pcts.get(resolved_source) or 0.0
     volume = volumes.get(resolved_source) or 0
     
-    return resolved_price, change, change_pct, volume
+    return resolved_price, change, change_pct, volume, quality_flag
 
-async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False):
+async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False, run_type: str = "dynamic"):
     start_time = datetime.now()
     setup_logging()
     
     logger.info("=" * 60)
     logger.info("Tradeora Intraday Ingestion Pipeline Started")
-    logger.info(f"Parameters: dry_run={dry_run}, bypass_session_guard={bypass_session_guard}")
+    logger.info(f"Parameters: dry_run={dry_run}, bypass_session_guard={bypass_session_guard}, run_type={run_type}")
     
     # 1. Market Session Guard
     if not bypass_session_guard and not is_market_open():
@@ -163,9 +175,17 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
             companies_map = {c["symbol"].upper(): c for c in db_companies}
             logger.info(f"Loaded {len(symbols)} companies from database.")
             
+        cairo_tz = pytz.timezone('Africa/Cairo')
+        now_cairo = datetime.now(cairo_tz)
+        
+        # 1:00 PM Cairo (hour 13) safety-upgrade check
+        if run_type == "dynamic" and now_cairo.hour == 13:
+            logger.info("Cairo Time is 1:00 PM (13:00). Upgrading run_type to 'full' for the daily safety consensus audit.")
+            run_type = "full"
+            
         # 5. Fetch Prices from 3 Providers
         tv_provider = TradingViewProvider()
-        mub_provider = MubasherProvider(max_concurrency=4)
+        mub_provider = MubasherProvider(max_concurrency=5)  # Concurrency optimized to 5
         inv_provider = InvestingProvider(mapping_dir="data")
         
         logger.info("Fetching prices from TradingView...")
@@ -176,16 +196,39 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
         inv_results, _ = await inv_provider.fetch_prices(bypass_session_guard=True)
         inv_map = {r["symbol"]: r for r in inv_results}
         
-        logger.info("Fetching prices from Mubasher...")
-        mub_results = await mub_provider.fetch_prices(symbols, bypass_session_guard=True)
-        mub_map = {r["symbol"]: r for r in mub_results}
+        # Decide Mubasher fetching logic based on run_type
+        mub_map = {}
+        
+        if run_type == "full":
+            logger.info("Full Run: Fetching all prices from Mubasher...")
+            mub_results = await mub_provider.fetch_prices(symbols, bypass_session_guard=True)
+            mub_map = {r["symbol"]: r for r in mub_results}
+        elif run_type == "light":
+            logger.info("Light Run: Skipping Mubasher completely.")
+            mub_map = {}
+        elif run_type == "dynamic":
+            conflicting_symbols = []
+            for sym in symbols:
+                tv_p = tv_map.get(sym, {}).get("price")
+                inv_p = inv_map.get(sym, {}).get("price")
+                if tv_p is not None and inv_p is not None and tv_p > 0 and inv_p > 0:
+                    diff = abs(tv_p - inv_p) / min(tv_p, inv_p) * 100
+                    if diff > 1.5:
+                        conflicting_symbols.append(sym)
+            
+            if conflicting_symbols:
+                logger.info(f"Dynamic Run: Found {len(conflicting_symbols)} conflicting symbols (>1.5% discrepancy). Fetching from Mubasher: {conflicting_symbols}")
+                mub_results = await mub_provider.fetch_prices(conflicting_symbols, bypass_session_guard=True)
+                mub_map = {r["symbol"]: r for r in mub_results}
+            else:
+                logger.info("Dynamic Run: No price discrepancies found between TradingView and Investing. Skipping Mubasher.")
+                mub_map = {}
         
         # 6. Apply Cross-validation & Outlier Filtering Consensus
         logger.info("Applying Outlier-Filtering Consensus Cross-validation...")
         consensus_records = []
-        cairo_tz = pytz.timezone('Africa/Cairo')
-        price_date = datetime.now(cairo_tz).date().isoformat()
-        fetched_at = datetime.now(cairo_tz).isoformat()
+        price_date = now_cairo.date().isoformat()
+        fetched_at = now_cairo.isoformat()
         
         for sym in symbols:
             # Get values
@@ -210,13 +253,13 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
                 "mub": mub_map.get(sym, {}).get("volume")
             }
             
-            p_final, chg_final, chg_pct_final, vol_final = calculate_consensus(
-                prices, changes, change_pcts, volumes
+            p_final, chg_final, chg_pct_final, vol_final, q_flag = calculate_consensus(
+                prices, changes, change_pcts, volumes, run_type=run_type
             )
             
             if p_final is None:
                 # No price fetched from any source
-                logger.warning(f"No price data available for {sym} from any of the 3 sources. Skipping.")
+                logger.warning(f"No price data available for {sym} from any of the sources. Skipping.")
                 continue
                 
             # Resolve company ID
@@ -235,7 +278,8 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
                 "volume": vol_final,
                 "source": "intraday_consensus",
                 "price_date": price_date,
-                "fetched_at": fetched_at
+                "fetched_at": fetched_at,
+                "data_quality_flag": q_flag
             })
             
         # 7. Database storage
@@ -296,6 +340,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tradeora Intraday Price Ingestion Pipeline")
     parser.add_argument("--dry-run", action="store_true", help="Run in dry-run mode (no DB inserts)")
     parser.add_argument("--bypass-session-guard", action="store_true", help="Bypass market hours check")
+    parser.add_argument("--run-type", default="dynamic", choices=["full", "light", "dynamic"], help="Type of run: full, light, or dynamic (default: dynamic)")
     args = parser.parse_args()
     
-    asyncio.run(run_pipeline(dry_run=args.dry_run, bypass_session_guard=args.bypass_session_guard))
+    asyncio.run(run_pipeline(dry_run=args.dry_run, bypass_session_guard=args.bypass_session_guard, run_type=args.run_type))

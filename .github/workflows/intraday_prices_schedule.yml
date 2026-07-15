@@ -1,7 +1,12 @@
 name: Intraday EGX Price Ingestion & Consensus
 
 on:
-  workflow_dispatch: # Triggered via API by cron-job.org or manually in GitHub UI
+  workflow_dispatch:
+    inputs:
+      run_type:
+        description: 'Type of run: full, light, or dynamic'
+        required: false
+        default: 'dynamic'
 
 jobs:
   ingest-intraday-prices:
@@ -43,4 +48,4 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
       run: |
         # bypass_session_guard is False by default for production safety
-        python services/intraday_importer.py
+        python services/intraday_importer.py --run-type ${{ github.event.inputs.run_type || 'dynamic' }}
