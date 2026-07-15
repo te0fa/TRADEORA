@@ -181,6 +181,21 @@ def main():
                 "new_status": True
             }).execute()
             print(f"Successfully marked {c['symbol']} as Shariah-compliant.")
+            
+            # Trigger historical backfill for this new entrant
+            print(f"Triggering historical backfill for new Shariah entrant: {c['symbol']}...")
+            try:
+                from scripts.backfill_historical import backfill_symbol
+                records = backfill_symbol(c['symbol'], c['id'], limit_days=300)
+                if records:
+                    # Batch insert using upsert
+                    client.table("historical_prices").upsert(records, on_conflict="company_id,price_date,source").execute()
+                    print(f"Successfully backfilled {len(records)} days of history for {c['symbol']}.")
+                else:
+                    print(f"No history returned for {c['symbol']}.")
+            except Exception as b_err:
+                print(f"Failed to backfill history for new entrant {c['symbol']}: {b_err}")
+                
         except Exception as e:
             print(f"Failed to update {c['symbol']}: {e}")
 

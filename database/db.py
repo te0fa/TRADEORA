@@ -128,6 +128,36 @@ def insert_company(company_data: dict) -> dict | None:
         logger.error(f"Error inserting company {company_data['symbol']}: {e}")
     return None
 
+def get_active_universe(filter_criteria: dict = None) -> list[dict]:
+    """
+    Returns the active universe of companies based on filter criteria.
+    Default criteria: is_shariah_compliant = True.
+    """
+    if is_dry_run():
+        return []
+        
+    client = get_db_client()
+    if not client:
+        return []
+        
+    query = client.table("companies").select("*")
+    
+    # Default filters if not specified
+    filters = filter_criteria if filter_criteria is not None else {"is_shariah_compliant": True}
+    
+    for field, val in filters.items():
+        if isinstance(val, list):
+            query = query.in_(field, val)
+        else:
+            query = query.eq(field, val)
+            
+    try:
+        res = query.execute()
+        return res.data if res.data else []
+    except Exception as e:
+        logger.error(f"Error fetching active universe: {e}")
+        return []
+
 def update_company(company_id: str, company_data: dict):
     """Updates a company's data."""
     logger.info(f"Updating company {company_id} with data: {company_data}")
