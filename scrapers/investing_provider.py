@@ -2,6 +2,7 @@ import os
 import json
 import datetime
 import pytz
+import re
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 from scrapers.utils import is_market_open, normalize_arabic, MarketClosedException
@@ -134,7 +135,7 @@ class InvestingProvider:
                 
                 # Step 1: Open index dropdown filter
                 print("[InvestingProvider] Selecting 'جميع أسهم مصر' index filter...")
-                dropdown = page.locator("div.dropdown_noSelect__rU_0Y").filter(has_text="EGX 30").first
+                dropdown = page.locator("span").filter(has_text=re.compile(r"^مؤشر EGX 30$|^EGX 30$")).first
                 await dropdown.scroll_into_view_if_needed()
                 await dropdown.click()
                 await page.wait_for_timeout(1000)
