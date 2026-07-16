@@ -42,7 +42,9 @@ This document outlines the planned future enhancements and architectural upgrade
 *   **Providers:** EODHD, Twelve Data, Alpha Vantage, Finnhub, Polygon, Financial Modeling Prep.
 *   **EGX Limitations & Findings:**
     *   **Google Finance & MSN/Bing Finance:** لا يغطيان البورصة المصرية (EGX) إطلاقاً على الإطلاق - لا داعي لإعادة تجربتهما للسوق المحلي.
-    *   **Yahoo Finance:** يعطي أسعاراً معدلة تاريخياً بناء على التوزيعات والانقسامات (split-adjusted) وغير صالح لمقارنة الأسعار اللحظية مع شاشة البورصة، ولكن قد يفيد مستقبلاً لبيانات تاريخ التوزيعات (dividend history).
+    *   **Yahoo Finance:** تم التغلب على مشكلة الأسعار المعدلة تاريخياً بتمرير المعامل `auto_adjust=False` مما يتيح سحب أسعار الإغلاق الفعلية (Raw Close Prices). ومع ذلك، يجب الانتباه لـ **محدودية هامة جداً**:
+        *   بعض الأسهم البارزة في البورصة المصرية تدرج في ياهو برمز الـ ISIN وليس بالرمز المعتاد (مثل: أوراسكوم كونستراكشون `ORAS` $\rightarrow$ `EGS95001C011.CA`، اكرومصر `ACRO` $\rightarrow$ `EGS3E071C013-EGP.CA`، النيل للأدوية `NIPH` $\rightarrow$ `EGS38331C012.CA` وغيرها - إجمالي 10 أسهم حالياً).
+        *   ياهو فايننس **لا يحتفظ بتاريخ عميق (محدود بـ 1 إلى 5 أيام تداول فقط)** للرموز القائمة على الـ ISIN. هذا يعني أن النسخ التاريخي العميق (300 يوم) غير متوفر لهذه الأسهم الأربعة، وبالتالي فإن المؤشرات الفنية (مثل RSI أو Moving Averages) لن تعمل لها فوراً إلا بعد تراكم التاريخ يومياً بمرور الوقت عبر تشغيل الـ Pipeline.
     *   **موقع EGX الرسمي (prices.aspx):** تم اختبار موقع EGX الرسمي لسحب الأسعار اللحظية آلياً - محظور بالكامل بجدار حماية F5 حتى مع Playwright ووضع التخفي المتقدم (صفحة فارغة تماماً، 0 جداول). لا داعي لإعادة المحاولة إلا لو تغيرت سياسة الموقع مستقبلاً. نعتمد بدلاً منه على TradingView + Investing.com + Mubasher للأسعار اللحظية.
 
 ### 2. Deferred Engineering Libraries
