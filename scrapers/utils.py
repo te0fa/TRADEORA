@@ -57,3 +57,18 @@ def normalize_arabic(text: str) -> str:
     # Normalize multiple spaces to single space
     text = re.sub(r'\s+', ' ', text).strip()
     return text
+
+def get_yahoo_ticker(symbol: str) -> str:
+    """
+    Maps an EGX symbol to its correct Yahoo Finance ticker.
+    Handles special cases like ISIN tickers (e.g. ORAS, DCRC, NCGC).
+    """
+    mapping = {
+        "ORAS": "EGS95001C011.CA",
+        "DCRC": "EGS21451C017-EGP.CA",
+        "NCGC": "EGS32131C012-EGP.CA",
+        "GTHE": "EGS74081C018-EGP.CA"
+    }
+    symbol_upper = symbol.upper()
+    return mapping.get(symbol_upper, f"{symbol_upper}.CA")
+

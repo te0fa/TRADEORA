@@ -1,7 +1,7 @@
 import requests
 import datetime
 import pytz
-from scrapers.utils import is_market_open, MarketClosedException
+from scrapers.utils import is_market_open, MarketClosedException, get_yahoo_ticker
 
 class YahooProvider:
     """
@@ -28,8 +28,8 @@ class YahooProvider:
         timestamp = datetime.datetime.now(cairo_tz).isoformat()
         
         for sym in symbols:
-            # EGX stocks are suffixed with .CA on Yahoo
-            yahoo_sym = f"{sym.upper()}.CA"
+            # Map symbol to standard or special ISIN Yahoo symbol
+            yahoo_sym = get_yahoo_ticker(sym)
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_sym}?interval=1m&range=1d"
             
             try:

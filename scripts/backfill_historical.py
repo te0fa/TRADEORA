@@ -16,21 +16,31 @@ from database import db
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+from scrapers.utils import get_yahoo_ticker
+
 def backfill_symbol(symbol: str, company_id: str, limit_days: int = 300) -> list[dict]:
     """
     Downloads historical prices for a symbol from Yahoo Finance and formats them.
     Returns a list of price records to insert.
     """
-    yahoo_ticker = f"{symbol.upper()}.CA"
+    yahoo_ticker = get_yahoo_ticker(symbol)
     records = []
     
     try:
         t = yf.Ticker(yahoo_ticker)
         # Fetch historical data (auto_adjust=False retrieves raw close prices)
-        df = t.history(period="2y", auto_adjust=False)
-        
+        try:
+            df = t.history(period="2y", auto_adjust=False)
+        except Exception as e:
+            logger.info(f"Period 2y not supported for {yahoo_ticker} ({e}). Falling back to 5d...")
+            df = t.history(period="5d", auto_adjust=False)
+            
         if df is None or df.empty:
-            logger.warning(f"No history found on Yahoo Finance for {yahoo_ticker}")
+            logger.info(f"No 2y data returned for {yahoo_ticker}. Falling back to 5d...")
+            df = t.history(period="5d", auto_adjust=False)
+            
+        if df is None or df.empty:
+            logger.warning(f"No history found on Yahoo Finance for {yahoo_ticker} even with 5d fallback")
             return []
             
         # Get the last limit_days of records
