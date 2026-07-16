@@ -73,7 +73,16 @@ def get_yahoo_ticker(symbol: str) -> str:
         "CAED": "EGS72201C014.CA",
         "ELNA": "EGS300L1C011.CA",
         "NIPH": "EGS38331C012.CA",
-        "RREI": "EGS65011C016.CA"
+        "RREI": "EGS65011C016.CA",
+        "AJWA": "EGS30211C014.CA",
+        "BONY": "EGS656M1C010.CA",
+        "DOMT": "EGS30031C016.CA",
+        "FERC": "EGS385S1C012.CA",
+        "GTEX": "EGS59U92C011.CA",
+        "RAKT": "EGS36021C011.CA",
+        "TANM": "EGS21EB1C011.CA",
+        "TAQA": "EGS490S1C014.CA",
+        "UTOP": "EGS655Y1C017.CA"
     }
     symbol_upper = symbol.upper()
     return mapping.get(symbol_upper, f"{symbol_upper}.CA")
