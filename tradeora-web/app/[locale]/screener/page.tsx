@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Search, SlidersHorizontal, TrendingUp, TrendingDown, RefreshCw, BarChart3, Star, Percent } from 'lucide-react';
+import { ScreenerRowSkeleton } from '@/components/ui/ScreenerRowSkeleton';
 
 export default function ScreenerPage() {
   const params = useParams();
@@ -248,9 +249,10 @@ export default function ScreenerPage() {
 
       {/* Main Table View */}
       {loading ? (
-        <div className="w-full py-24 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-3 border-accent-blue/30 border-t-accent-blue rounded-full animate-spin"></div>
-          <p className="text-xs text-slate-400">{isAr ? 'جاري فرز وتحديث قائمة الأسهم ومطابقتها...' : 'Sorting and loading stocks...'}</p>
+        <div className="glass-card rounded-2xl border border-white/5 overflow-hidden p-2">
+          {Array.from({ length: 15 }).map((_, i) => (
+            <ScreenerRowSkeleton key={i} />
+          ))}
         </div>
       ) : (
         <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">

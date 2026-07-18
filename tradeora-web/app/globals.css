@@ -131,3 +131,8 @@ body {
   outline: none;
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
 }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

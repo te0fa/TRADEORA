@@ -40,6 +40,7 @@ import { Info } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { WatchlistButton } from '@/components/stock/WatchlistButton';
 import { PriceAlertModal } from '@/components/stock/PriceAlertModal';
+import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 
 interface PriceChartProps {
   symbol: string;
@@ -1925,12 +1926,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
 
       {/* ── Main Chart Grid ── */}
       {isIntradayLoading ? (
-        <div className="w-full h-96 flex flex-col items-center justify-center text-text-secondary border border-dashed border-white/5 rounded-xl bg-white/[0.01]">
-          <span className="text-xl animate-spin mb-2">🔄</span>
-          <span className="text-xs font-bold font-sans tracking-wide text-text-secondary/60">
-            {locale === 'ar' ? 'جاري تحميل البيانات اللحظية من Yahoo Finance...' : 'Loading Yahoo Finance Intraday candles...'}
-          </span>
-        </div>
+        <ChartSkeleton />
       ) : allChartData.length > 0 ? (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
 
