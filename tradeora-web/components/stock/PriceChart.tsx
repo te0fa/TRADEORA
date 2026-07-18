@@ -834,18 +834,59 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     if (analysisCandles.length === 0) return null;
     const idx = analysisCandles.length - 1;
     const last = analysisCandles[idx];
+    const closes = analysisCloses;
+    const highs = analysisCandles.map(c => c.high);
+    const lows = analysisCandles.map(c => c.low);
+
+    // Bollinger Bands Width & Position
+    const bb = analysisBbRaw[idx];
+    const sma20 = analysisSma20Raw[idx] ?? last.close;
+    // Calculate std dev for BB:
+    const closes20 = closes.slice(-20);
+    const mean20 = sma20;
+    const std20 = Math.sqrt(
+      closes20.reduce((a, b) => a + (b - mean20) ** 2, 0) / Math.max(closes20.length, 1)
+    );
+    const bbWidth = std20 > 0 ? (std20 * 4) / mean20 * 100 : 2;
+    const bbPos = std20 > 0 ? (last.close - mean20) / (std20 * 2) : 0;
+
+    // Stochastic RSI:
+    const rsi14 = analysisRsiRaw.slice(-14);
+    const validRsis = rsi14.filter(x => x !== null && x !== undefined) as number[];
+    const lastRsi = analysisRsiRaw[idx] ?? 50;
+    const minRsi = validRsis.length > 0 ? Math.min(...validRsis) : 30;
+    const maxRsi = validRsis.length > 0 ? Math.max(...validRsis) : 70;
+    const stochRsi = (maxRsi - minRsi) > 0 ? (lastRsi - minRsi) / (maxRsi - minRsi) : 0.5;
+
+    // Distance to 52-week High (ATH):
+    const recentHighs = highs.slice(-252);
+    const ath52 = recentHighs.length > 0 ? Math.max(...recentHighs) : last.close;
+    const distAth = ((last.close - ath52) / ath52) * 100;
+
+    // Volume Spike:
+    const recentVols = analysisCandles.slice(-14).map(c => c.volume ?? 0);
+    const avgVol = recentVols.reduce((a, b) => a + b, 0) / Math.max(recentVols.length, 1);
+    const volRatio = avgVol > 0 ? (last.volume ?? 0) / avgVol : 1;
+    const volSpike = volRatio >= 3 ? 1 : 0;
+
     return {
       ...last,
-      rsi: analysisRsiRaw[idx] ?? null,
+      rsi: lastRsi,
       macd: analysisMacdRaw[idx]?.macd ?? null,
       macdSignal: analysisMacdRaw[idx]?.signal ?? null,
       macdHistogram: analysisMacdRaw[idx]?.histogram ?? null,
-      sma20: analysisSma20Raw[idx] ?? null,
+      sma20,
       sma50: analysisSma50Raw[idx] ?? null,
-      bbUpper: analysisBbRaw[idx]?.upper ?? null,
-      bbLower: analysisBbRaw[idx]?.lower ?? null,
+      bbUpper: bb?.upper ?? null,
+      bbLower: bb?.lower ?? null,
+      bbWidth,
+      bbPos,
+      stochRsi,
+      distAth,
+      volRatio,
+      volSpike,
     };
-  }, [analysisCandles, analysisRsiRaw, analysisMacdRaw, analysisSma20Raw, analysisSma50Raw, analysisBbRaw]);
+  }, [analysisCandles, analysisCloses, analysisRsiRaw, analysisMacdRaw, analysisSma20Raw, analysisSma50Raw, analysisBbRaw]);
 
   // ─── Scored Technical Analysis ────────────────────────────────────
   const rsiDetails = useMemo(() => {
@@ -969,15 +1010,95 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     return { desc, score: scoreVal, signal };
   }, [topLevels, currentPrice, locale]);
 
-  // BB score
-  const bbScore = useMemo(() => {
-    if (!analysisData || analysisData.bbUpper === null || analysisData.bbLower === null) return 0;
+  // BB score and details
+  const bbDetails = useMemo(() => {
+    if (!analysisData || analysisData.bbUpper === null || analysisData.bbLower === null) {
+      return { val: '-', desc: locale === 'ar' ? 'غير متاح' : 'N/A', score: 0, signal: '🟡' };
+    }
     const c = analysisData.close;
-    const range = analysisData.bbUpper - analysisData.bbLower;
-    if (c < analysisData.bbLower + range * 0.2) return 1;
-    if (c > analysisData.bbUpper - range * 0.2) return -1;
-    return 0;
-  }, [analysisData]);
+    const upper = analysisData.bbUpper;
+    const lower = analysisData.bbLower;
+    const width = analysisData.bbWidth ?? 2;
+    const pos = analysisData.bbPos ?? 0;
+
+    let desc = '';
+    let scoreVal = 0;
+    let signal = '🟡';
+
+    if (pos <= -0.8) {
+      desc = locale === 'ar' ? 'السعر قرب الحد السفلي للبولنجر (إيجابي)' : 'Price near lower Bollinger Band (bullish)';
+      scoreVal = 2;
+      signal = '🟢';
+    } else if (pos >= 0.8) {
+      desc = locale === 'ar' ? 'السعر قرب الحد العلوي للبولنجر (سلبي)' : 'Price near upper Bollinger Band (bearish)';
+      scoreVal = -2;
+      signal = '🔴';
+    } else {
+      desc = locale === 'ar' ? 'السعر داخل حدود البولنجر (محايد)' : 'Price inside Bollinger Bands (neutral)';
+      scoreVal = 0;
+      signal = '🟡';
+    }
+
+    const valStr = locale === 'ar'
+      ? `العرض: ${width.toFixed(1)}% / الموضع: ${pos.toFixed(2)}`
+      : `Width: ${width.toFixed(1)}% / Pos: ${pos.toFixed(2)}`;
+
+    return { val: valStr, desc, score: scoreVal, signal };
+  }, [analysisData, locale]);
+
+  // Stochastic RSI details
+  const stochRsiDetails = useMemo(() => {
+    if (!analysisData || analysisData.stochRsi === undefined) {
+      return { val: '-', desc: locale === 'ar' ? 'غير متاح' : 'N/A', score: 0, signal: '🟡' };
+    }
+    const stoch = analysisData.stochRsi;
+    let desc = '';
+    let scoreVal = 0;
+    let signal = '🟡';
+
+    if (stoch <= 0.2) {
+      desc = locale === 'ar' ? 'مؤشر ستوكاستيك RSI متشبع بيعياً (إيجابي)' : 'Stochastic RSI oversold (bullish)';
+      scoreVal = 2;
+      signal = '🟢';
+    } else if (stoch >= 0.8) {
+      desc = locale === 'ar' ? 'مؤشر ستوكاستيك RSI متشبع شرائياً (سلبي)' : 'Stochastic RSI overbought (bearish)';
+      scoreVal = -2;
+      signal = '🔴';
+    } else {
+      desc = locale === 'ar' ? 'مؤشر ستوكاستيك RSI في منطقة معتدلة' : 'Stochastic RSI in a neutral zone';
+      scoreVal = 0;
+      signal = '🟡';
+    }
+
+    return { val: stoch.toFixed(3), desc, score: scoreVal, signal };
+  }, [analysisData, locale]);
+
+  // ATH Proximity details
+  const athDetails = useMemo(() => {
+    if (!analysisData || analysisData.distAth === undefined) {
+      return { val: '-', desc: locale === 'ar' ? 'غير متاح' : 'N/A', score: 0, signal: '🟡' };
+    }
+    const dist = analysisData.distAth;
+    let desc = '';
+    let scoreVal = 0;
+    let signal = '🟡';
+
+    if (dist >= -2) {
+      desc = locale === 'ar' ? 'السعر يقترب جداً من القمة السنوية (حذر)' : 'Price very close to 52-week High (caution)';
+      scoreVal = -1;
+      signal = '🔴';
+    } else {
+      desc = locale === 'ar' ? 'السعر يتداول بأريحية تحت القمة السنوية' : 'Price trading safely below 52-week High';
+      scoreVal = 0;
+      signal = '🟡';
+    }
+
+    const valStr = locale === 'ar'
+      ? `المسافة للقمة: ${dist.toFixed(1)}%`
+      : `Dist to ATH: ${dist.toFixed(1)}%`;
+
+    return { val: valStr, desc, score: scoreVal, signal };
+  }, [analysisData, locale]);
 
   // Volume Analysis
   const volumeDetails = useMemo(() => {
@@ -1036,7 +1157,14 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
 
   // Overall combined score (-8 to +8)
   const scoreDetails = useMemo(() => {
-    let sum = rsiDetails.score + macdDetails.score + smaDetails.score + srDetails.score + bbScore + volumeDetails.score;
+    let sum = rsiDetails.score +
+              macdDetails.score +
+              smaDetails.score +
+              srDetails.score +
+              bbDetails.score +
+              stochRsiDetails.score +
+              athDetails.score +
+              volumeDetails.score;
     const lastRSI = analysisData?.rsi ?? 50;
     
     let athWarning = '';
@@ -1055,7 +1183,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     
     const finalScore = Math.max(-8, Math.min(8, sum));
     return { finalScore, athWarning, lastRSI };
-  }, [rsiDetails.score, macdDetails.score, smaDetails.score, srDetails.score, bbScore, volumeDetails.score, isNearATH, analysisData]);
+  }, [rsiDetails.score, macdDetails.score, smaDetails.score, srDetails.score, bbDetails.score, stochRsiDetails.score, athDetails.score, volumeDetails.score, isNearATH, analysisData]);
 
   const overallScore = scoreDetails.finalScore;
   const { athWarning, lastRSI } = scoreDetails;
@@ -1104,37 +1232,115 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     const action = overallScore >= 2 ? 'buy' : overallScore <= -2 ? 'sell' : 'neutral';
     const isSell = action === 'sell';
 
+    // ATR calculations on analysisCandles:
+    const atrValues = calcATR(analysisCandles, 14);
+    const currentATR = atrValues[atrValues.length - 1] ?? (currentPrice * 0.015);
+
+    // Multipliers for fallbacks:
     const tpMultiplier = isIntradayInterval ? 0.015 : 0.035;
     const tp2Multiplier = isIntradayInterval ? 0.03 : 0.07;
     const slMultiplier = isIntradayInterval ? 0.01 : 0.035;
 
-    const tp1 = isSell ? currentPrice * (1 - tpMultiplier) : currentPrice * (1 + tpMultiplier);
-    const tp2 = isSell ? currentPrice * (1 - tp2Multiplier) : currentPrice * (1 + tp2Multiplier);
-    const sl = isSell ? currentPrice * (1 + slMultiplier) : currentPrice * (1 - slMultiplier);
+    // 1. Bollinger Bands Targets:
+    const bb_tp1 = analysisData?.sma20 ?? currentPrice;
+    const bb_tp2 = isSell
+      ? (analysisData?.bbLower ?? (currentPrice * (1 - tp2Multiplier)))
+      : (analysisData?.bbUpper ?? (currentPrice * (1 + tp2Multiplier)));
+    const bb_sl = isSell
+      ? (analysisData?.bbUpper ?? (currentPrice * (1 + slMultiplier)))
+      : (analysisData?.bbLower ?? (currentPrice * (1 - slMultiplier)));
 
-    const tp1Source = isSell
-      ? (locale === 'ar' ? `هدف 1 سلبي -${(tpMultiplier * 100).toFixed(1)}%` : `Target 1 bearish -${(tpMultiplier * 100).toFixed(1)}%`)
-      : (locale === 'ar' ? `هدف 1 إيجابي +${(tpMultiplier * 100).toFixed(1)}%` : `Target 1 bullish +${(tpMultiplier * 100).toFixed(1)}%`);
+    // 2. RSI Targets:
+    const rsi_tp1 = isSell ? currentPrice - 1.2 * currentATR : currentPrice + 1.2 * currentATR;
+    const rsi_tp2 = isSell ? currentPrice - 2.4 * currentATR : currentPrice + 2.4 * currentATR;
+    const rsi_sl = isSell ? currentPrice + 1.5 * currentATR : currentPrice - 1.5 * currentATR;
 
-    const tp2Source = isSell
-      ? (locale === 'ar' ? `هدف 2 سلبي -${(tp2Multiplier * 100).toFixed(1)}%` : `Target 2 bearish -${(tp2Multiplier * 100).toFixed(1)}%`)
-      : (locale === 'ar' ? `هدف 2 إيجابي +${(tp2Multiplier * 100).toFixed(1)}%` : `Target 2 bullish +${(tp2Multiplier * 100).toFixed(1)}%`);
+    // 3. MACD Targets:
+    const macd_tp1 = isSell ? currentPrice - 1.5 * currentATR : currentPrice + 1.5 * currentATR;
+    const macd_tp2 = isSell ? currentPrice - 3.0 * currentATR : currentPrice + 3.0 * currentATR;
+    const macd_sl = isSell ? currentPrice + 1.2 * currentATR : currentPrice - 1.2 * currentATR;
 
-    const slSource = isSell
-      ? (locale === 'ar' ? `وقف خسارة +${(slMultiplier * 100).toFixed(1)}%` : `Stop Loss +${(slMultiplier * 100).toFixed(1)}%`)
-      : (locale === 'ar' ? `وقف خسارة -${(slMultiplier * 100).toFixed(1)}%` : `Stop Loss -${(slMultiplier * 100).toFixed(1)}%`);
+    // 4. Moving Averages Targets:
+    const ma_tp1 = isSell ? currentPrice - 1.8 * currentATR : currentPrice + 1.8 * currentATR;
+    const ma_tp2 = isSell ? currentPrice - 3.2 * currentATR : currentPrice + 3.2 * currentATR;
+    const ma_sl = isSell
+      ? Math.max(analysisData?.sma20 ?? currentPrice, analysisData?.sma50 ?? currentPrice) * 1.005
+      : Math.min(analysisData?.sma20 ?? currentPrice, analysisData?.sma50 ?? currentPrice) * 0.995;
+
+    // 5. Support / Resistance Targets:
+    const sr_tp1 = isSell
+      ? (supportsBelow[0]?.price ?? (currentPrice * (1 - tpMultiplier)))
+      : (resistancesAbove[0]?.price ?? (currentPrice * (1 + tpMultiplier)));
+    const sr_tp2 = isSell
+      ? (supportsBelow[1]?.price ?? supportsBelow[0]?.price ?? (currentPrice * (1 - tp2Multiplier)))
+      : (resistancesAbove[1]?.price ?? resistancesAbove[0]?.price ?? (currentPrice * (1 + tp2Multiplier)));
+    const sr_sl = isSell
+      ? (resistancesAbove[0]?.price ?? (currentPrice * (1 + slMultiplier)))
+      : (supportsBelow[0]?.price ?? (currentPrice * (1 - slMultiplier)));
+
+    // Median helper:
+    function median(values: number[]): number {
+      if (values.length === 0) return 0;
+      const sorted = [...values].sort((a, b) => a - b);
+      const half = Math.floor(sorted.length / 2);
+      if (sorted.length % 2 !== 0) return sorted[half];
+      return (sorted[half - 1] + sorted[half]) / 2.0;
+    }
+
+    // final consensus values
+    const tp1 = median([bb_tp1, rsi_tp1, macd_tp1, ma_tp1, sr_tp1]);
+    const tp2 = median([bb_tp2, rsi_tp2, macd_tp2, ma_tp2, sr_tp2]);
+    const sl = median([bb_sl, rsi_sl, macd_sl, ma_sl, sr_sl]);
+
+    const tp1Source = locale === 'ar' ? 'سعر توافقي (وسيط أهداف المؤشرات)' : 'Consensus price (median of indicator targets)';
+    const tp2Source = locale === 'ar' ? 'سعر توافقي (وسيط أهداف المؤشرات الثاني)' : 'Consensus price (median of indicator second targets)';
+    const slSource = locale === 'ar' ? 'سعر توافقي (وسيط مستويات الوقف)' : 'Consensus price (median of indicator stops)';
 
     const reward = isSell ? (currentPrice - ((tp1 + tp2) / 2)) : (((tp1 + tp2) / 2) - currentPrice);
     const risk = isSell ? (sl - currentPrice) : (currentPrice - sl);
     const rr = risk > 0 ? (reward / risk).toFixed(1) : '1.0';
 
+    const indicatorRecs = [
+      {
+        name: locale === 'ar' ? 'نطاقات البولنجر (Bollinger Bands)' : 'Bollinger Bands',
+        signal: bbDetails.signal,
+        tp1: bb_tp1,
+        tp2: bb_tp2,
+        sl: bb_sl
+      },
+      {
+        name: locale === 'ar' ? 'مؤشر القوة النسبية (RSI)' : 'RSI Indicator',
+        signal: rsiDetails.signal,
+        tp1: rsi_tp1,
+        tp2: rsi_tp2,
+        sl: rsi_sl
+      },
+      {
+        name: locale === 'ar' ? 'مؤشر الماكد (MACD)' : 'MACD Indicator',
+        signal: macdDetails.signal,
+        tp1: macd_tp1,
+        tp2: macd_tp2,
+        sl: macd_sl
+      },
+      {
+        name: locale === 'ar' ? 'المتوسطات المتحركة (SMA 20/50)' : 'Moving Averages (SMA 20/50)',
+        signal: smaDetails.signal,
+        tp1: ma_tp1,
+        tp2: ma_tp2,
+        sl: ma_sl
+      },
+      {
+        name: locale === 'ar' ? 'مستويات الدعم والمقاومة (S/R)' : 'Support & Resistance (S/R)',
+        signal: srDetails.signal,
+        tp1: sr_tp1,
+        tp2: sr_tp2,
+        sl: sr_sl
+      }
+    ];
+
     const tradeDuration = isIntradayInterval
       ? (locale === 'ar' ? 'ساعات (صفقة يومية)' : 'Hours (Day Trading)')
       : (locale === 'ar' ? 'أيام - أسابيع (سـوينج)' : 'Days - Weeks (Swing)');
-
-    // ATR calculations on analysisCandles:
-    const atrValues = calcATR(analysisCandles, 14);
-    const currentATR = atrValues[atrValues.length - 1] ?? 0;
 
     // Expected bars to reach targets:
     const barsToTP1 = currentATR > 0
@@ -1280,9 +1486,10 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       winRate,
       winRate2,
       totalSignals,
-      atr: currentATR
+      atr: currentATR,
+      indicatorRecs
     };
-  }, [overallScore, topLevels, currentPrice, analysisData, isNearATH, lastRSI, locale, isIntradayInterval, analysisCandles, analysisRsiRaw, analysisMacdRaw, signalStats]);
+  }, [overallScore, topLevels, currentPrice, analysisData, isNearATH, lastRSI, locale, isIntradayInterval, analysisCandles, analysisRsiRaw, analysisMacdRaw, signalStats, bbDetails, rsiDetails, macdDetails, smaDetails, srDetails]);
 
   useEffect(() => {
     if (!analysisData) {
@@ -1290,66 +1497,26 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       return;
     }
 
-    // حساب ATH distance
-    const recentHighs = analysisCandles
-      .slice(-252)
-      .map((c: any) => c.high)
-    const ath52 = recentHighs.length > 0
-      ? Math.max(...recentHighs) : currentPrice
-    const distAth = (currentPrice - ath52)
-                    / ath52 * 100
-
-    // BB width (تقريبي)
-    const closes20 = analysisCandles
-      .slice(-20).map((c: any) => c.close)
-    const mean20 = closes20.reduce(
-      (a: number, b: number) => a+b, 0
-    ) / Math.max(closes20.length, 1)
-    const std20 = Math.sqrt(
-      closes20.reduce(
-        (a: number, b: number) =>
-          a + (b-mean20)**2, 0
-      ) / Math.max(closes20.length, 1)
-    )
-    const bbWidth = std20 > 0
-      ? (std20*4)/mean20*100 : 2
-    const bbPos   = std20 > 0
-      ? (currentPrice-mean20)/(std20*2) : 0
-
-    // Volume ratio
-    const recentVols = analysisCandles
-      .slice(-14).map((c: any) => c.volume || 0)
-    const avgVol = recentVols.reduce(
-      (a: number, b: number) => a+b, 0
-    ) / Math.max(recentVols.length, 1)
-    const lastVol  = recentVols.at(-1) || 0
-    const volRatio = avgVol > 0
-      ? lastVol/avgVol : 1
-    const volSpike = volRatio >= 3 ? 1 : 0
-
-    // Day of week (0=Sun=أحد في EGX)
-    const dayOfWeek = new Date().getDay()
+    const dayOfWeek = new Date().getDay();
 
     const features = [
       analysisData.rsi ?? 50,
       analysisData.macdHistogram ?? 0,
       analysisData.macd ?? 0,
       analysisData.sma20
-        ? (currentPrice-analysisData.sma20)
-          /analysisData.sma20*100 : 0,
+        ? (currentPrice - analysisData.sma20) / analysisData.sma20 * 100 : 0,
       analysisData.sma50
-        ? (currentPrice-analysisData.sma50)
-          /analysisData.sma50*100 : 0,
-      (dealSetup?.atr ?? 0) / (currentPrice||1)*100,
-      Math.min(volRatio, 5),
+        ? (currentPrice - analysisData.sma50) / analysisData.sma50 * 100 : 0,
+      (dealSetup?.atr ?? 0) / (currentPrice || 1) * 100,
+      Math.min(analysisData.volRatio ?? 1, 5),
       0.5,           // price_pos
-      bbWidth,
-      bbPos,
-      0.5,           // stoch_rsi (تقريبي)
-      volSpike,
-      distAth,
+      analysisData.bbWidth ?? 2,
+      analysisData.bbPos ?? 0,
+      analysisData.stochRsi ?? 0.5,
+      analysisData.volSpike ?? 0,
+      analysisData.distAth ?? 0,
       dayOfWeek,
-    ].join(',')
+    ].join(',');
 
     fetch('/api/ml-predict', {
       method: 'POST',
@@ -1359,7 +1526,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       .then(r => r.json())
       .then(d => setMlProb(d.probability))
       .catch(() => setMlProb(null));
-  }, [analysisData, interval, dealSetup?.atr, currentPrice, analysisCandles]);
+  }, [analysisData, interval, dealSetup?.atr, currentPrice]);
 
   const scoreBarPct = ((overallScore + 8) / 16) * 100;
   const isLargeData = allChartData.length > 200;
@@ -1877,7 +2044,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
               </div>
 
               {/* S/R Proximity Scorecard */}
-              <div className="flex flex-col gap-1 pb-1">
+              <div className="flex flex-col gap-1 pb-2.5 border-b border-white/5">
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span className="text-text-secondary flex items-center gap-1">
                     {locale === 'ar' ? 'الدعم والمقاومة:' : 'S/R Proximity:'}
@@ -1895,6 +2062,72 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                   </span>
                 </div>
                 <p className="text-[10px] text-text-secondary/70">{srDetails.desc}</p>
+              </div>
+
+              {/* Bollinger Bands Scorecard */}
+              <div className="flex flex-col gap-1 pb-2.5 border-b border-white/5">
+                <div className="flex justify-between items-center text-[11px] font-bold">
+                  <span className="text-text-secondary flex items-center gap-1">
+                    {locale === 'ar' ? 'نطاقات البولنجر (Bollinger):' : 'Bollinger Bands:'}
+                    <div className="group relative flex items-center">
+                      <Info className="w-3.5 h-3.5 cursor-help" />
+                      <div className="hidden group-hover:block absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 p-2.5 bg-surface-dark border border-white/10 rounded-xl shadow-2xl text-[10px] text-text-secondary font-normal whitespace-normal leading-relaxed">
+                        {locale === 'ar' ? 'نطاقات البولنجر تقيس تذبذب السوق. ملامسة الحد السفلي تعني دخول السعر منطقة تشبع بيعي (إيجابي)، وملامسة الحد العلوي تعني دخول منطقة تشبع شرائي (سلبي).' : 'Bollinger Bands measure market volatility. Touching the lower band indicates oversold, while the upper band indicates overbought.'}
+                      </div>
+                    </div>
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    bbDetails.score > 0 ? 'bg-green-500/10 text-green-400' : bbDetails.score < 0 ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-text-secondary'
+                  }`}>
+                    {bbDetails.signal} {locale === 'ar' ? (bbDetails.score > 0 ? 'شراء' : bbDetails.score < 0 ? 'بيع' : 'محايد') : (bbDetails.score > 0 ? 'Buy' : bbDetails.score < 0 ? 'Sell' : 'Neutral')} ({bbDetails.score >= 0 ? '+' : ''}{bbDetails.score} {locale === 'ar' ? 'نقطة' : 'pts'})
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-secondary/70">{bbDetails.desc}</p>
+                <div className="text-[9px] font-mono text-text-secondary/50 mt-0.5">{bbDetails.val}</div>
+              </div>
+
+              {/* Stochastic RSI Scorecard */}
+              <div className="flex flex-col gap-1 pb-2.5 border-b border-white/5">
+                <div className="flex justify-between items-center text-[11px] font-bold">
+                  <span className="text-text-secondary flex items-center gap-1">
+                    Stoch RSI:
+                    <div className="group relative flex items-center">
+                      <Info className="w-3.5 h-3.5 cursor-help" />
+                      <div className="hidden group-hover:block absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 p-2.5 bg-surface-dark border border-white/10 rounded-xl shadow-2xl text-[10px] text-text-secondary font-normal whitespace-normal leading-relaxed">
+                        {locale === 'ar' ? 'مؤشر ستوكاستيك RSI يقيس الحساسية الزخمة لـ RSI. القيمة تحت 0.2 تشير لتشبع بيعي قوي، وفوق 0.8 تشير لتشبع شرائي قوي.' : 'Stochastic RSI applies Stochastic calculation to RSI values. <0.2 is oversold, >0.8 is overbought.'}
+                      </div>
+                    </div>
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    stochRsiDetails.score > 0 ? 'bg-green-500/10 text-green-400' : stochRsiDetails.score < 0 ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-text-secondary'
+                  }`}>
+                    {stochRsiDetails.signal} {locale === 'ar' ? (stochRsiDetails.score > 0 ? 'شراء' : stochRsiDetails.score < 0 ? 'بيع' : 'محايد') : (stochRsiDetails.score > 0 ? 'Buy' : stochRsiDetails.score < 0 ? 'Sell' : 'Neutral')} ({stochRsiDetails.score >= 0 ? '+' : ''}{stochRsiDetails.score} {locale === 'ar' ? 'نقطة' : 'pts'})
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-secondary/70">{stochRsiDetails.desc}</p>
+                <div className="text-[9px] font-mono text-text-secondary/50 mt-0.5">{stochRsiDetails.val}</div>
+              </div>
+
+              {/* ATH Proximity Scorecard */}
+              <div className="flex flex-col gap-1 pb-1">
+                <div className="flex justify-between items-center text-[11px] font-bold">
+                  <span className="text-text-secondary flex items-center gap-1">
+                    {locale === 'ar' ? 'القرب من القمة السنوية:' : '52w High Proximity:'}
+                    <div className="group relative flex items-center">
+                      <Info className="w-3.5 h-3.5 cursor-help" />
+                      <div className="hidden group-hover:block absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 p-2.5 bg-surface-dark border border-white/10 rounded-xl shadow-2xl text-[10px] text-text-secondary font-normal whitespace-normal leading-relaxed">
+                        {locale === 'ar' ? 'يوضح مدى قرب السعر الحالي من أعلى قمة مسجلة في آخر 52 أسبوعاً. الاقتراب منها يمثل حاجز مقاومة نفسي وفني هام.' : 'Measures how close the current price is to its 52-week High. Reaching it represents a major psychological and technical resistance.'}
+                      </div>
+                    </div>
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    athDetails.score < 0 ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-text-secondary'
+                  }`}>
+                    {athDetails.signal} {locale === 'ar' ? (athDetails.score < 0 ? 'حذر' : 'محايد') : (athDetails.score < 0 ? 'Caution' : 'Neutral')} ({athDetails.score >= 0 ? '+' : ''}{athDetails.score} {locale === 'ar' ? 'نقطة' : 'pts'})
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-secondary/70">{athDetails.desc}</p>
+                <div className="text-[9px] font-mono text-text-secondary/50 mt-0.5">{athDetails.val}</div>
               </div>
 
               {/* Overall Combined Score & Pointer Bar */}
@@ -2098,6 +2331,44 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                       }`}>
                         {(mlProb * 100).toFixed(1)}%
                       </span>
+                    </div>
+                  )}
+
+                  {dealSetup.indicatorRecs && (
+                    <div className="mt-3 border-t border-white/5 pt-3">
+                      <span className="text-[11px] font-bold text-text-primary block mb-2 flex items-center gap-1.5">
+                        <span>📊</span>
+                        <span>{locale === 'ar' ? 'توصيات المؤشرات الفردية:' : 'Individual Indicator Recommendations:'}</span>
+                      </span>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-[10px] text-text-secondary">
+                          <thead>
+                            <tr className="border-b border-white/5 text-text-secondary/70">
+                              <th className="pb-1 font-semibold">{locale === 'ar' ? 'المؤشر' : 'Indicator'}</th>
+                              <th className="pb-1 text-center font-semibold">{locale === 'ar' ? 'الإشارة' : 'Signal'}</th>
+                              <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'الوقف' : 'Stop'}</th>
+                              <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'هدف 1' : 'TP1'}</th>
+                              <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'هدف 2' : 'TP2'}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {dealSetup.indicatorRecs.map((rec, i) => (
+                              <tr key={i} className="hover:bg-white/5 transition-colors">
+                                <td className="py-1.5 font-medium max-w-[95px] truncate text-text-primary">{rec.name}</td>
+                                <td className="py-1.5 text-center">{rec.signal}</td>
+                                <td className="py-1.5 text-right font-mono text-red-400">{rec.sl.toFixed(2)}</td>
+                                <td className="py-1.5 text-right font-mono text-green-400">{rec.tp1.toFixed(2)}</td>
+                                <td className="py-1.5 text-right font-mono text-green-400">{rec.tp2.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="text-[9px] text-text-secondary/50 mt-1.5 leading-relaxed bg-white/5 p-1.5 rounded border border-white/5">
+                        💡 {locale === 'ar'
+                          ? 'يتم احتساب الأهداف النهائية للمجموعة عن طريق وسيط (Median) توصيات المؤشرات الخمسة أعلاه لاستبعاد القيم الشاذة وضمان أقصى دقة.'
+                          : 'Final consensus targets are calculated using the median of the 5 indicators above to eliminate outliers and maximize accuracy.'}
+                      </p>
                     </div>
                   )}
 
