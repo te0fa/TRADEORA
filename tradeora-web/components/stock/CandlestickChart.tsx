@@ -135,6 +135,16 @@ const CandlestickChartInner = (
         fontFamily: 'sans-serif',
         attributionLogo: false,
       },
+      watermark: {
+        visible:  true,
+        fontSize: 18,
+        horzAlign: 'center',
+        vertAlign: 'center',
+        color: 'rgba(201, 168, 76, 0.08)',
+        text: 'TRADEORA',
+        fontFamily: 'Georgia, serif',
+        fontStyle: 'bold',
+      },
       grid: {
         vertLines: { color: 'rgba(255,255,255,0.04)' },
         horzLines: { color: 'rgba(255,255,255,0.04)' },
@@ -162,7 +172,7 @@ const CandlestickChartInner = (
         timeVisible: isIntraday, // Show hours/minutes only for intraday intervals
         secondsVisible: false,
       },
-    });
+    } as any);
 
     chartRef.current = chart;
 
@@ -324,12 +334,53 @@ const CandlestickChartInner = (
 
     chart.timeScale().fitContent();
 
+    // إخفاء كل عناصر TradingView
+    const style = document.createElement('style');
+    style.textContent = `
+      .tv-lightweight-charts table,
+      .tv-lightweight-charts a[href*="tradingview"],
+      .tv-lightweight-charts .watermark {
+        display: none !important;
+        opacity: 0 !important;
+      }
+    `;
+    containerRef.current.appendChild(style);
+
+    // إنشاء طبقة لوجو فوق الشارت
+    const logoOverlay = document.createElement('div');
+    logoOverlay.style.cssText = `
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    `;
+
+    const logoImg = document.createElement('img');
+    logoImg.src = '/logo.png';
+    logoImg.style.cssText = `
+      height: 28px;
+      width: auto;
+      object-fit: contain;
+      filter: brightness(0.9);
+    `;
+
+    logoOverlay.appendChild(logoImg);
+    containerRef.current.style.position = 'relative';
+    containerRef.current.appendChild(logoOverlay);
+
     return () => {
       // Clear all lines on unmount
       priceLineRefs.current.forEach((line) => {
         candlestickSeriesRef.current?.removePriceLine(line);
       });
       priceLineRefs.current.clear();
+      style.remove();
+      logoOverlay.remove();
       chart.remove();
       chartRef.current = null;
       candlestickSeriesRef.current = null;
