@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: NextRequest) {
   try {
     const { referral_code, new_user_id } = await req.json();
 
-    const { data: referrer, error: referrerError } = await supabase
+    const { data: referrer, error: referrerError } = await supabaseAdmin
       .from('user_profiles')
       .select('id, referral_count, referral_months')
       .eq('referral_code', referral_code.toUpperCase())
@@ -19,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Link new user to referrer
-    await supabase
+    await supabaseAdmin
       .from('user_profiles')
       .update({
         referred_by: referrer.id
@@ -33,7 +38,7 @@ export async function POST(req: NextRequest) {
     const end = new Date();
     end.setMonth(end.getMonth() + newMonths);
 
-    await supabase
+    await supabaseAdmin
       .from('user_profiles')
       .update({
         referral_count:  newCount,
