@@ -22,6 +22,15 @@ export default function AuthPage({ params }: AuthPageProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const [refCode, setRefCode] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const code = new URLSearchParams(window.location.search).get('ref') || '';
+      setRefCode(code.toUpperCase());
+    }
+  }, []);
+
   const isAr = locale === 'ar';
 
   // Check if user is already logged in
@@ -75,6 +84,22 @@ export default function AuthPage({ params }: AuthPageProps) {
           });
           if (profileError) {
             console.error('Error creating user profile:', profileError);
+          }
+
+          // Apply referral rewards if refCode is present
+          if (refCode) {
+            try {
+              await fetch('/api/referral/use', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  referral_code: refCode,
+                  new_user_id: data.user.id,
+                })
+              });
+            } catch (refErr) {
+              console.error('Failed to consume referral code:', refErr);
+            }
           }
         }
 
@@ -209,6 +234,21 @@ export default function AuthPage({ params }: AuthPageProps) {
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent-blue outline-none transition-colors placeholder:text-text-secondary/30"
             />
           </div>
+
+          {!isLogin && (
+            <div>
+              <label className="text-xs text-text-secondary/80 block mb-1.5 font-medium">
+                {isAr ? 'كود الإحالة (اختياري)' : 'Referral Code (Optional)'}
+              </label>
+              <input
+                type="text"
+                value={refCode}
+                onChange={(e) => setRefCode(e.target.value.toUpperCase())}
+                placeholder="TRA-XXXXX"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-accent-blue outline-none transition-colors placeholder:text-text-secondary/30"
+              />
+            </div>
+          )}
 
           <button
             type="submit"

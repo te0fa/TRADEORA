@@ -12,6 +12,8 @@ export default function SettingsPage() {
   const push = usePushNotifications();
   const isAr = locale === 'ar';
 
+  const t = (ar: string, en: string) => (isAr ? ar : en);
+
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -98,7 +100,7 @@ export default function SettingsPage() {
     }
   };
 
-  const t = (ar: string, en: string) => (isAr ? ar : en);
+
 
   if (loading) {
     return (
@@ -384,6 +386,93 @@ export default function SettingsPage() {
             >
               🔑 {t('إعادة تعيين كلمة السر', 'Reset Password')}
             </button>
+          </div>
+
+          {/* 🎁 Referral Program Card */}
+          <div className="card-gold rounded-2xl p-6 mb-5 relative overflow-hidden bg-gradient-to-br from-yellow-500/5 to-transparent border border-[#C9A84C]/25">
+            <h2 className="font-bold mb-4 text-yellow-400 text-sm flex items-center gap-1.5">
+              <span>🎁</span>
+              <span>{t('برنامج الإحالة والمكافآت', 'Referral Program')}</span>
+            </h2>
+
+            <div className="bg-black/20 rounded-xl p-4 mb-4">
+              <p className="text-slate-400 text-[10px] mb-2">
+                {t('كود الإحالة الخاص بك:', 'Your referral code:')}
+              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-yellow-400 font-extrabold text-xl tracking-widest font-mono">
+                  {profile?.referral_code ?? '...'}
+                </p>
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/${locale}/auth?ref=${profile?.referral_code}`
+                      );
+                      alert(t('✅ تم نسخ رابط الإحالة بنجاح!', '✅ Referral link copied!'));
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 text-white text-[10px] font-bold hover:bg-white/20 transition cursor-pointer"
+                >
+                  {t('📋 نسخ', '📋 Copy')}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4 text-center">
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-slate-400 text-[10px]">{t('أحضرت', 'Invited')}</p>
+                <p className="text-xl font-black text-yellow-400 font-sans">
+                  {profile?.referral_count ?? 0}
+                </p>
+                <p className="text-slate-500 text-[9px]">{t('صديق', 'friends')}</p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-slate-400 text-[10px]">{t('ربحت', 'Earned')}</p>
+                <p className="text-xl font-black text-green-400 font-sans">
+                  {profile?.referral_months ?? 0}
+                </p>
+                <p className="text-slate-500 text-[9px]">{t('شهر مجاني', 'free months')}</p>
+              </div>
+            </div>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 text-[10px] text-yellow-400 leading-relaxed mb-4">
+              {t(
+                '🎁 لكل صديق يسجل بكودك: تحصل أنت وصديقك على شهر Premium كامل مجاناً لفك قفل جميع الأسهم والإشارات!',
+                '🎁 For every friend who signs up using your code: Both of you will instantly receive 1 Free Month of Premium access!'
+              )}
+            </div>
+
+            {/* Share Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const url = `${window.location.origin}/${locale}/auth?ref=${profile?.referral_code}`;
+                    const text = t(
+                      `انضم لـ TRADEORA وحلل أسهم البورصة المصرية بالذكاء الاصطناعي! 📊\n${url}`,
+                      `Join TRADEORA and analyze EGX stocks with AI! 📊\n${url}`
+                    );
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                  }
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30 transition-all cursor-pointer text-center"
+              >
+                {t('📱 واتساب', '📱 WhatsApp')}
+              </button>
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const url = `${window.location.origin}/${locale}/auth?ref=${profile?.referral_code}`;
+                    const text = t('انضم لـ TRADEORA!', 'Join TRADEORA!');
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+                  }
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[#229ED9]/20 text-[#60C8F5] text-xs font-bold hover:bg-[#229ED9]/30 transition-all cursor-pointer text-center"
+              >
+                {t('✈️ تيليجرام', '✈️ Telegram')}
+              </button>
+            </div>
           </div>
 
           {/* Premium Subscription Card */}

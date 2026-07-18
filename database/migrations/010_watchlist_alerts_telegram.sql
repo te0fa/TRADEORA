@@ -63,4 +63,39 @@ CREATE POLICY "users_own_subs" ON push_subscriptions FOR ALL USING (auth.uid() =
 ALTER TABLE user_profiles
   ADD COLUMN IF NOT EXISTS default_capital NUMERIC DEFAULT 10000,
   ADD COLUMN IF NOT EXISTS default_risk_pct NUMERIC DEFAULT 2,
-  ADD COLUMN IF NOT EXISTS preferred_sectors JSONB;
+  ADD COLUMN IF NOT EXISTS preferred_sectors JSONB,
+  ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE,
+  ADD COLUMN IF NOT EXISTS referred_by UUID REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS referral_count INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS referral_months INTEGER DEFAULT 0;
+
+-- Unique referral code generator function
+CREATE OR REPLACE FUNCTION gen_referral_code()
+RETURNS TEXT AS $$
+DECLARE
+  chars TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  code  TEXT := '';
+  i     INT;
+BEGIN
+  FOR i IN 1..8 LOOP
+    code := code || substr(chars, floor(random()*length(chars)+1)::int, 1);
+  END LOOP;
+  RETURN 'TRA-' || code;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to assign referral code automatically to new profiles
+CREATE OR REPLACE FUNCTION assign_referral_code()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.referral_code IS NULL THEN
+    NEW.referral_code := gen_referral_code();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_referral_code ON user_profiles;
+CREATE TRIGGER set_referral_code
+  BEFORE INSERT ON user_profiles
+  FOR EACH ROW EXECUTE FUNCTION assign_referral_code();
