@@ -43,8 +43,7 @@ def calc_ema(closes, n):
             result[i] = closes[i]*k + result[i-1]*(1-k)
     return result
 
-def calc_features(candles, sector_return=0.0,
-                  egx30_return=0.0):
+def calc_features(candles):
     closes = [c['close'] for c in candles]
     highs  = [c['high']  for c in candles]
     lows   = [c['low']   for c in candles]
@@ -165,8 +164,6 @@ def calc_features(candles, sector_return=0.0,
             'vol_spike':  vol_spike,
             'dist_ath':   dist_ath,
             'day_of_week': day_of_week,
-            'sector_ret': sector_return,
-            'egx30_ret':  egx30_return,
         })
     return rows
 
@@ -247,7 +244,6 @@ def build_dataset(timeframe='1d',
                 f['bb_width'], f['bb_pos'],
                 f['stoch_rsi'], f['vol_spike'],
                 f['dist_ath'], f['day_of_week'],
-                f['sector_ret'], f['egx30_ret'],
             ])
             y_rows.append(label)
 

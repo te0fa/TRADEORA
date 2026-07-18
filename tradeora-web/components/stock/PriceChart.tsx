@@ -1349,8 +1349,6 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       volSpike,
       distAth,
       dayOfWeek,
-      0,             // sector_ret
-      0,             // egx30_ret
     ].join(',')
 
     fetch('/api/ml-predict', {
