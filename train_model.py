@@ -8,8 +8,11 @@ from sklearn.preprocessing import StandardScaler
 from supabase import create_client
 from dotenv import load_dotenv
 import datetime
+from pathlib import Path
 
-load_dotenv()
+# Load Environment Variables explicitly from script folder
+load_dotenv(dotenv_path=Path(__file__).parent / '.env')
+
 sb = create_client(os.getenv('SUPABASE_URL'),
                    os.getenv('SUPABASE_KEY'))
 

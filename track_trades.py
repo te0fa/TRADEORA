@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import yfinance as yf
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -17,9 +18,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load Environment Variables
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(dotenv_path=os.path.join(BASE_DIR, '.env'))
+# Load Environment Variables explicitly from script folder
+load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
