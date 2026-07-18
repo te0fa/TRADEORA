@@ -22,6 +22,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Bad signature' }, { status: 400 });
     }
 
+    // Webhook Idempotency Check: prevent duplicate event processing
+    try {
+      const { data: existingEvent } = await supabase
+        .from('processed_stripe_events')
+        .select('event_id')
+        .eq('event_id', event.id)
+        .maybeSingle();
+
+      if (existingEvent) {
+        console.log(`Stripe event ${event.id} already processed. Skipping...`);
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      // Record the event immediately as processed
+      await supabase
+        .from('processed_stripe_events')
+        .insert([{ event_id: event.id, event_type: event.type }]);
+    } catch (e) {
+      console.error('Error verifying processed Stripe event, aborting to prevent unsafe updates.', e);
+      return NextResponse.json({ error: 'Database check failed' }, { status: 500 });
+    }
+
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as any;
       const userId  = session.metadata?.user_id;
