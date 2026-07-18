@@ -29,6 +29,7 @@ export default function SettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -65,10 +66,21 @@ export default function SettingsPage() {
           setTelegramInfo(telegramRes.data);
         }
 
+        // Show upgrade success toast if redirected from Stripe
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('upgraded') === '1') {
+            setToastMessage(isAr ? '🎉 تهانينا! تم ترقية حسابك للباقة المميزة بنجاح!' : '🎉 Congratulations! Account upgraded to Premium successfully!');
+            // Clean URL query params without reloading
+            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+          }
+        }
+
         setLoading(false);
       });
     });
-  }, [router, locale]);
+  }, [router, locale, isAr]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,7 +513,7 @@ export default function SettingsPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => alert(t('سيتم تحويلك لبوابة الدفع قريباً 💳', 'Redirecting to payment gateway...'))}
+                  onClick={() => router.push(`/${locale}/pricing`)}
                   className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
                 >
                   {t('⚡ ترقية الحساب للمميز', 'Upgrade to Premium')}
@@ -532,6 +544,17 @@ export default function SettingsPage() {
         </div>
 
       </div>
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border border-yellow-500/20 bg-[#0A0F1E]/95 text-yellow-400 text-xs font-semibold shadow-2xl backdrop-blur-md animate-fade-in font-sans">
+          <span>{toastMessage}</span>
+          <button onClick={() => setToastMessage(null)} className="ml-3 text-slate-400 hover:text-white cursor-pointer font-bold text-xs p-1">
+            ✕
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }
