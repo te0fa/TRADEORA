@@ -1,0 +1,135 @@
+{
+  "logo": "TRADEORA",
+  "langSwitcher": "English",
+  "clockCairo": "توقيت القاهرة",
+  "sessionStatus": {
+    "open": "جلسة مفتوحة 🟢",
+    "closed": "السوق مغلق 🔴"
+  },
+  "dataSourcesStatus": "مصادر البيانات",
+  "lastUpdate": "آخر تحديث",
+  "pageIndicator": "الصفحة {current} من {total}",
+  "relativeTime": {
+    "seconds": "منذ ثوانٍ",
+    "minute": "منذ دقيقة",
+    "minutes": "منذ {count} دقائق",
+    "hour": "منذ ساعة",
+    "hours": "منذ {count} ساعات",
+    "day": "منذ يوم",
+    "days": "منذ {count} أيام"
+  },
+  "table": {
+    "symbol": "الرمز",
+    "name": "الاسم",
+    "currentPrice": "السعر الحالي",
+    "change": "التغيير",
+    "changePercent": "% التغيير",
+    "volume": "الحجم",
+    "source": "مصدر السعر",
+    "dataQuality": "جودة البيانات",
+    "lastFetch": "آخر تحديث",
+    "shariah": "شريعة",
+    "actions": "إجراءات"
+  },
+  "filters": {
+    "searchPlaceholder": "بحث بالرمز أو اسم الشركة...",
+    "allSectors": "كل القطاعات",
+    "shariahOnly": "شريعة فقط ☪️",
+    "allStocks": "كل الأسهم",
+    "gaining": "الصاعدة ▲",
+    "losing": "الخاسرة ▼"
+  },
+  "overview": {
+    "totalCompanies": "إجمالي الشركات",
+    "gainingCompanies": "الشركات الصاعدة",
+    "losingCompanies": "الشركات الهابطة",
+    "unchangedCompanies": "الشركات المستقرة",
+    "avgChange": "متوسط التغيير اليوم"
+  },
+  "dashboard": {
+    "title": "شاشة مراقبة سوق المال",
+    "subtitle": "مراقبة حية لـ ٣١٤ شركة مدرجة بأسعار الإجماع اللحظية والبيانات الرسمية.",
+    "errorTitle": "فشل تحميل البيانات",
+    "errorSubtitle": "حدث خطأ أثناء الاتصال بقاعدة البيانات. يرجى التحقق من اتصال الإنترنت أو المحاولة لاحقاً.",
+    "retryButton": "إعادة المحاولة"
+  },
+  "stockDetail": {
+    "open": "افتتاح",
+    "high": "أعلى",
+    "low": "أدنى",
+    "close": "إغلاق",
+    "sector": "القطاع",
+    "isin": "الرمز الدولي (ISIN)",
+    "shariahStatus": "التوافق مع الشريعة",
+    "shariahCompliant": "متوافق ☪️",
+    "shariahNonCompliant": "غير متوافق",
+    "chartTabs": {
+      "intraday": "حركة لحظية (اليوم)",
+      "historical": "البيانات التاريخية"
+    },
+    "priceHistory": "سجل الأسعار التاريخية",
+    "date": "التاريخ",
+    "dataSourcesComparison": "مقارنة مصادر البيانات اللحظية",
+    "divergence": "الانحراف عن الإجماع",
+    "lastKnownPrice": "(آخر سعر متاح)",
+    "noDataAvailable": "بيانات غير متاحة",
+    "noIntradayData": "لا توجد بيانات لحظية مسجلة اليوم.",
+    "notFoundTitle": "لم يتم العثور على السهم",
+    "notFoundSubtitle": "الرمز غير مدرج في قاعدة بيانات Tradeora حالياً.",
+    "refreshButton": "تحديث الشاشة"
+  },
+  "qualityFlags": {
+    "consensusPerfect": "إجماع مثالي ✅",
+    "consensus2Source": "إجماع ثنائي ⚡",
+    "singleSource": "مصدر واحد ⚠️",
+    "conflict": "تعارض ⛔",
+    "outlier": "تم استبعاد قيمة شاذة 🔍"
+  },
+  "sources": {
+    "egx_bulletin": "نشرة EGX",
+    "intraday_consensus": "إجماع",
+    "tradingview": "مباشر",
+    "mubasher": "مباشر",
+    "investing": "إنفستنج",
+    "yahoo_historical": "تاريخي"
+  },
+  "sourceTooltips": {
+    "egx_bulletin": "سعر الإغلاق من نشرة البورصة الرسمية",
+    "tradingview": "سعر TradingView، الحجم حقيقي من البورصة",
+    "intraday_consensus": "متوسط 3 مصادر خلال الجلسة",
+    "mubasher": "سعر Mubasher اللحظي",
+    "investing": "سعر Investing اللحظي",
+    "yahoo_historical": "بيانات تاريخية من Yahoo Finance"
+  },
+  "watchlist": {
+    "title": "قائمة المتابعة",
+    "subtitle": "مراقبة مخصصة للأسهم التي قمت بإضافتها للمتابعة الشخصية.",
+    "empty": "قائمة المتابعة فارغة. أضف بعض الشركات من اللوحة الرئيسية.",
+    "add": "إضافة للمتابعة",
+    "remove": "إزالة من المتابعة",
+    "errorTitle": "فشل تحميل قائمة المتابعة"
+  },
+  "technicalAnalysis": {
+    "title": "تحليل تقني سريع",
+    "rsi": "RSI (14)",
+    "macd": "MACD",
+    "sma20": "SMA 20",
+    "sma50": "SMA 50",
+    "strongSupport": "دعم قوي",
+    "support": "دعم",
+    "strongResistance": "مقاومة قوية",
+    "resistance": "مقاومة",
+    "touches": "لمس",
+    "signal": "إشارة",
+    "neutral": "محايد",
+    "bullish": "إيجابي",
+    "bearish": "سلبي",
+    "aboveSma": "السعر فوق SMA20 و SMA50",
+    "belowSma": "السعر تحت SMA20 و SMA50",
+    "aboveSma20Below50": "السعر فوق SMA20 وتحت SMA50",
+    "belowSma20Above50": "السعر تحت SMA20 وفوق SMA50",
+    "insufficientRsi": "بيانات غير كافية لحساب RSI (يحتاج ١٤ يوم)",
+    "insufficientMacd": "بيانات غير كافية لحساب MACD (يحتاج ٢٦ يوم)",
+    "insufficientSma200": "بيانات غير كافية لحساب SMA200 (يحتاج ٢٠٠ يوم)"
+  }
+}

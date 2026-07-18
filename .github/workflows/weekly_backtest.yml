@@ -19,3 +19,17 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PYTHONPATH: ${{ github.workspace }}
+
+      - name: Retrain AI Models
+        run: python train_model.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+      - name: Commit updated models
+        run: |
+          git config user.name "TRADEORA Bot"
+          git config user.email "bot@tradeora.ai"
+          git add models/
+          git commit -m "chore: weekly model retrain $(date +%Y-%m-%d)" || true
+          git push origin main

@@ -15,6 +15,7 @@ from database import db
 from scrapers.tradingview_provider import TradingViewProvider
 from scrapers.mubasher_provider import MubasherProvider
 from scrapers.investing_provider import InvestingProvider
+from scrapers.yahoo_intraday_provider import YahooIntradayProvider
 from scrapers.utils import is_market_open, MarketClosedException
 
 logger = logging.getLogger(__name__)
@@ -50,9 +51,10 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
     Resolves the final price, change, change_percent, and volume based on:
     - Excludes N/A or <= 0 values.
     - If 1 source: use it.
-    - If 2 sources: average if difference <= 1.5%, else use higher priority (TV > Mubasher > Investing).
-    - If 3 sources: check outliers against median (> 1.5% diff). Discard outliers, average remaining.
+    - If 2 sources: average if difference <= 1.5%, else use higher priority (TV > Mubasher > Investing > Yahoo).
+    - If 3-4 sources: check outliers against median (> 1.5% diff). Discard outliers, average remaining.
     """
+    import statistics
     valid_p = {k: v for k, v in prices.items() if v is not None and v > 0}
     if not valid_p:
         return None, None, None, None, None
@@ -73,8 +75,8 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
         
         if diff <= 1.5:
             resolved_price = (p0 + p1) / 2
-            # Find priority source for extra fields (tv > mub > inv)
-            for src in ["tv", "mub", "inv"]:
+            # Find priority source for extra fields (tv > mub > inv > yah)
+            for src in ["tv", "mub", "inv", "yah"]:
                 if src in valid_p:
                     resolved_source = src
                     break
@@ -88,7 +90,7 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
                 quality_flag = "2_source_consensus_tradingview_unavailable"
         else:
             # Large difference: use higher priority source
-            for src in ["tv", "mub", "inv"]:
+            for src in ["tv", "mub", "inv", "yah"]:
                 if src in valid_p:
                     resolved_source = src
                     resolved_price = valid_p[src]
@@ -97,10 +99,10 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
             # Set quality flag for unresolved conflict without a 3rd source
             quality_flag = "conflict_over_1.5_no_source3"
             
-    else: # len(valid_p) == 3 (All 3 sources are valid!)
+    else: # len(valid_p) >= 3 (All 3-4 sources are valid!)
         # Calculate median
         vals = sorted(list(valid_p.values()))
-        median = vals[1]
+        median = statistics.median(vals)
         
         # Check outliers relative to median (difference > 1.5%)
         non_outliers = {}
@@ -109,19 +111,19 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
             if diff <= 1.5:
                 non_outliers[src] = p
                 
-        if len(non_outliers) == 3:
-            # Perfect consensus among all 3 sources
-            resolved_price = (vals[0] + vals[1] + vals[2]) / 3
-            # Find priority source among all
-            for src in ["tv", "mub", "inv"]:
-                if src in valid_p:
+        if len(non_outliers) >= 3:
+            # Perfect consensus or discarded outliers, leaving 3-4 sources
+            resolved_price = sum(non_outliers.values()) / len(non_outliers)
+            # Find priority source among non-outliers
+            for src in ["tv", "mub", "inv", "yah"]:
+                if src in non_outliers:
                     resolved_source = src
                     break
-            quality_flag = None # None represents perfect 3-source consensus
+            quality_flag = None if len(non_outliers) == len(valid_p) else "outlier_discarded"
         elif len(non_outliers) == 2:
             resolved_price = sum(non_outliers.values()) / len(non_outliers)
             # Find priority source among non-outliers
-            for src in ["tv", "mub", "inv"]:
+            for src in ["tv", "mub", "inv", "yah"]:
                 if src in non_outliers:
                     resolved_source = src
                     break
@@ -129,7 +131,11 @@ def calculate_consensus(prices: dict, changes: dict, change_pcts: dict, volumes:
         else:
             # Fallback to median
             resolved_price = median
-            resolved_source = "tv"
+            # Find priority source among all valid
+            for src in ["tv", "mub", "inv", "yah"]:
+                if src in valid_p:
+                    resolved_source = src
+                    break
             quality_flag = "low_consensus_fallback_to_median"
             
     # Extract fields from the resolved source
@@ -160,6 +166,7 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
         {"id": "tradingview", "name": "TradingView Scanner", "priority": 1, "enabled": True},
         {"id": "mubasher", "name": "Mubasher Portal", "priority": 2, "enabled": True},
         {"id": "investing", "name": "Investing.com", "priority": 3, "enabled": True},
+        {"id": "yahoo", "name": "Yahoo Finance", "priority": 4, "enabled": True},
         {"id": "intraday_consensus", "name": "Intraday Consensus Price", "priority": 0, "enabled": True}
     ]
     db.upsert_market_sources(sources)
@@ -211,6 +218,20 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
         inv_results, _ = await inv_provider.fetch_prices(bypass_session_guard=True)
         inv_map = {r["symbol"]: r for r in inv_results}
         
+        logger.info("Fetching prices from Yahoo Finance...")
+        yahoo_provider = YahooIntradayProvider()
+        yahoo_map = {}
+        try:
+            yahoo_results = await asyncio.get_event_loop().run_in_executor(
+                None,
+                yahoo_provider.fetch_prices,
+                symbols,
+                bypass_session_guard
+            )
+            yahoo_map = {r["symbol"]: r for r in yahoo_results}
+        except Exception as e:
+            logger.warning(f"Yahoo provider failed: {e}")
+        
         # Decide Mubasher fetching logic based on run_type
         mub_map = {}
         
@@ -255,22 +276,26 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
             prices = {
                 "tv": tv_map.get(sym, {}).get("price"),
                 "inv": inv_map.get(sym, {}).get("price"),
-                "mub": mub_map.get(sym, {}).get("price")
+                "mub": mub_map.get(sym, {}).get("price"),
+                "yah": yahoo_map.get(sym, {}).get("price")
             }
             changes = {
                 "tv": tv_map.get(sym, {}).get("change"),
                 "inv": inv_map.get(sym, {}).get("change"),
-                "mub": mub_map.get(sym, {}).get("change")
+                "mub": mub_map.get(sym, {}).get("change"),
+                "yah": yahoo_map.get(sym, {}).get("change")
             }
             change_pcts = {
                 "tv": tv_map.get(sym, {}).get("change_percent"),
                 "inv": inv_map.get(sym, {}).get("change_percent"),
-                "mub": mub_map.get(sym, {}).get("change_percent")
+                "mub": mub_map.get(sym, {}).get("change_percent"),
+                "yah": yahoo_map.get(sym, {}).get("change_percent")
             }
             volumes = {
                 "tv": tv_map.get(sym, {}).get("volume"),
                 "inv": inv_map.get(sym, {}).get("volume"),
-                "mub": mub_map.get(sym, {}).get("volume")
+                "mub": mub_map.get(sym, {}).get("volume"),
+                "yah": yahoo_map.get(sym, {}).get("volume")
             }
             
             p_final, chg_final, chg_pct_final, vol_final, q_flag = calculate_consensus(

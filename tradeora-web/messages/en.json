@@ -1,0 +1,135 @@
+{
+  "logo": "TRADEORA",
+  "langSwitcher": "العربية",
+  "clockCairo": "Cairo Time",
+  "sessionStatus": {
+    "open": "Market Open 🟢",
+    "closed": "Market Closed 🔴"
+  },
+  "dataSourcesStatus": "Data Sources",
+  "lastUpdate": "Last Update",
+  "pageIndicator": "Page {current} of {total}",
+  "relativeTime": {
+    "seconds": "seconds ago",
+    "minute": "1 minute ago",
+    "minutes": "{count} minutes ago",
+    "hour": "1 hour ago",
+    "hours": "{count} hours ago",
+    "day": "1 day ago",
+    "days": "{count} days ago"
+  },
+  "table": {
+    "symbol": "Symbol",
+    "name": "Name",
+    "currentPrice": "Price",
+    "change": "Change",
+    "changePercent": "Change %",
+    "volume": "Volume",
+    "source": "Price Source",
+    "dataQuality": "Data Quality",
+    "lastFetch": "Last Fetch",
+    "shariah": "Shariah",
+    "actions": "Actions"
+  },
+  "filters": {
+    "searchPlaceholder": "Search by symbol or company name...",
+    "allSectors": "All Sectors",
+    "shariahOnly": "Shariah Only ☪️",
+    "allStocks": "All Stocks",
+    "gaining": "Gainers ▲",
+    "losing": "Losers ▼"
+  },
+  "overview": {
+    "totalCompanies": "Total Companies",
+    "gainingCompanies": "Gainers",
+    "losingCompanies": "Losers",
+    "unchangedCompanies": "Unchanged",
+    "avgChange": "Avg Change Today"
+  },
+  "dashboard": {
+    "title": "EGX Live Monitoring Screen",
+    "subtitle": "Live tracking of 314 listed companies using consensus prices and official reports.",
+    "errorTitle": "Failed to Load Data",
+    "errorSubtitle": "An error occurred while connecting to the database server. Please check your network connection.",
+    "retryButton": "Try Again"
+  },
+  "stockDetail": {
+    "open": "Open",
+    "high": "High",
+    "low": "Low",
+    "close": "Close",
+    "sector": "Sector",
+    "isin": "ISIN Code",
+    "shariahStatus": "Shariah Status",
+    "shariahCompliant": "Compliant ☪️",
+    "shariahNonCompliant": "Non-Compliant",
+    "chartTabs": {
+      "intraday": "Intraday (Today)",
+      "historical": "Historical Data"
+    },
+    "priceHistory": "Historical Price Record",
+    "date": "Date",
+    "dataSourcesComparison": "Real-time Data Sources Comparison",
+    "divergence": "Divergence from Consensus",
+    "lastKnownPrice": "(Last Known Price)",
+    "noDataAvailable": "Data Not Available",
+    "noIntradayData": "No intraday price points recorded for today.",
+    "notFoundTitle": "Stock Not Found",
+    "notFoundSubtitle": "The symbol is not registered in Tradeora database.",
+    "refreshButton": "Refresh Screen"
+  },
+  "qualityFlags": {
+    "consensusPerfect": "Perfect Consensus ✅",
+    "consensus2Source": "2-Source Consensus ⚡",
+    "singleSource": "Single Source ⚠️",
+    "conflict": "Conflict ⛔",
+    "outlier": "Outlier Discarded 🔍"
+  },
+  "sources": {
+    "egx_bulletin": "EGX Bulletin",
+    "intraday_consensus": "Consensus",
+    "tradingview": "Live",
+    "mubasher": "Live",
+    "investing": "Investing",
+    "yahoo_historical": "Historical"
+  },
+  "sourceTooltips": {
+    "egx_bulletin": "Closing price from the official exchange bulletin",
+    "tradingview": "TradingView price, volume is real from the exchange",
+    "intraday_consensus": "Average of 3 sources during the session",
+    "mubasher": "Mubasher intraday price feed",
+    "investing": "Investing intraday price feed",
+    "yahoo_historical": "Historical data from Yahoo Finance"
+  },
+  "watchlist": {
+    "title": "Watchlist",
+    "subtitle": "Custom dashboard tracking only stocks you added to your personal watchlist.",
+    "empty": "Your watchlist is empty. Add companies from the main dashboard.",
+    "add": "Add to Watchlist",
+    "remove": "Remove",
+    "errorTitle": "Failed to Load Watchlist"
+  },
+  "technicalAnalysis": {
+    "title": "Quick Technical Analysis",
+    "rsi": "RSI (14)",
+    "macd": "MACD",
+    "sma20": "SMA 20",
+    "sma50": "SMA 50",
+    "strongSupport": "Strong Support",
+    "support": "Support",
+    "strongResistance": "Strong Resistance",
+    "resistance": "Resistance",
+    "touches": "touches",
+    "signal": "Signal",
+    "neutral": "Neutral",
+    "bullish": "Bullish",
+    "bearish": "Bearish",
+    "aboveSma": "Price above SMA20 & SMA50",
+    "belowSma": "Price below SMA20 & SMA50",
+    "aboveSma20Below50": "Price above SMA20, below SMA50",
+    "belowSma20Above50": "Price below SMA20, above SMA50",
+    "insufficientRsi": "Insufficient data to calculate RSI (requires 14 days)",
+    "insufficientMacd": "Insufficient data to calculate MACD (requires 26 days)",
+    "insufficientSma200": "Insufficient data to calculate SMA200 (requires 200 days)"
+  }
+}
