@@ -2,33 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const {
-      rsi,
-      macd_hist,
-      macd_raw,
-      dist_ema20,
-      dist_ema50,
-      atr_pct,
-      vol_ratio,
-      price_pos,
-      interval
-    } = await req.json();
+    const { features, interval } = await req.json();
 
-    // Call Python script for prediction:
     const { exec } = require('child_process');
     const { promisify } = require('util');
     const execAsync = promisify(exec);
-
-    const features = [
-      rsi,
-      macd_hist,
-      macd_raw,
-      dist_ema20,
-      dist_ema50,
-      atr_pct,
-      vol_ratio,
-      price_pos
-    ].join(',');
 
     const tf = ['15m', '30m'].includes(interval)
       ? '15m'

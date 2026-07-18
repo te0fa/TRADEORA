@@ -1289,28 +1289,79 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       setMlProb(null);
       return;
     }
-    const features = {
-      rsi:        analysisData.rsi ?? 50,
-      macd_hist:  analysisData.macdHistogram ?? 0,
-      macd_raw:   analysisData.macd ?? 0,
-      dist_ema20: analysisData.sma20
-        ? (analysisData.close - analysisData.sma20) / analysisData.sma20 * 100 : 0,
-      dist_ema50: analysisData.sma50
-        ? (analysisData.close - analysisData.sma50) / analysisData.sma50 * 100 : 0,
-      atr_pct:    (dealSetup?.atr ?? 0) / (currentPrice || 1) * 100,
-      vol_ratio:  1,
-      price_pos:  0.5,
-      interval,
-    };
+
+    // حساب ATH distance
+    const recentHighs = analysisCandles
+      .slice(-252)
+      .map((c: any) => c.high)
+    const ath52 = recentHighs.length > 0
+      ? Math.max(...recentHighs) : currentPrice
+    const distAth = (currentPrice - ath52)
+                    / ath52 * 100
+
+    // BB width (تقريبي)
+    const closes20 = analysisCandles
+      .slice(-20).map((c: any) => c.close)
+    const mean20 = closes20.reduce(
+      (a: number, b: number) => a+b, 0
+    ) / Math.max(closes20.length, 1)
+    const std20 = Math.sqrt(
+      closes20.reduce(
+        (a: number, b: number) =>
+          a + (b-mean20)**2, 0
+      ) / Math.max(closes20.length, 1)
+    )
+    const bbWidth = std20 > 0
+      ? (std20*4)/mean20*100 : 2
+    const bbPos   = std20 > 0
+      ? (currentPrice-mean20)/(std20*2) : 0
+
+    // Volume ratio
+    const recentVols = analysisCandles
+      .slice(-14).map((c: any) => c.volume || 0)
+    const avgVol = recentVols.reduce(
+      (a: number, b: number) => a+b, 0
+    ) / Math.max(recentVols.length, 1)
+    const lastVol  = recentVols.at(-1) || 0
+    const volRatio = avgVol > 0
+      ? lastVol/avgVol : 1
+    const volSpike = volRatio >= 3 ? 1 : 0
+
+    // Day of week (0=Sun=أحد في EGX)
+    const dayOfWeek = new Date().getDay()
+
+    const features = [
+      analysisData.rsi ?? 50,
+      analysisData.macdHistogram ?? 0,
+      analysisData.macd ?? 0,
+      analysisData.sma20
+        ? (currentPrice-analysisData.sma20)
+          /analysisData.sma20*100 : 0,
+      analysisData.sma50
+        ? (currentPrice-analysisData.sma50)
+          /analysisData.sma50*100 : 0,
+      (dealSetup?.atr ?? 0) / (currentPrice||1)*100,
+      Math.min(volRatio, 5),
+      0.5,           // price_pos
+      bbWidth,
+      bbPos,
+      0.5,           // stoch_rsi (تقريبي)
+      volSpike,
+      distAth,
+      dayOfWeek,
+      0,             // sector_ret
+      0,             // egx30_ret
+    ].join(',')
+
     fetch('/api/ml-predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(features)
+      body: JSON.stringify({ features, interval })
     })
       .then(r => r.json())
       .then(d => setMlProb(d.probability))
       .catch(() => setMlProb(null));
-  }, [analysisData, interval, dealSetup?.atr, currentPrice]);
+  }, [analysisData, interval, dealSetup?.atr, currentPrice, analysisCandles]);
 
   const scoreBarPct = ((overallScore + 8) / 16) * 100;
   const isLargeData = allChartData.length > 200;

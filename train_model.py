@@ -43,52 +43,130 @@ def calc_ema(closes, n):
             result[i] = closes[i]*k + result[i-1]*(1-k)
     return result
 
-def calc_features(candles):
-    """يحول الشموع لـ feature vector"""
+def calc_features(candles, sector_return=0.0,
+                  egx30_return=0.0):
     closes = [c['close'] for c in candles]
     highs  = [c['high']  for c in candles]
     lows   = [c['low']   for c in candles]
     vols   = [c.get('volume', 0) for c in candles]
+    times  = [c.get('time', None) for c in candles]
 
-    rsi    = calc_rsi(closes, 14)
-    ema12  = calc_ema(closes, 12)
-    ema26  = calc_ema(closes, 26)
-    ema20  = calc_ema(closes, 20)
-    ema50  = calc_ema(closes, 50)
+    rsi   = calc_rsi(closes, 14)
+    ema12 = calc_ema(closes, 12)
+    ema26 = calc_ema(closes, 26)
+    ema20 = calc_ema(closes, 20)
+    ema50 = calc_ema(closes, 50)
+
+    # Bollinger Bands
+    def calc_bb(closes, n=20):
+        bb_width = [None]*len(closes)
+        bb_pos   = [None]*len(closes)
+        for i in range(n-1, len(closes)):
+            window = closes[i-n+1:i+1]
+            mean = sum(window)/n
+            std  = (sum((x-mean)**2 for x in window)/n)**0.5
+            if std > 0:
+                bb_width[i] = (std*4) / mean * 100
+                bb_pos[i]   = (closes[i]-mean) / (std*2)
+        return bb_width, bb_pos
+
+    # Stochastic RSI
+    def calc_stoch_rsi(rsi_vals, period=14):
+        stoch = [None]*len(rsi_vals)
+        for i in range(period, len(rsi_vals)):
+            window = [x for x in rsi_vals[i-period:i+1]
+                      if x is not None]
+            if len(window) < period:
+                continue
+            min_r, max_r = min(window), max(window)
+            if max_r - min_r > 0:
+                stoch[i] = (rsi_vals[i]-min_r)/(max_r-min_r)
+            else:
+                stoch[i] = 0.5
+        return stoch
+
+    bb_width, bb_pos = calc_bb(closes)
+    stoch_rsi = calc_stoch_rsi(rsi)
 
     rows = []
     for i in range(50, len(candles)-1):
-        cl   = closes[i]
+        cl = closes[i]
         if None in [rsi[i], ema12[i], ema26[i],
-                    ema20[i], ema50[i]]:
+                    ema20[i], ema50[i],
+                    bb_width[i], bb_pos[i],
+                    stoch_rsi[i]]:
             continue
 
-        macd_hist = (ema12[i]-ema26[i]) - \
-                    (ema12[i-1]-ema26[i-1]) \
-                    if ema12[i-1] and ema26[i-1] else 0
+        # MACD
+        macd_raw  = ema12[i] - ema26[i]
+        macd_prev = ((ema12[i-1] or 0) -
+                     (ema26[i-1] or 0))
+        macd_hist = macd_raw - macd_prev
 
         # ATR
         trs = [max(highs[j]-lows[j],
                    abs(highs[j]-closes[j-1]),
                    abs(lows[j]-closes[j-1]))
                for j in range(max(1,i-13), i+1)]
-        atr = sum(trs)/len(trs) if trs else 0
+        atr = sum(trs)/len(trs) if trs else 0.001
 
-        # Volume ratio
-        avg_vol = sum(vols[i-13:i+1])/14 if i>=13 else 1
-        vol_ratio = vols[i]/avg_vol if avg_vol > 0 else 1
+        # Volume spike
+        avg_vol   = sum(vols[i-13:i+1])/14 \
+                    if i >= 13 else 1
+        vol_ratio = vols[i]/avg_vol \
+                    if avg_vol > 0 else 1
+        vol_spike = 1 if vol_ratio >= 3 else 0
+
+        # Distance to ATH (52-week high)
+        lookback_52 = min(i, 252)
+        ath_52  = max(highs[i-lookback_52:i+1])
+        dist_ath = (cl - ath_52) / ath_52 * 100
+
+        # Day of week (0=Mon, 6=Sun, EGX: 0=Sun)
+        day_of_week = 0
+        if times[i]:
+            try:
+                import datetime
+                if isinstance(times[i], (int, float)):
+                    dt = datetime.datetime.fromtimestamp(
+                        times[i])
+                    day_of_week = dt.weekday()
+                elif hasattr(times[i], 'weekday'):
+                    day_of_week = times[i].weekday()
+            except:
+                pass
+
+        # Day of week for EGX (Sun=0, Mon=1, ..., Thu=4, Fri=5, Sat=6)
+        # Python weekday() returns 0 for Monday and 6 for Sunday.
+        # Let's adjust to EGX convention:
+        # Mon (0) -> 1, Tue (1) -> 2, Wed (2) -> 3, Thu (3) -> 4, Fri (4) -> 5, Sat (5) -> 6, Sun (6) -> 0.
+        day_of_week = (day_of_week + 1) % 7
+
+        # Price position in candle
+        candle_range = highs[i] - lows[i]
+        price_pos = (cl - lows[i]) / \
+                    (candle_range + 0.001)
 
         rows.append({
             'idx': i,
-            'rsi': rsi[i],
-            'macd_hist': macd_hist,
-            'macd_raw': ema12[i] - ema26[i],
-            'dist_ema20': (cl - ema20[i]) / ema20[i] * 100,
-            'dist_ema50': (cl - ema50[i]) / ema50[i] * 100,
-            'atr_pct': atr / cl * 100,
-            'vol_ratio': min(vol_ratio, 5),
-            'price_pos': (cl - lows[i]) / (highs[i]-lows[i]+0.001),
-            'close': cl,
+            # ── الـ features الأصلية ──
+            'rsi':        rsi[i],
+            'macd_hist':  macd_hist,
+            'macd_raw':   macd_raw,
+            'dist_ema20': (cl-ema20[i])/ema20[i]*100,
+            'dist_ema50': (cl-ema50[i])/ema50[i]*100,
+            'atr_pct':    atr/cl*100,
+            'vol_ratio':  min(vol_ratio, 5),
+            'price_pos':  price_pos,
+            # ── الـ features الجديدة ──
+            'bb_width':   bb_width[i],
+            'bb_pos':     bb_pos[i],
+            'stoch_rsi':  stoch_rsi[i],
+            'vol_spike':  vol_spike,
+            'dist_ath':   dist_ath,
+            'day_of_week': day_of_week,
+            'sector_ret': sector_return,
+            'egx30_ret':  egx30_return,
         })
     return rows
 
@@ -165,7 +243,11 @@ def build_dataset(timeframe='1d',
             X_rows.append([
                 f['rsi'], f['macd_hist'], f['macd_raw'],
                 f['dist_ema20'], f['dist_ema50'],
-                f['atr_pct'], f['vol_ratio'], f['price_pos']
+                f['atr_pct'], f['vol_ratio'], f['price_pos'],
+                f['bb_width'], f['bb_pos'],
+                f['stoch_rsi'], f['vol_spike'],
+                f['dist_ath'], f['day_of_week'],
+                f['sector_ret'], f['egx30_ret'],
             ])
             y_rows.append(label)
 
