@@ -7,6 +7,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import StandardScaler
 from supabase import create_client
 from dotenv import load_dotenv
+import datetime
 
 load_dotenv()
 sb = create_client(os.getenv('SUPABASE_URL'),
@@ -125,10 +126,8 @@ def calc_features(candles):
         day_of_week = 0
         if times[i]:
             try:
-                import datetime
                 if isinstance(times[i], (int, float)):
-                    dt = datetime.datetime.fromtimestamp(
-                        times[i])
+                    dt = datetime.datetime.fromtimestamp(times[i])
                     day_of_week = dt.weekday()
                 elif hasattr(times[i], 'weekday'):
                     day_of_week = times[i].weekday()
