@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Search, SlidersHorizontal, TrendingUp, TrendingDown, RefreshCw, BarChart3, Star, Percent } from 'lucide-react';
+import { useUserRole } from '@/lib/useUserRole';
+import Link from 'next/link';
 import { ScreenerRowSkeleton } from '@/components/ui/ScreenerRowSkeleton';
 
 export default function ScreenerPage() {
@@ -10,6 +12,8 @@ export default function ScreenerPage() {
   const locale = params?.locale as string || 'ar';
   const router = useRouter();
   const isAr = locale === 'ar';
+
+  const { isPremium, loading: roleLoading } = useUserRole();
 
   const [stocks, setStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -295,15 +299,22 @@ export default function ScreenerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filtered.map(stock => {
+                {filtered.map((stock, idx) => {
+                  const isLocked = !isPremium && idx >= 5;
                   const isUp = stock.change > 0;
                   const isDown = stock.change < 0;
 
                   return (
                     <tr 
                       key={stock.id}
-                      onClick={() => router.push(`/${locale}/stock/${stock.symbol}`)}
-                      className="hover:bg-white/[0.01] transition-colors cursor-pointer group"
+                      onClick={() => {
+                        if (isLocked) {
+                          router.push(`/${locale}/pricing`);
+                        } else {
+                          router.push(`/${locale}/stock/${stock.symbol}`);
+                        }
+                      }}
+                      className={`hover:bg-white/[0.01] transition-colors cursor-pointer group ${isLocked ? 'blur-[3px] select-none pointer-events-none opacity-40' : ''}`}
                     >
                       {/* Symbol + Name */}
                       <td className="py-3.5 px-4 text-start">
@@ -373,6 +384,21 @@ export default function ScreenerPage() {
               </tbody>
             </table>
           </div>
+
+          {!isPremium && filtered.length > 5 && (
+            <div className="text-center py-8 border-t border-white/5 bg-[#111E2E]/60 flex flex-col items-center justify-center">
+              <p className="text-[#C9A84C] font-bold text-xs mb-3 flex items-center gap-1.5">
+                <span>🔒</span>
+                <span>{isAr ? 'للوصول لكامل الأسهم (314 سهم)' : 'Unlock all 314 EGX stocks'}</span>
+              </p>
+              <Link
+                href={`/${locale}/pricing`}
+                className="px-6 py-2 rounded-xl text-xs font-bold btn-gold transition-all shadow-md shadow-[#C9A84C]/10 cursor-pointer"
+              >
+                ⭐ {isAr ? 'اشترك Premium' : 'Upgrade Premium'}
+              </Link>
+            </div>
+          )}
 
           {filtered.length === 0 && (
             <div className="text-center py-20 text-slate-500">
