@@ -38,3 +38,9 @@ CREATE TABLE user_telegram (
 );
 ALTER TABLE user_telegram ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users_own_telegram" ON user_telegram FOR ALL USING (auth.uid() = user_id);
+
+-- Trailing Stop Loss Columns
+ALTER TABLE user_trades
+  ADD COLUMN IF NOT EXISTS trailing_sl BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS trailing_pct NUMERIC DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS current_sl NUMERIC;

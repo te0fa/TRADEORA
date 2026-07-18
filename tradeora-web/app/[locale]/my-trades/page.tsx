@@ -5,11 +5,89 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 import { Briefcase, ArrowUpRight, ArrowDownRight, Clock, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface MyTradesPageProps {
   params: Promise<{
     locale: string;
   }>;
+}
+
+function exportToPDF(trades: any[], locale: string) {
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  // Header
+  doc.setFontSize(18);
+  doc.setTextColor(14, 165, 233); // blue
+  doc.text('TRADEORA - Trade Report', 14, 20);
+
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(
+    `Generated: ${new Date().toLocaleDateString('ar-EG')}`,
+    14, 28
+  );
+
+  // KPIs
+  const closed = trades.filter(t => t.status==='closed');
+  const wins   = closed.filter(t => (t.pnl_percent??0)>0);
+  const totalPnl = closed.reduce(
+    (s,t) => s+(t.pnl_amount??0), 0
+  );
+
+  doc.setFontSize(11);
+  doc.setTextColor(0);
+  doc.text(`Total Trades: ${trades.length}`, 14, 38);
+  doc.text(`Win Rate: ${closed.length>0 ?
+    Math.round(wins.length/closed.length*100) : 0}%`, 80, 38);
+  doc.text(`Total P&L: ${totalPnl.toFixed(2)} EGP`, 150, 38);
+
+  // Table
+  autoTable(doc, {
+    startY: 48,
+    head: [[
+      'Symbol', 'Direction', 'Entry', 'TP1', 'TP2',
+      'SL', 'Status', 'P&L%', 'P&L EGP', 'Date'
+    ]],
+    body: trades.map(t => [
+      t.symbol,
+      t.direction === 'buy' ? '▲ Buy' : '▼ Sell',
+      t.entry_price?.toFixed(2),
+      t.tp1?.toFixed(2),
+      t.tp2?.toFixed(2),
+      t.sl?.toFixed(2),
+      t.status === 'active' ? 'Active'
+        : t.status === 'tp1_hit' ? 'TP1 Hit'
+        : (t.pnl_percent??0)>0 ? 'Win' : 'Loss',
+      t.pnl_percent !== null
+        ? `${t.pnl_percent>0?'+':''}${t.pnl_percent?.toFixed(2)}%`
+        : '—',
+      t.pnl_amount !== null
+        ? `${t.pnl_amount?.toFixed(0)} EGP`
+        : '—',
+      new Date(t.activated_at).toLocaleDateString('ar-EG')
+    ]),
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+    },
+    headStyles: {
+      fillColor: [14, 165, 233],
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: [240, 249, 255]
+    },
+    columnStyles: {
+      7: { textColor: [34, 197, 94] }, // P&L%
+    },
+  });
+
+  doc.save(`TRADEORA_Trades_${
+    new Date().toISOString().split('T')[0]
+  }.pdf`);
 }
 
 export default function MyTradesPage({ params }: MyTradesPageProps) {
@@ -27,6 +105,10 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [exitPrice, setExitPrice] = useState<number>(0);
   const [closing, setClosing] = useState(false);
+
+  // Trailing Stop Loss states
+  const [trailingEnabled, setTrailingEnabled] = useState(false);
+  const [trailingPct, setTrailingPct] = useState(2);
 
   // Load user session and trades
   useEffect(() => {
@@ -61,6 +143,8 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
   const handleOpenCloseModal = (trade: any) => {
     setSelectedTrade(trade);
     setExitPrice(trade.entry_price);
+    setTrailingEnabled(!!trade.trailing_sl);
+    setTrailingPct(Number(trade.trailing_pct ?? 2));
     setShowCloseModal(true);
   };
 
@@ -70,6 +154,26 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
     setClosing(true);
 
     try {
+      // IF Trailing Stop is enabled in the form, update the parameters rather than closing immediately
+      if (trailingEnabled) {
+        const { error } = await supabase
+          .from('user_trades')
+          .update({
+            trailing_sl: true,
+            trailing_pct: trailingPct,
+            current_sl: selectedTrade.current_sl || selectedTrade.sl
+          })
+          .eq('id', selectedTrade.id);
+
+        if (error) throw error;
+
+        alert(isAr ? '🛡️ تم تفعيل وتعديل الوقف المتحرك للصفقة!' : '🛡️ Trailing Stop Loss updated successfully!');
+        setShowCloseModal(false);
+        setSelectedTrade(null);
+        if (user) fetchUserTrades(user.id);
+        return;
+      }
+
       const entry = Number(selectedTrade.entry_price);
       const shares = Number(selectedTrade.shares_count);
       const direction = selectedTrade.direction;
@@ -114,7 +218,7 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
       if (user) fetchUserTrades(user.id);
     } catch (err: any) {
       console.error('Error closing trade:', err);
-      alert(isAr ? `❌ فشل إغلاق الصفقة: ${err.message}` : `❌ Failed to close trade: ${err.message}`);
+      alert(isAr ? `❌ فشل تعديل الصفقة: ${err.message}` : `❌ Failed to modify trade: ${err.message}`);
     } finally {
       setClosing(false);
     }
@@ -133,6 +237,13 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
             {isAr ? 'إدارة وتتبع تصفية صفقاتك الحقيقية التي قمت بتفعيلها يدوياً.' : 'Track and manage the lifecycle of your active trades.'}
           </p>
         </div>
+        <button
+          onClick={() => exportToPDF(trades, locale as string)}
+          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-slate-300 text-sm hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+        >
+          <span>📄</span>
+          <span>{isAr ? 'تصدير PDF' : 'Export PDF'}</span>
+        </button>
       </div>
 
       {loading ? (
@@ -334,9 +445,46 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
                   required
                   value={exitPrice}
                   onChange={(e) => setExitPrice(Number(e.target.value))}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:border-accent-blue outline-none text-left"
+                  disabled={trailingEnabled}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:border-accent-blue outline-none text-left disabled:opacity-50"
                 />
               </div>
+
+              {/* Trailing SL switch */}
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-slate-400 text-xs">
+                  🛡️ {isAr ? 'وقف خسارة متحرك' : 'Trailing Stop Loss'}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={trailingEnabled}
+                    onChange={e => setTrailingEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-white/10 peer-checked:bg-blue-500 rounded-full transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4" />
+                </label>
+              </div>
+
+              {trailingEnabled && (
+                <div className="mt-2 text-start">
+                  <label className="text-[10px] text-slate-400">
+                    {isAr ? 'نسبة الوقف المتحرك (%)' : 'Trailing %'}
+                  </label>
+                  <input
+                    type="number"
+                    value={trailingPct}
+                    onChange={e => setTrailingPct(Number(e.target.value))}
+                    min={0.5} max={10} step={0.5}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white mt-1 focus:border-blue-500 outline-none text-left font-mono text-xs"
+                  />
+                  <p className="text-[9px] text-slate-500 mt-1 leading-normal">
+                    {isAr
+                      ? `لو السعر ارتفع → يتحرك الوقف تلقائياً بفارق ${trailingPct}%`
+                      : `SL moves up ${trailingPct}% below peak price`}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
@@ -358,7 +506,7 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
                 {closing ? (
                   <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                 ) : (
-                  <span>{isAr ? 'تأكيد الخروج' : 'Confirm Exit'}</span>
+                  <span>{trailingEnabled ? (isAr ? 'حفظ التفعيل' : 'Activate Trailing') : (isAr ? 'تأكيد الخروج' : 'Confirm Exit')}</span>
                 )}
               </button>
             </div>

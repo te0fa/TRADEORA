@@ -80,11 +80,28 @@ def track_user_trades():
             return pnl_per_share * shares * qty_fraction
 
         if t['status'] == 'active':
-            # Check Stop Loss (SL)
-            if (isBuy and price <= sl) or (not isBuy and price >= sl):
+            # Check Trailing Stop Loss
+            if t.get('trailing_sl'):
+                pct = float(t.get('trailing_pct', 2)) / 100
+                new_sl = price * (1 - pct) if isBuy else price * (1 + pct)
+                current_sl = float(t.get('current_sl') or sl)
+
+                if (isBuy and new_sl > current_sl) or (not isBuy and new_sl < current_sl):
+                    try:
+                        sb.table('user_trades').update({'current_sl': new_sl}).eq('id', t['id']).execute()
+                        logger.info(f"⬆️ Trailing SL {symbol}: {current_sl:.2f} → {new_sl:.2f}")
+                        # Update local variable to prevent outdated checks
+                        t['current_sl'] = new_sl
+                    except Exception as sl_err:
+                        logger.error(f"Failed to update current_sl: {sl_err}")
+
+            active_sl = float(t.get('current_sl') or sl)
+
+            # Check Stop Loss (SL) or Trailing Stop Loss breach
+            if (isBuy and price <= active_sl) or (not isBuy and price >= active_sl):
                 updates['status'] = 'closed'
                 updates['exit_price'] = price
-                updates['exit_reason'] = 'sl'
+                updates['exit_reason'] = 'trailing_sl' if t.get('trailing_sl') else 'sl'
                 updates['pnl_percent'] = round(calc_pnl_pct(price), 2)
                 updates['pnl_amount'] = round(calc_pnl_amt(price), 2)
             

@@ -128,6 +128,37 @@ export function Navbar({ locale }: NavbarProps) {
                 <BarChart2 className="w-3.5 h-3.5" />
                 <span>{isAr ? '📊 الأسهم' : 'Stocks'}</span>
               </Link>
+
+              <Link 
+                href={`/${locale}/screener`}
+                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
+                  pathname.includes('/screener') ? 'text-accent-blue bg-white/5' : ''
+                }`}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>{isAr ? '🔍 فرز الأسهم' : 'Screener'}</span>
+              </Link>
+
+              <Link 
+                href={`/${locale}/sectors`}
+                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
+                  pathname.includes('/sectors') ? 'text-accent-blue bg-white/5 font-bold' : ''
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                <span>{isAr ? '🏭 القطاعات' : 'Sectors'}</span>
+              </Link>
+
+              <Link 
+                href={`/${locale}/compare`}
+                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
+                  pathname.includes('/compare') ? 'text-accent-blue bg-white/5 font-bold' : ''
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+                <span>{isAr ? '⚖️ مقارنة' : 'Compare'}</span>
+              </Link>
+
               <Link 
                 href={`/${locale}/watchlist`}
                 className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
@@ -137,6 +168,7 @@ export function Navbar({ locale }: NavbarProps) {
                 <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
                 <span>{isAr ? '⭐ المراقبة' : 'Watchlist'}</span>
               </Link>
+
               <Link 
                 href={`/${locale}/my-trades`}
                 className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
@@ -155,16 +187,6 @@ export function Navbar({ locale }: NavbarProps) {
               >
                 <TrendingUp className="w-3.5 h-3.5" />
                 <span>{isAr ? '📈 الأداء' : 'Performance'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/screener`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/screener') ? 'text-accent-blue bg-white/5' : ''
-                }`}
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>{isAr ? '🔍 فرز الأسهم' : 'Screener'}</span>
               </Link>
 
               {userRole === 'admin' && (
@@ -300,6 +322,18 @@ export function Navbar({ locale }: NavbarProps) {
             <BarChart2 className="w-3.5 h-3.5" />
             <span>{isAr ? 'الأسهم' : 'Stocks'}</span>
           </Link>
+          <Link href={`/${locale}/screener`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
+            <Search className="w-3.5 h-3.5" />
+            <span>{isAr ? 'الفرز' : 'Screener'}</span>
+          </Link>
+          <Link href={`/${locale}/sectors`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
+            <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+            <span>{isAr ? 'القطاعات' : 'Sectors'}</span>
+          </Link>
+          <Link href={`/${locale}/compare`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
+            <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+            <span>{isAr ? 'مقارنة' : 'Compare'}</span>
+          </Link>
           <Link href={`/${locale}/watchlist`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
             <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
             <span>{isAr ? 'المراقبة' : 'Watchlist'}</span>
@@ -312,9 +346,9 @@ export function Navbar({ locale }: NavbarProps) {
             <TrendingUp className="w-3.5 h-3.5" />
             <span>{isAr ? 'الأداء' : 'Performance'}</span>
           </Link>
-          <Link href={`/${locale}/screener`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Search className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الفرز' : 'Screener'}</span>
+          <Link href={`/${locale}/settings`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
+            <Settings className="w-3.5 h-3.5" />
+            <span>{isAr ? 'الإعدادات' : 'Settings'}</span>
           </Link>
           {userRole === 'admin' && (
             <Link href={`/${locale}/admin`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px] text-red-400">
@@ -322,10 +356,6 @@ export function Navbar({ locale }: NavbarProps) {
               <span>{isAr ? 'التحكم' : 'Admin'}</span>
             </Link>
           )}
-          <Link href={`/${locale}/settings`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Settings className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الإعدادات' : 'Settings'}</span>
-          </Link>
         </div>
       )}
     </header>
