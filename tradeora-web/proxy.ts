@@ -2,6 +2,34 @@ import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+// Configure Upstash Redis client
+let redis: Redis | null = null;
+let ratelimitHeavy: Ratelimit | null = null;
+let ratelimitStandard: Ratelimit | null = null;
+
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+
+  ratelimitHeavy = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, '1 m'),
+    analytics: true,
+    prefix: '@upstash/ratelimit/heavy',
+  });
+
+  ratelimitStandard = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(10, '1 m'),
+    analytics: true,
+    prefix: '@upstash/ratelimit/standard',
+  });
+}
 
 const intlMiddleware = createMiddleware({
   locales: ['ar', 'en'],
@@ -10,10 +38,65 @@ const intlMiddleware = createMiddleware({
 });
 
 export default async function proxy(req: NextRequest) {
-  // 1. Run next-intl middleware first to get the response with correct locale/headers
+  const url = req.nextUrl.clone();
+  const path = url.pathname;
+
+  // 1. Apply Upstash Rate Limiting to API endpoints
+  if (path.startsWith('/api/') && redis) {
+    // Exclude payment webhooks to prevent callback failure
+    if (!path.includes('/api/stripe/webhook')) {
+      const ip = req.headers.get('x-forwarded-for') || (req as any).ip || '127.0.0.1';
+      let isAllowed = true;
+      let limit = 10;
+      let remaining = 9;
+      let reset = Date.now() + 60000;
+
+      try {
+        if (path.includes('/api/ml-predict') || path.includes('/api/screener')) {
+          if (ratelimitHeavy) {
+            const result = await ratelimitHeavy.limit(ip);
+            isAllowed = result.success;
+            limit = result.limit;
+            remaining = result.remaining;
+            reset = result.reset;
+          }
+        } else {
+          if (ratelimitStandard) {
+            const result = await ratelimitStandard.limit(ip);
+            isAllowed = result.success;
+            limit = result.limit;
+            remaining = result.remaining;
+            reset = result.reset;
+          }
+        }
+      } catch (err) {
+        console.error('Rate limiting Redis error:', err);
+      }
+
+      if (!isAllowed) {
+        return new NextResponse(
+          JSON.stringify({
+            error: 'تم تجاوز الحد المسموح به من الطلبات. يرجى المحاولة مرة أخرى لاحقاً.',
+            message: 'Too many requests. Please try again later.'
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RateLimit-Limit': String(limit),
+              'X-RateLimit-Remaining': String(remaining),
+              'X-RateLimit-Reset': String(reset),
+            },
+          }
+        );
+      }
+    }
+  }
+
+  // 2. Run next-intl middleware first to get the response with correct locale/headers
   let res = intlMiddleware(req);
 
-  // 2. Initialize Supabase Client using standard Server Side Client pattern
+  // 3. Initialize Supabase Client using standard Server Side Client pattern
   const supabaseClient = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
@@ -33,13 +116,10 @@ export default async function proxy(req: NextRequest) {
     }
   );
 
-  // 3. Refresh session if expired
+  // 4. Refresh session if expired
   const { data: { session } } = await supabaseClient.auth.getSession();
 
-  const url = req.nextUrl.clone();
-  const path = url.pathname;
-
-  // 4. Define bypass paths
+  // 5. Define bypass paths for UI routing validation
   const isAuthPage = path.includes('/auth');
   
   const isBypass = path.includes('/_next') || 
@@ -52,7 +132,7 @@ export default async function proxy(req: NextRequest) {
     return res;
   }
 
-  // 5. Authentication Routing Logic
+  // 6. Authentication Routing Logic
   if (!session && !isAuthPage) {
     const localeMatch = path.match(/^\/(ar|en)/);
     const locale = localeMatch ? localeMatch[1] : 'ar';
@@ -67,7 +147,7 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 6. Protect /admin routes from non-admins
+  // 7. Protect /admin routes from non-admins
   if (session && path.includes('/admin')) {
     const { data: profile } = await supabaseClient
       .from('user_profiles')
@@ -90,6 +170,6 @@ export const config = {
   matcher: [
     '/', 
     '/(ar|en)/:path*', 
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|api/).*)'
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)' // Match everything including api
   ]
 };
