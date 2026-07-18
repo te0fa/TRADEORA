@@ -19,7 +19,8 @@ import {
   BarChart2, 
   Bell,
   Search,
-  Shield
+  Shield,
+  Star
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -127,7 +128,15 @@ export function Navbar({ locale }: NavbarProps) {
                 <BarChart2 className="w-3.5 h-3.5" />
                 <span>{isAr ? '📊 الأسهم' : 'Stocks'}</span>
               </Link>
-
+              <Link 
+                href={`/${locale}/watchlist`}
+                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
+                  pathname.includes('/watchlist') ? 'text-accent-blue bg-white/5 font-bold' : ''
+                }`}
+              >
+                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                <span>{isAr ? '⭐ المراقبة' : 'Watchlist'}</span>
+              </Link>
               <Link 
                 href={`/${locale}/my-trades`}
                 className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
@@ -290,6 +299,10 @@ export function Navbar({ locale }: NavbarProps) {
           <Link href={`/${locale}`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
             <BarChart2 className="w-3.5 h-3.5" />
             <span>{isAr ? 'الأسهم' : 'Stocks'}</span>
+          </Link>
+          <Link href={`/${locale}/watchlist`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
+            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+            <span>{isAr ? 'المراقبة' : 'Watchlist'}</span>
           </Link>
           <Link href={`/${locale}/my-trades`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
             <Briefcase className="w-3.5 h-3.5" />

@@ -129,6 +129,56 @@ def track_user_trades():
             try:
                 sb.table('user_trades').update(updates).eq('id', t['id']).execute()
                 logger.info(f"Updated user trade {symbol}: {updates}")
+
+                # Dispatch Telegram notification if verified
+                BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+                if BOT_TOKEN:
+                    import requests
+                    try:
+                        tg_res = sb.table('user_telegram')\
+                                   .select('chat_id')\
+                                   .eq('user_id', t['user_id'])\
+                                   .eq('verified', True)\
+                                   .execute()
+                        tg = tg_res.data or []
+                        if tg:
+                            chat_id = tg[0]['chat_id']
+                            msg = None
+                            
+                            if updates.get('status') == 'tp1_hit':
+                                msg = (
+                                    f"🎯 <b>الهدف الأول TP1 - {t['symbol']}</b>\n\n"
+                                    f"✅ السعر وصل لـ <b>{price:.2f} EGP</b>\n"
+                                    f"💰 جني 50% من الكمية الآن\n\n"
+                                    f"<i>الهدف الثاني: {t['tp2']:.2f} EGP</i>"
+                                )
+                            elif updates.get('exit_reason') == 'sl':
+                                msg = (
+                                    f"🚨 <b>وقف الخسارة - {t['symbol']}</b>\n\n"
+                                    f"⚠️ السعر ضرب الوقف عند "
+                                    f"<b>{price:.2f} EGP</b>\n"
+                                    f"📉 الخسارة: {updates.get('pnl_percent',''):.2f}%\n\n"
+                                    f"<i>لا بأس، الإدارة الصحيحة تحمي رأس المال</i>"
+                                )
+                            elif updates.get('exit_reason') == 'tp2':
+                                msg = (
+                                    f"🏆 <b>الهدف الثاني TP2 - {t['symbol']}</b>\n\n"
+                                    f"💰 ربح كامل: <b>+{updates.get('pnl_percent',''):.2f}%</b>\n"
+                                    f"🎉 صفقة ناجحة بالكامل!\n\n"
+                                    f"<i>TRADEORA يهنئك بهذا الربح</i>"
+                                )
+
+                            if msg:
+                                requests.post(
+                                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                                    json={
+                                        'chat_id': chat_id,
+                                        'text': msg,
+                                        'parse_mode': 'HTML'
+                                    }
+                                )
+                    except Exception as tg_err:
+                        logger.error(f"Failed to fetch telegram verification/send notification: {tg_err}")
             except Exception as e:
                 logger.error(f"Failed to update user trade {t['id']}: {e}")
 
@@ -289,7 +339,92 @@ def track_recommended_trades():
             except Exception as e:
                 logger.error(f"Failed to update database for closed recommended trade {trade_id}: {e}")
 
+def check_price_alerts():
+    """يفحص تنبيهات السعر ويرسل تيليجرام"""
+    logger.info("Checking custom price alerts...")
+    import requests
+    BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    if not BOT_TOKEN:
+        logger.warning("TELEGRAM_BOT_TOKEN not configured. Skipping price alerts.")
+        return
+
+    try:
+        res = sb.table('price_alerts')\
+                 .select('*')\
+                 .eq('status', 'active')\
+                 .execute()
+        alerts = res.data or []
+    except Exception as e:
+        logger.error(f"Failed to fetch price alerts from DB: {e}")
+        return
+
+    logger.info(f"Found {len(alerts)} active price alerts to check.")
+
+    for alert in alerts:
+        symbol = alert['symbol']
+        # جلب السعر الحالي
+        price = get_current_price(symbol)
+        if not price:
+            continue
+
+        triggered = (
+            alert['condition'] == 'above' and
+            price >= float(alert['target_price'])
+        ) or (
+            alert['condition'] == 'below' and
+            price <= float(alert['target_price'])
+        )
+
+        if triggered:
+            # جلب chat_id من user_telegram
+            try:
+                tg_res = sb.table('user_telegram')\
+                           .select('chat_id')\
+                           .eq('user_id', alert['user_id'])\
+                           .eq('verified', True)\
+                           .execute()
+                tg = tg_res.data or []
+            except Exception as e:
+                logger.error(f"Failed to fetch telegram chat ID: {e}")
+                continue
+
+            if tg:
+                chat_id = tg[0]['chat_id']
+                arrow = '▲' if alert['condition'] == 'above' else '▼'
+                msg = (
+                    f"🔔 <b>تنبيه سعر - {alert['symbol']}</b>\n\n"
+                    f"{arrow} السعر وصل لـ "
+                    f"<b>{price:.2f} EGP</b>\n"
+                    f"الهدف كان: {float(alert['target_price']):.2f} EGP\n\n"
+                    f"<i>افتح TRADEORA للتفاصيل</i>"
+                )
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                        json={
+                            'chat_id': chat_id,
+                            'text': msg,
+                            'parse_mode': 'HTML'
+                        }
+                    )
+                except Exception as tg_err:
+                    logger.error(f"Failed to send telegram message: {tg_err}")
+
+            # تحديث حالة التنبيه
+            try:
+                sb.table('price_alerts')\
+                  .update({
+                    'status': 'triggered',
+                    'triggered_at': datetime.now(timezone.utc).isoformat()
+                  })\
+                  .eq('id', alert['id'])\
+                  .execute()
+                logger.info(f"✅ Alert triggered: {alert['symbol']} @ {price}")
+            except Exception as db_err:
+                logger.error(f"Failed to update alert status in DB: {db_err}")
+
 if __name__ == '__main__':
     track_recommended_trades()
     track_user_trades()
-    print("✅ All trades tracking done!")
+    check_price_alerts()
+    print("✅ Track + Alerts done!")

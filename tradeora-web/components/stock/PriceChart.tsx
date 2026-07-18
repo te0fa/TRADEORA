@@ -38,6 +38,8 @@ import { fetchHistoricalPrices, fetchSignalStats, SignalStat } from '@/lib/queri
 import { CandlestickChart, CandlestickChartHandle, SRLevel } from '@/components/stock/CandlestickChart';
 import { Info } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { WatchlistButton } from '@/components/stock/WatchlistButton';
+import { PriceAlertModal } from '@/components/stock/PriceAlertModal';
 
 interface PriceChartProps {
   symbol: string;
@@ -353,6 +355,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
   const [tradeEntry, setTradeEntry] = useState(0);
   const [userCapital, setUserCapital] = useState(10000);
   const [userRiskPercent, setUserRiskPercent] = useState(2);
+  const [showAlertModal, setShowAlertModal] = useState(false);
 
   useEffect(() => {
     try {
@@ -1837,8 +1840,21 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
             </div>
           )}
         </div>
-        <div className="flex flex-col items-start sm:items-end gap-1 text-[11px] text-text-secondary">
-          <div className="flex items-center gap-1.5 font-bold">
+        <div className="flex flex-col items-start sm:items-end gap-2 text-[11px] text-text-secondary">
+          <div className="flex items-center gap-2">
+            <WatchlistButton
+              companyId={companyId}
+              symbol={symbol}
+            />
+            <button
+              onClick={() => setShowAlertModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+            >
+              <span>🔔</span>
+              <span>{locale === 'ar' ? 'تنبيه سعر' : 'Price Alert'}</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 font-bold mt-1">
             <span>{marketOpen ? '🟢' : '⚫'}</span>
             <span className="text-text-primary">
               {marketOpen ? (locale === 'ar' ? 'مباشر' : 'Live') : (locale === 'ar' ? 'السوق مغلق' : 'Closed')}
@@ -1861,6 +1877,16 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
             ✕
           </button>
         </div>
+      )}
+
+      {showAlertModal && (
+        <PriceAlertModal
+          companyId={companyId}
+          symbol={symbol}
+          currentPrice={currentPrice}
+          locale={locale}
+          onClose={() => setShowAlertModal(false)}
+        />
       )}
 
       {/* ── Indicator Toggles ── */}
