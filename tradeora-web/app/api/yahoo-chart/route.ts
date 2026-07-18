@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Ticker Fallback: if CA ticker failed or returned empty, try without CA suffix
     if (!hasData && ticker.endsWith('.CA')) {
       const fallbackTicker = ticker.slice(0, -3);
-      console.log(`Primary CA ticker ${ticker} empty/failed. Trying fallback: ${fallbackTicker}`);
+      console.debug(`Primary CA ticker ${ticker} empty/failed. Trying fallback: ${fallbackTicker}`);
       const fallbackUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${fallbackTicker}?interval=${queryInterval}&range=${range}`;
       
       const resFb = await fetch(fallbackUrl, { headers, next: { revalidate: 30 } });

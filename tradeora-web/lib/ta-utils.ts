@@ -128,7 +128,7 @@ export function calcSupportResistance(
     }
   }
 
-  console.log(`calcSupportResistance: scanned last ${actualLookback} candles. Found ${supportCandidates.length} swing lows and ${resistanceCandidates.length} swing highs.`);
+  console.debug(`calcSupportResistance: scanned last ${actualLookback} candles. Found ${supportCandidates.length} swing lows and ${resistanceCandidates.length} swing highs.`);
 
   // Helper function to cluster levels
   function cluster(prices: number[]): { price: number; strength: number }[] {
