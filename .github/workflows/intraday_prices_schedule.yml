@@ -53,3 +53,29 @@ jobs:
       run: |
         # bypass_session_guard is False by default for production safety
         python services/intraday_importer.py --run-type ${{ github.event.inputs.run_type || 'dynamic' }}
+
+    - name: Prune Old Intraday Snapshots (Older than 7 days)
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        python -c "
+        import os
+        from supabase import create_client
+        from datetime import datetime, timezone, timedelta
+        sb = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        print('Pruning records created before:', cutoff)
+        
+        # We perform deleting in chunks to prevent database transaction timeout locks
+        has_more = True
+        total_deleted = 0
+        while has_more:
+            res = sb.table('intraday_snapshots').delete().lt('created_at', cutoff).limit(5000).execute()
+            deleted = len(res.data) if res.data else 0
+            total_deleted += deleted
+            print(f'Deleted {deleted} rows. Total so far: {total_deleted}')
+            if deleted < 5000:
+                has_more = False
+        print('Pruning job completed successfully.')
+        "
