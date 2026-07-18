@@ -20,8 +20,25 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'TRADEORA — Stock Market Dashboard',
-  description: 'Egyptian stock market consensus and analysis platform.',
+  title: 'TRADEORA — منصة التحليل الفني للبورصة المصرية',
+  description:
+    'تحليل فني احترافي لأسهم البورصة المصرية ' +
+    'بالذكاء الاصطناعي والمؤشرات التقنية المتقدمة',
+  keywords:
+    'بورصة مصر, تحليل فني, EGX, TRADEORA, ' +
+    'أسهم, توصيات, ذكاء اصطناعي',
+  openGraph: {
+    title: 'TRADEORA',
+    description: 'منصة التحليل الفني للبورصة المصرية',
+    images: ['/logo.png'],
+    locale: 'ar_EG',
+    type: 'website',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/logo-icon.png',
+  },
+  themeColor: '#C9A84C',
 };
 
 export default async function LocaleLayout({
@@ -39,11 +56,11 @@ export default async function LocaleLayout({
     <html lang={locale} dir={dir} className={`${cairo.variable} ${inter.variable} h-full`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#0EA5E9" />
+        <meta name="theme-color" content="#C9A84C" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/logo-icon.png" />
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {

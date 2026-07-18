@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useMarketStatus } from '@/hooks/useMarketStatus';
 import { toEasternArabic } from '@/lib/formatters';
 import { supabase } from '@/lib/supabase';
@@ -102,8 +103,15 @@ export function Navbar({ locale }: NavbarProps) {
         {/* Left Side: Logo & Main Navigation Links */}
         <div className="flex items-center gap-6">
           {/* Logo */}
-          <Link href={`/${locale}`} className="text-xl sm:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-accent-blue via-blue-400 to-emerald-400 font-inter select-none">
-            {t('logo') || 'TRADEORA'}
+          <Link href={`/${locale}`} className="flex items-center gap-2">
+            <Image
+              src="/logo.png"
+              alt="TRADEORA"
+              width={140}
+              height={45}
+              className="object-contain"
+              priority
+            />
           </Link>
 
           {/* Navigation Links (Visible only if logged in) */}
