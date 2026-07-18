@@ -1,4 +1,6 @@
 -- Migration 002: Add market context to companies and create watchlists tables
+-- NOTE: The watchlists and watchlist_items table structures defined here have been DEPRECATED.
+-- They were dropped and completely replaced by the modern watchlist schema in Migration 010.
 
 -- 1. Alter companies table to add new columns with defaults if not exists
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS market TEXT DEFAULT 'EGX';
