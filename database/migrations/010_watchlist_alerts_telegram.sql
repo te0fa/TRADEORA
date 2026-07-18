@@ -62,4 +62,5 @@ CREATE POLICY "users_own_subs" ON push_subscriptions FOR ALL USING (auth.uid() =
 -- Alter user_profiles table for sizing settings
 ALTER TABLE user_profiles
   ADD COLUMN IF NOT EXISTS default_capital NUMERIC DEFAULT 10000,
-  ADD COLUMN IF NOT EXISTS default_risk_pct NUMERIC DEFAULT 2;
+  ADD COLUMN IF NOT EXISTS default_risk_pct NUMERIC DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS preferred_sectors JSONB;

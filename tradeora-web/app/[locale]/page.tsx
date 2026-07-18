@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, Compass, Cpu, Check, Activity, BarChart2, Star, Zap } from 'lucide-react';
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 
 interface Props {
   params: Promise<{
@@ -36,12 +37,22 @@ export default function DashboardPage({ params }: Props) {
   const [sectors, setSectors] = useState<any[]>([]);
 
   // Count animations
+  // Count animations
   const [analyzedStocks, setAnalyzedStocks] = useState(0);
   const [aiAccuracy, setAiAccuracy] = useState(0);
   const [signalsTested, setSignalsTested] = useState(0);
   const [marketInterval, setMarketInterval] = useState(0);
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const done = localStorage.getItem('onboarding_done');
+        if (!done) setShowOnboarding(true);
+      }
+    });
+
     fetchMarketOverview();
     fetchTopSignals();
     fetchSectors();
@@ -420,6 +431,16 @@ export default function DashboardPage({ params }: Props) {
           {t('إنشاء حساب مجاني', 'Create Free Account')}
         </button>
       </section>
+
+      {showOnboarding && (
+        <OnboardingFlow
+          locale={locale as string}
+          onComplete={() => {
+            localStorage.setItem('onboarding_done', '1');
+            setShowOnboarding(false);
+          }}
+        />
+      )}
 
     </div>
   );
