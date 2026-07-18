@@ -94,17 +94,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Fetch dynamic thresholds from system settings
+    let minRR = 1.5;
+    let minML = 0.58;
+    try {
+      const { data: settingsRes } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'risk_management')
+        .maybeSingle();
+      if (settingsRes?.value) {
+        minRR = Number(settingsRes.value.min_risk_reward ?? 1.5);
+        minML = Number(settingsRes.value.min_ml_probability ?? 0.58);
+      }
+    } catch (e) {
+      console.warn('Error fetching system settings thresholds, using defaults.', e);
+    }
+
+    const parsedEntry = parseFloat(entry_price);
+    const parsedTP1 = parseFloat(tp1);
+    const parsedTP2 = parseFloat(tp2);
+    const parsedSL = parseFloat(sl);
+    const parsedML = ml_probability ? parseFloat(ml_probability) : null;
+
+    // 1. Validate ML Probability if provided
+    if (parsedML !== null && parsedML < minML) {
+      return NextResponse.json(
+        { error: `الاحتمال المتوقع للنجاح (${(parsedML * 100).toFixed(0)}%) أقل من الحد الأدنى المسموح به (${(minML * 100).toFixed(0)}%)` },
+        { status: 400 }
+      );
+    }
+
+    // 2. Validate Risk/Reward Ratio
+    const isSell = direction === 'sell';
+    const reward = isSell ? (parsedEntry - ((parsedTP1 + parsedTP2) / 2)) : (((parsedTP1 + parsedTP2) / 2) - parsedEntry);
+    const risk = isSell ? (parsedSL - parsedEntry) : (parsedEntry - parsedSL);
+    const calculatedRR = risk > 0 ? (reward / risk) : 1.0;
+
+    if (calculatedRR < minRR) {
+      return NextResponse.json(
+        { error: `نسبة العائد إلى المخاطرة (R:R = ${calculatedRR.toFixed(2)}) أقل من الحد الأدنى المسموح به (${minRR.toFixed(2)})` },
+        { status: 400 }
+      );
+    }
+
     const newTrade = {
       company_id: company_id || null,
       symbol: symbol.toUpperCase(),
       direction: direction || 'buy',
-      entry_price: parseFloat(entry_price),
-      tp1: parseFloat(tp1),
-      tp2: parseFloat(tp2),
-      sl: parseFloat(sl),
+      entry_price: parsedEntry,
+      tp1: parsedTP1,
+      tp2: parsedTP2,
+      sl: parsedSL,
       timeframe,
       status: 'active',
-      ml_probability: ml_probability ? parseFloat(ml_probability) : null,
+      ml_probability: parsedML,
       win_rate_hist: win_rate_hist ? parseFloat(win_rate_hist) : null,
       features_snapshot: features_snapshot || null,
       recommended_at: new Date().toISOString()
