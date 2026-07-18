@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { Cairo, Inter } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
+import { DisclaimerModal } from '@/components/layout/DisclaimerModal';
 
 const cairo = Cairo({
   subsets: ['arabic'],
@@ -42,6 +43,7 @@ export default async function LocaleLayout({
           <main className="flex-1 flex flex-col max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             {children}
           </main>
+          <DisclaimerModal />
         </NextIntlClientProvider>
       </body>
     </html>

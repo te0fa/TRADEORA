@@ -29,6 +29,17 @@ def setup_logging():
     )
 
 def main():
+    # EGX Holidays Check (Friday & Saturday)
+    from datetime import datetime
+    import pytz
+    cairo = pytz.timezone('Africa/Cairo')
+    now = datetime.now(cairo)
+    weekday = now.weekday()  # 0=Mon, 4=Fri, 5=Sat, 6=Sun in Python
+    
+    if weekday in [4, 5]:
+        print(f"[{now.strftime('%Y-%m-%d')}] عطلة — لا تداول في EGX اليوم")
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="Tradeora EGX Scraper and Importer Pipeline")
     parser.add_argument("--file", help="Path to a specific local HTML, Excel, or CSV file to parse directly.")
     parser.add_argument("--dry-run", action="store_true", help="Run the pipeline in dry-run mode (no database insertions).")

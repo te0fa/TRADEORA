@@ -17,10 +17,27 @@ import {
   ReferenceArea,
 } from 'recharts';
 import { PriceRecord } from '@/lib/market-utils';
-import { calcSMA, calcBollingerBands, calcRSI, calcMACD, calcSupportResistance, calcATR } from '@/lib/ta-utils';
+import {
+  calcSMA,
+  calcBollingerBands,
+  calcRSI,
+  calcMACD,
+  calcSupportResistance,
+  calcATR,
+  calcVolumeScore,
+  calcVolumeRatio,
+  detectCandlePattern,
+  detectRSIDivergence,
+  calcTFSignal,
+  calcPositionSize,
+  detectSRLevels,
+  type CandlePattern,
+  type TFSignal
+} from '@/lib/ta-utils';
 import { fetchHistoricalPrices, fetchSignalStats, SignalStat } from '@/lib/queries';
 import { CandlestickChart, CandlestickChartHandle, SRLevel } from '@/components/stock/CandlestickChart';
 import { Info } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface PriceChartProps {
   symbol: string;
@@ -320,6 +337,74 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
   const [visibleSRLines, setVisibleSRLines] = useState<Set<number>>(new Set());
   const [signalStats, setSignalStats] = useState<SignalStat[]>([]);
   const [mlProb, setMlProb] = useState<number | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [settings, setSettings] = useState({
+    trailing_stop_to_entry: true,
+    min_risk_reward: 1.5,
+    min_ml_probability: 0.58,
+    require_volume_spike: true
+  });
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+
+  const [showTradeModal, setShowTradeModal] = useState(false);
+  const [tradeShares, setTradeShares] = useState(100);
+  const [tradeEntry, setTradeEntry] = useState(0);
+  const [userCapital, setUserCapital] = useState(10000);
+  const [userRiskPercent, setUserRiskPercent] = useState(2);
+
+  useEffect(() => {
+    try {
+      const savedCap = localStorage.getItem('user_capital');
+      const savedRisk = localStorage.getItem('user_risk_percent');
+      if (savedCap) setUserCapital(Number(savedCap));
+      if (savedRisk) setUserRiskPercent(Number(savedRisk));
+    } catch (e) {
+      console.error('Error loading config in PriceChart:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.settings) {
+          setSettings(data.settings);
+        }
+        setIsSettingsLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching settings:', err);
+        setIsSettingsLoading(false);
+      });
+  }, []);
+
+  const handleUpdateSetting = async (key: string, value: any) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update setting');
+      }
+    } catch (err) {
+      console.error('Error saving setting:', err);
+      // Revert on error
+      fetch('/api/settings')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.success && data.settings) {
+            setSettings(data.settings);
+          }
+        });
+    }
+  };
+
   const chartRef = useRef<CandlestickChartHandle>(null);
 
   useEffect(() => {
@@ -830,6 +915,61 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
   const analysisSma50Raw = useMemo(() => calcSMA(analysisCloses, 50), [analysisCloses]);
   const analysisBbRaw = useMemo(() => calcBollingerBands(analysisCloses, 20, 2), [analysisCloses]);
 
+  // ── Volume ──────────────────────────
+  const volumeScore = useMemo(() =>
+    calcVolumeScore(analysisCandles)
+  , [analysisCandles]);
+
+  const volumeRatio = useMemo(() =>
+    calcVolumeRatio(analysisCandles)
+  , [analysisCandles]);
+
+  // ── Candle Pattern ───────────────────
+  const candlePattern = useMemo(() =>
+    detectCandlePattern(analysisCandles)
+  , [analysisCandles]);
+
+  // ── RSI Divergence ───────────────────
+  const rsiDivergence = useMemo(() =>
+    detectRSIDivergence(analysisCandles, analysisRsiRaw)
+  , [analysisCandles, analysisRsiRaw]);
+
+  // للـ 1D — نستخدم dbPrices دايماً
+  const dailySignal = useMemo(() => {
+    if (dbPrices.length < 50) return 'neutral' as TFSignal;
+    const candles = dbPrices.map(p => ({
+      close: p.close_price,
+      open:  p.open_price  ?? p.close_price,
+      high:  p.high_price  ?? p.close_price,
+      low:   p.low_price   ?? p.close_price,
+    }));
+    const rsi = calcRSI(candles.map(c => c.close), 14);
+    return calcTFSignal(candles, rsi);
+  }, [dbPrices]);
+
+  // للفريم الحالي
+  const currentTFSignal = useMemo(() => {
+    if (analysisCandles.length < 50) return 'neutral' as TFSignal;
+    const rsi = calcRSI(analysisCandles.map((c: any) => c.close), 14);
+    return calcTFSignal(analysisCandles, rsi);
+  }, [analysisCandles]);
+
+  // Multi-TF Score
+  const mtfScore = useMemo(() => {
+    const signals = [dailySignal, currentTFSignal];
+    const bulls = signals.filter(s => s === 'bullish').length;
+    const bears = signals.filter(s => s === 'bearish').length;
+    if (bulls === 2) return 'strong_bull';
+    if (bears === 2) return 'strong_bear';
+    if (bulls > bears) return 'mild_bull';
+    if (bears > bulls) return 'mild_bear';
+    return 'neutral';
+  }, [dailySignal, currentTFSignal]);
+
+  const srLevels = useMemo(() =>
+    detectSRLevels(analysisCandles, currentPrice)
+  , [analysisCandles, currentPrice]);
+
   const analysisData = useMemo(() => {
     if (analysisCandles.length === 0) return null;
     const idx = analysisCandles.length - 1;
@@ -1295,10 +1435,19 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     const tp1Source = locale === 'ar' ? 'سعر توافقي (وسيط أهداف المؤشرات)' : 'Consensus price (median of indicator targets)';
     const tp2Source = locale === 'ar' ? 'سعر توافقي (وسيط أهداف المؤشرات الثاني)' : 'Consensus price (median of indicator second targets)';
     const slSource = locale === 'ar' ? 'سعر توافقي (وسيط مستويات الوقف)' : 'Consensus price (median of indicator stops)';
-
+    const tradeDuration = isIntradayInterval
+      ? (locale === 'ar' ? 'ساعات (صفقة يومية)' : 'Hours (Day Trading)')
+      : (locale === 'ar' ? 'أيام - أسابيع (سـوينج - بحد أقصى ٢٠ يوم تداول للتصفية)' : 'Days - Weeks (Swing - Max 20 trading days)');
     const reward = isSell ? (currentPrice - ((tp1 + tp2) / 2)) : (((tp1 + tp2) / 2) - currentPrice);
     const risk = isSell ? (sl - currentPrice) : (currentPrice - sl);
+    const rrNum = risk > 0 ? (reward / risk) : 1.0;
     const rr = risk > 0 ? (reward / risk).toFixed(1) : '1.0';
+
+    // Quality filters checks
+    const filteredByRR = rrNum < settings.min_risk_reward;
+    const filteredByML = mlProb !== null && mlProb < settings.min_ml_probability;
+    const filteredByVolume = settings.require_volume_spike && (analysisData?.volRatio ?? 1.0) < 1.3;
+    const isFiltered = (action === 'buy' || action === 'sell') && (filteredByRR || filteredByML || filteredByVolume);
 
     const indicatorRecs = [
       {
@@ -1338,9 +1487,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       }
     ];
 
-    const tradeDuration = isIntradayInterval
-      ? (locale === 'ar' ? 'ساعات (صفقة يومية)' : 'Hours (Day Trading)')
-      : (locale === 'ar' ? 'أيام - أسابيع (سـوينج)' : 'Days - Weeks (Swing)');
+
 
     // Expected bars to reach targets:
     const barsToTP1 = currentATR > 0
@@ -1487,9 +1634,22 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       winRate2,
       totalSignals,
       atr: currentATR,
-      indicatorRecs
+      indicatorRecs,
+      filteredByRR,
+      filteredByML,
+      filteredByVolume,
+      isFiltered
     };
-  }, [overallScore, topLevels, currentPrice, analysisData, isNearATH, lastRSI, locale, isIntradayInterval, analysisCandles, analysisRsiRaw, analysisMacdRaw, signalStats, bbDetails, rsiDetails, macdDetails, smaDetails, srDetails]);
+  }, [overallScore, topLevels, currentPrice, analysisData, isNearATH, lastRSI, locale, isIntradayInterval, analysisCandles, analysisRsiRaw, analysisMacdRaw, signalStats, bbDetails, rsiDetails, macdDetails, smaDetails, srDetails, settings, mlProb]);
+
+  // تحقق هل TP1 قريب من مقاومة قوية؟
+  const tp1NearResistance = useMemo(() => {
+    if (!dealSetup) return false;
+    return srLevels.some(l =>
+      l.type === 'resistance' &&
+      Math.abs(l.price - dealSetup.tp1) / dealSetup.tp1 < 0.02
+    );
+  }, [srLevels, dealSetup]);
 
   useEffect(() => {
     if (!analysisData) {
@@ -1527,6 +1687,88 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       .then(d => setMlProb(d.probability))
       .catch(() => setMlProb(null));
   }, [analysisData, interval, dealSetup?.atr, currentPrice]);
+
+  useEffect(() => {
+    setIsSaved(false);
+    if (!symbol) return;
+    fetch(`/api/trades?symbol=${symbol}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.trades) {
+          const hasActive = data.trades.some((t: any) => t.status === 'active');
+          if (hasActive) {
+            setIsSaved(true);
+          }
+        }
+      })
+      .catch(err => console.error('Error fetching trades:', err));
+  }, [symbol]);
+
+  const handleSaveRecommendation = async () => {
+    if (isSaving || isSaved) return;
+    setIsSaving(true);
+    try {
+      const dayOfWeek = new Date().getDay();
+      const featuresSnapshot = analysisData ? {
+        rsi: analysisData.rsi ?? 50,
+        macd_hist: analysisData.macdHistogram ?? 0,
+        macd: analysisData.macd ?? 0,
+        sma20_dist: analysisData.sma20 ? (currentPrice - analysisData.sma20) / analysisData.sma20 * 100 : 0,
+        sma50_dist: analysisData.sma50 ? (currentPrice - analysisData.sma50) / analysisData.sma50 * 100 : 0,
+        atr_pct: (dealSetup?.atr ?? 0) / (currentPrice || 1) * 100,
+        vol_ratio: Math.min(analysisData.volRatio ?? 1, 5),
+        bb_width: analysisData.bbWidth ?? 2,
+        bb_pos: analysisData.bbPos ?? 0,
+        stoch_rsi: analysisData.stochRsi ?? 0.5,
+        vol_spike: analysisData.volSpike ?? 0,
+        dist_ath: analysisData.distAth ?? 0,
+        day_of_week: dayOfWeek
+      } : null;
+
+      const res = await fetch('/api/trades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_id: companyId,
+          symbol,
+          direction: dealSetup.action,
+          entry_price: dealSetup.entry,
+          tp1: dealSetup.tp1,
+          tp2: dealSetup.tp2,
+          sl: dealSetup.sl,
+          timeframe: interval,
+          ml_probability: mlProb,
+          win_rate_hist: dealSetup.winRate,
+          features_snapshot: featuresSnapshot
+        })
+      });
+
+      if (res.ok) {
+        setIsSaved(true);
+        setToastMessage(
+          locale === 'ar'
+            ? '✅ تم حفظ التوصية بنجاح لمتابعة الأداء!'
+            : '✅ Recommendation saved successfully for performance tracking!'
+        );
+        setTimeout(() => setToastMessage(null), 4000);
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to save');
+      }
+    } catch (err: any) {
+      console.error('Error saving trade:', err);
+      setToastMessage(
+        locale === 'ar'
+          ? `❌ فشل حفظ التوصية: ${err.message}`
+          : `❌ Failed to save recommendation: ${err.message}`
+      );
+      setTimeout(() => setToastMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
 
   const scoreBarPct = ((overallScore + 8) / 16) * 100;
   const isLargeData = allChartData.length > 200;
@@ -1679,6 +1921,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                 showBB={showBB}
                 showVol={showVol}
                 interval={interval}
+                srLevels={srLevels}
                 onCrosshairMove={handleCrosshairMove}
               />
               {intradayHasNoData && ['15m', '30m', '1h', '4h'].includes(interval) && (
@@ -2216,172 +2459,699 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                   </span>
                 </h3>
 
-                <div className="flex flex-col gap-2 text-[10px]">
-                  <div className="flex justify-between items-center py-1 border-b border-white/5">
-                    <span className="text-text-secondary">{locale === 'ar' ? 'الدخول المقترح:' : 'Suggested Entry:'}</span>
-                    <span className="font-mono font-bold text-text-primary">{dealSetup.entry.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-green-400">🎯 {locale === 'ar' ? 'هدف 1:' : 'Target 1:'}</span>
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-green-400">
-                          {dealSetup.tp1.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}
-                          <span className="text-green-400/60 ml-1 text-[9px]">
-                            ({dealSetup.isSell ? '-' : '+'}{Math.abs(((dealSetup.tp1 - dealSetup.entry) / dealSetup.entry) * 100).toFixed(1)}%)
-                          </span>
-                        </span>
-                        <div className="text-[9px] text-text-secondary/60 flex justify-end gap-2 mt-0.5">
-                          {dealSetup.timeToTP1 && (
-                            <span>⏱ {dealSetup.timeToTP1}</span>
-                          )}
-                          {dealSetup.winRate !== null && (
-                            <span className={dealSetup.winRate >= 60
-                              ? 'text-green-400 font-bold'
-                              : dealSetup.winRate >= 45
-                                ? 'text-yellow-400 font-bold'
-                                : 'text-red-400 font-bold'}>
-                              📊 {dealSetup.winRate}% {dealSetup.totalSignals > 0 ? (locale === 'ar' ? `(من ${dealSetup.totalSignals} إشارة)` : `(of ${dealSetup.totalSignals} signals)`) : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {dealSetup.tp1Source && (
-                      <p className="text-[9px] text-text-secondary/50 text-end leading-tight">{dealSetup.tp1Source}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-green-400">🎯 {locale === 'ar' ? 'هدف 2:' : 'Target 2:'}</span>
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-green-400">
-                          {dealSetup.tp2.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}
-                          <span className="text-green-400/60 ml-1 text-[9px]">
-                            ({dealSetup.isSell ? '-' : '+'}{Math.abs(((dealSetup.tp2 - dealSetup.entry) / dealSetup.entry) * 100).toFixed(1)}%)
-                          </span>
-                        </span>
-                        <div className="text-[9px] text-text-secondary/60 flex justify-end gap-2 mt-0.5">
-                          {dealSetup.timeToTP2 && (
-                            <span>⏱ {dealSetup.timeToTP2}</span>
-                          )}
-                          {dealSetup.winRate2 !== null && (
-                            <span className={dealSetup.winRate2 >= 60
-                              ? 'text-green-400 font-bold'
-                              : dealSetup.winRate2 >= 45
-                                ? 'text-yellow-400 font-bold'
-                                : 'text-red-400 font-bold'}>
-                              📊 {dealSetup.winRate2}% {dealSetup.totalSignals > 0 ? (locale === 'ar' ? `(من ${dealSetup.totalSignals} إشارة)` : `(of ${dealSetup.totalSignals} signals)`) : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {dealSetup.tp2Source && (
-                      <p className="text-[9px] text-text-secondary/50 text-end leading-tight">{dealSetup.tp2Source}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-0.5 pb-2 border-b border-white/5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-red-400">🛑 {locale === 'ar' ? 'وقف الخسارة:' : 'Stop Loss:'}</span>
-                      <span className="font-mono font-bold text-red-400">
-                        {dealSetup.sl.toFixed(3)} 
-                        <span className="text-red-400/60 ml-1 text-[9px]">
-                          ({dealSetup.isSell ? '+' : '-'}{Math.abs(((dealSetup.sl - dealSetup.entry) / dealSetup.entry) * 100).toFixed(1)}%)
-                        </span>
-                      </span>
-                    </div>
-                    {dealSetup.slSource && (
-                      <p className="text-[9px] text-text-secondary/50 text-end leading-tight">{dealSetup.slSource}</p>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between items-center pt-0.5 border-b border-white/5 pb-2">
-                    <span className="text-text-secondary">{locale === 'ar' ? 'نسبة العائد/المخاطرة:' : 'Risk/Reward Ratio:'}</span>
-                    <span className="font-mono font-bold text-text-primary">1 : {dealSetup.rr}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-0.5 border-b border-white/5 pb-2">
-                    <span className="text-text-secondary">{locale === 'ar' ? 'المدى المتوقع للصفقة:' : 'Expected Duration:'}</span>
-                    <span className="font-bold text-text-primary">{dealSetup.tradeDuration}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-0.5 border-b border-white/5 pb-2">
-                    <span className="text-text-secondary">
-                      {locale === 'ar' ? 'تذبذب الشمعة (ATR):' : 'Candle Volatility (ATR):'}
+                {/* Advanced Risk Settings Panel */}
+                <div className="border border-white/5 bg-white/[0.01] rounded-xl p-2.5 mb-2 font-sans">
+                  <button
+                    onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+                    className="w-full flex items-center justify-between text-[10px] font-bold text-accent-blue hover:text-accent-blue/80 transition-colors cursor-pointer select-none"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span>🎛️</span>
+                      <span>{locale === 'ar' ? 'فلاتر جودة التوصيات والمخاطر' : 'Risk & Quality Filters'}</span>
                     </span>
-                    <span className="font-mono text-text-primary">
-                      {dealSetup.atr.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}
-                    </span>
-                  </div>
+                    <span>{showSettingsPanel ? '▲' : '▼'}</span>
+                  </button>
 
-                  {mlProb !== null && (
-                    <div className="flex justify-between items-center p-2 rounded-lg bg-white/5 border border-white/10 mt-1">
-                      <span className="text-[11px] text-text-secondary flex items-center gap-1.5">
-                        <span>🤖</span>
-                        <span>{locale === 'ar' ? 'احتمال النجاح (AI):' : 'AI Success Probability:'}</span>
-                      </span>
-                      <span className={`font-bold text-sm ${
-                        mlProb >= 0.65 ? 'text-green-400'
-                        : mlProb >= 0.50 ? 'text-yellow-400'
-                        : 'text-red-400'
-                      }`}>
-                        {(mlProb * 100).toFixed(1)}%
-                      </span>
+                  {showSettingsPanel && (
+                    <div className="flex flex-col gap-2.5 mt-2.5 pt-2.5 border-t border-white/5 text-[9px] text-text-secondary">
+                      {/* Trailing Stop */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-text-primary">
+                            {locale === 'ar' ? 'الوقف للتعادل بعد الهدف الأول' : 'Trailing Stop to Entry after TP1'}
+                          </span>
+                          <span className="text-[8px] text-text-secondary/60">
+                            {locale === 'ar' ? 'نقل الوقف لسعر الدخول بعد ضرب TP1 لتأمين الصفقة.' : 'Move Stop to entry after TP1 hits.'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateSetting('trailing_stop_to_entry', !settings.trailing_stop_to_entry)}
+                          className={`w-8 h-4 rounded-full p-0.5 transition-colors cursor-pointer ${
+                            settings.trailing_stop_to_entry ? 'bg-emerald-500 flex justify-end' : 'bg-white/10 flex justify-start'
+                          }`}
+                        >
+                          <span className="w-3 h-3 bg-white rounded-full block shadow" />
+                        </button>
+                      </div>
+
+                      {/* Risk Reward Filter */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-text-primary">
+                            {locale === 'ar' ? 'تصفية العائد/المخاطرة (R:R)' : 'Risk/Reward (R:R) Filter'}
+                          </span>
+                          <span className="text-[8px] text-text-secondary/60">
+                            {locale === 'ar' ? 'استبعاد الصفقات ذات العائد الضعيف مقابل الوقف.' : 'Exclude setups with low risk-reward ratios.'}
+                          </span>
+                        </div>
+                        <select
+                          value={settings.min_risk_reward}
+                          onChange={(e) => handleUpdateSetting('min_risk_reward', parseFloat(e.target.value))}
+                          className="bg-surface-dark border border-white/10 text-text-primary rounded px-1.5 py-0.5 outline-none text-[9px] font-sans"
+                        >
+                          <option value={0}>{locale === 'ar' ? 'تعطيل' : 'Disabled'}</option>
+                          <option value={1.2}>1 : 1.2</option>
+                          <option value={1.5}>1 : 1.5</option>
+                          <option value={1.8}>1 : 1.8</option>
+                          <option value={2.0}>1 : 2.0</option>
+                        </select>
+                      </div>
+
+                      {/* ML Probability Filter */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-text-primary">
+                            {locale === 'ar' ? 'فلتر احتمالية الذكاء الاصطناعي' : 'AI Win Probability Filter'}
+                          </span>
+                          <span className="text-[8px] text-text-secondary/60">
+                            {locale === 'ar' ? 'استبعاد الصفقات ذات احتمالية النجاح المنخفضة بالـ AI.' : 'Exclude setups with low AI success probability.'}
+                          </span>
+                        </div>
+                        <select
+                          value={settings.min_ml_probability}
+                          onChange={(e) => handleUpdateSetting('min_ml_probability', parseFloat(e.target.value))}
+                          className="bg-surface-dark border border-white/10 text-text-primary rounded px-1.5 py-0.5 outline-none text-[9px] font-sans"
+                        >
+                          <option value={0}>{locale === 'ar' ? 'تعطيل' : 'Disabled'}</option>
+                          <option value={0.50}>50%</option>
+                          <option value={0.55}>55%</option>
+                          <option value={0.58}>58%</option>
+                          <option value={0.60}>60%</option>
+                          <option value={0.65}>65%</option>
+                        </select>
+                      </div>
+
+                      {/* Volume Spike Filter */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-text-primary">
+                            {locale === 'ar' ? 'اشتراط تأكيد السيولة' : 'Confirm Volume Spike'}
+                          </span>
+                          <span className="text-[8px] text-text-secondary/60">
+                            {locale === 'ar' ? 'حجب الصفقة إذا لم يكن حجم التداول > 1.3x من متوسط 20 يوم.' : 'Require volume > 1.3x of 20-day average.'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateSetting('require_volume_spike', !settings.require_volume_spike)}
+                          className={`w-8 h-4 rounded-full p-0.5 transition-colors cursor-pointer ${
+                            settings.require_volume_spike ? 'bg-emerald-500 flex justify-end' : 'bg-white/10 flex justify-start'
+                          }`}
+                        >
+                          <span className="w-3 h-3 bg-white rounded-full block shadow" />
+                        </button>
+                      </div>
                     </div>
                   )}
+                </div>
 
-                  {dealSetup.indicatorRecs && (
-                    <div className="mt-3 border-t border-white/5 pt-3">
-                      <span className="text-[11px] font-bold text-text-primary block mb-2 flex items-center gap-1.5">
-                        <span>📊</span>
-                        <span>{locale === 'ar' ? 'توصيات المؤشرات الفردية:' : 'Individual Indicator Recommendations:'}</span>
-                      </span>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-[10px] text-text-secondary">
-                          <thead>
-                            <tr className="border-b border-white/5 text-text-secondary/70">
-                              <th className="pb-1 font-semibold">{locale === 'ar' ? 'المؤشر' : 'Indicator'}</th>
-                              <th className="pb-1 text-center font-semibold">{locale === 'ar' ? 'الإشارة' : 'Signal'}</th>
-                              <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'الوقف' : 'Stop'}</th>
-                              <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'هدف 1' : 'TP1'}</th>
-                              <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'هدف 2' : 'TP2'}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5">
-                            {dealSetup.indicatorRecs.map((rec, i) => (
-                              <tr key={i} className="hover:bg-white/5 transition-colors">
-                                <td className="py-1.5 font-medium max-w-[95px] truncate text-text-primary">{rec.name}</td>
-                                <td className="py-1.5 text-center">{rec.signal}</td>
-                                <td className="py-1.5 text-right font-mono text-red-400">{rec.sl.toFixed(2)}</td>
-                                <td className="py-1.5 text-right font-mono text-green-400">{rec.tp1.toFixed(2)}</td>
-                                <td className="py-1.5 text-right font-mono text-green-400">{rec.tp2.toFixed(2)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                {dealSetup.isFiltered ? (
+                  <div className="flex flex-col items-center justify-center p-6 text-center rounded-xl bg-amber-500/5 border border-amber-500/10 gap-3 mt-1 font-sans">
+                    <span className="text-2xl animate-pulse">🛡️</span>
+                    <h4 className="text-xs font-bold text-amber-400">
+                      {locale === 'ar' ? 'تم حجب هذه التوصية بواسطة فلاتر الجودة النشطة' : 'Setup Filtered by Active Quality Settings'}
+                    </h4>
+                    <p className="text-[9px] leading-relaxed text-text-secondary/80 max-w-[220px]">
+                      {locale === 'ar' 
+                        ? 'توصية الشراء/البيع الحالية لا تستوفي كافة معايير المخاطر والجودة التي قمت بتفعيلها في الإعدادات أعلاه:'
+                        : 'The current trade setup does not meet all active risk and quality parameters configured above:'}
+                    </p>
+                    <div className="flex flex-col gap-1 w-full text-start text-[8px] text-text-secondary/60 bg-black/10 p-2 rounded-lg border border-white/5">
+                      {dealSetup.filteredByRR && (
+                        <div className="flex justify-between items-center text-red-400 font-medium">
+                          <span>• {locale === 'ar' ? 'معدل العائد للمخاطرة ضعيف:' : 'Poor Risk/Reward Ratio:'}</span>
+                          <span className="font-mono">1 : {dealSetup.rr} &lt; {settings.min_risk_reward}</span>
+                        </div>
+                      )}
+                      {dealSetup.filteredByML && (
+                        <div className="flex justify-between items-center text-red-400 font-medium">
+                          <span>• {locale === 'ar' ? 'احتمالية الذكاء الاصطناعي ضعيفة:' : 'Low AI Win Probability:'}</span>
+                          <span className="font-mono">{(mlProb !== null ? mlProb * 100 : 0).toFixed(0)}% &lt; {settings.min_ml_probability * 100}%</span>
+                        </div>
+                      )}
+                      {dealSetup.filteredByVolume && (
+                        <div className="flex justify-between items-center text-red-400 font-medium">
+                          <span>• {locale === 'ar' ? 'حجم تداول ضعيف (سيولة منخفضة):' : 'Low Relative Trading Volume:'}</span>
+                          <span className="font-mono">{(analysisData?.volRatio ?? 1.0).toFixed(1)}x &lt; 1.3x</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 text-[10px]">
+                    <div className="flex justify-between items-center py-1 border-b border-white/5">
+                      <span className="text-text-secondary">{locale === 'ar' ? 'الدخول المقترح:' : 'Suggested Entry:'}</span>
+                      <span className="font-mono font-bold text-text-primary">{dealSetup.entry.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}</span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-green-400">🎯 {locale === 'ar' ? 'هدف 1:' : 'Target 1:'}</span>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-green-400">
+                            {dealSetup.tp1.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}
+                            <span className="text-green-400/60 ml-1 text-[9px]">
+                              ({dealSetup.isSell ? '-' : '+'}{Math.abs(((dealSetup.tp1 - dealSetup.entry) / dealSetup.entry) * 100).toFixed(1)}%)
+                            </span>
+                          </span>
+                          <div className="text-[9px] text-text-secondary/60 flex justify-end gap-2 mt-0.5">
+                            {dealSetup.timeToTP1 && (
+                              <span>⏱ {dealSetup.timeToTP1}</span>
+                            )}
+                            {dealSetup.winRate !== null && (
+                              <span className={dealSetup.winRate >= 60
+                                ? 'text-green-400 font-bold'
+                                : dealSetup.winRate >= 45
+                                  ? 'text-yellow-400 font-bold'
+                                  : 'text-red-400 font-bold'}>
+                                📊 {dealSetup.winRate}% {dealSetup.totalSignals > 0 ? (locale === 'ar' ? `(من ${dealSetup.totalSignals} إشارة)` : `(of ${dealSetup.totalSignals} signals)`) : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-[9px] text-text-secondary/50 mt-1.5 leading-relaxed bg-white/5 p-1.5 rounded border border-white/5">
-                        💡 {locale === 'ar'
-                          ? 'يتم احتساب الأهداف النهائية للمجموعة عن طريق وسيط (Median) توصيات المؤشرات الخمسة أعلاه لاستبعاد القيم الشاذة وضمان أقصى دقة.'
-                          : 'Final consensus targets are calculated using the median of the 5 indicators above to eliminate outliers and maximize accuracy.'}
+                      {dealSetup.tp1Source && (
+                        <p className="text-[9px] text-text-secondary/50 text-end leading-tight">{dealSetup.tp1Source}</p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-green-400">🎯 {locale === 'ar' ? 'هدف 2:' : 'Target 2:'}</span>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-green-400">
+                            {dealSetup.tp2.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}
+                            <span className="text-green-400/60 ml-1 text-[9px]">
+                              ({dealSetup.isSell ? '-' : '+'}{Math.abs(((dealSetup.tp2 - dealSetup.entry) / dealSetup.entry) * 100).toFixed(1)}%)
+                            </span>
+                          </span>
+                          <div className="text-[9px] text-text-secondary/60 flex justify-end gap-2 mt-0.5">
+                            {dealSetup.timeToTP2 && (
+                              <span>⏱ {dealSetup.timeToTP2}</span>
+                            )}
+                            {dealSetup.winRate2 !== null && (
+                              <span className={dealSetup.winRate2 >= 60
+                                ? 'text-green-400 font-bold'
+                                : dealSetup.winRate2 >= 45
+                                  ? 'text-yellow-400 font-bold'
+                                  : 'text-red-400 font-bold'}>
+                                📊 {dealSetup.winRate2}% {dealSetup.totalSignals > 0 ? (locale === 'ar' ? `(من ${dealSetup.totalSignals} إشارة)` : `(of ${dealSetup.totalSignals} signals)`) : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {dealSetup.tp2Source && (
+                        <p className="text-[9px] text-text-secondary/50 text-end leading-tight">{dealSetup.tp2Source}</p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-0.5 pb-2 border-b border-white/5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-red-400">🛑 {locale === 'ar' ? 'وقف الخسارة:' : 'Stop Loss:'}</span>
+                        <span className="font-mono font-bold text-red-400">
+                          {dealSetup.sl.toFixed(3)} 
+                          <span className="text-red-400/60 ml-1 text-[9px]">
+                            ({dealSetup.isSell ? '+' : '-'}{Math.abs(((dealSetup.sl - dealSetup.entry) / dealSetup.entry) * 100).toFixed(1)}%)
+                          </span>
+                        </span>
+                      </div>
+                      {dealSetup.slSource && (
+                        <p className="text-[9px] text-text-secondary/50 text-end leading-tight">{dealSetup.slSource}</p>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center pt-0.5 border-b border-white/5 pb-2">
+                      <span className="text-text-secondary">{locale === 'ar' ? 'نسبة العائد/المخاطرة:' : 'Risk/Reward Ratio:'}</span>
+                      <span className="font-mono font-bold text-text-primary">1 : {dealSetup.rr}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-0.5 border-b border-white/5 pb-2">
+                      <span className="text-text-secondary">{locale === 'ar' ? 'المدى المتوقع للصفقة:' : 'Expected Duration:'}</span>
+                      <span className="font-bold text-text-primary">{dealSetup.tradeDuration}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-0.5 border-b border-white/5 pb-2">
+                      <span className="text-text-secondary">
+                        {locale === 'ar' ? 'تذبذب الشمعة (ATR):' : 'Candle Volatility (ATR):'}
+                      </span>
+                      <span className="font-mono text-text-primary">
+                        {dealSetup.atr.toFixed(3)} {locale === 'ar' ? 'ج.م' : 'EGP'}
+                      </span>
+                    </div>
+
+                    {dealSetup && (
+                      <div className="mt-3 p-3 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+                        {/* Capital Input */}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] text-slate-400">
+                            💰 {locale === 'ar' ? 'رأس المال المتاح:' : 'Available Capital:'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              value={userCapital}
+                              onChange={e => setUserCapital(Number(e.target.value))}
+                              className="w-24 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-right outline-none focus:border-purple-500"
+                            />
+                            <span className="text-[10px] text-slate-500">
+                              EGP
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Position Size Calculation */}
+                        {(() => {
+                          const pos = calcPositionSize(
+                            userCapital,
+                            currentPrice,
+                            dealSetup.sl,
+                            userRiskPercent
+                          );
+                          const totalInvest = pos.shares * currentPrice;
+                          const potentialTP1 = pos.shares * (dealSetup.tp1 - currentPrice);
+                          const potentialTP2 = pos.shares * (dealSetup.tp2 - currentPrice);
+
+                          return (
+                            <div className="space-y-1.5 text-[11px] font-sans">
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">
+                                  📊 {locale === 'ar' ? 'عدد الأسهم المقترح:' : 'Suggested Shares:'}
+                                </span>
+                                <span className="text-purple-300 font-bold">
+                                  {pos.shares.toLocaleString()} {locale === 'ar' ? 'سهم' : 'Shares'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">
+                                  💵 {locale === 'ar' ? 'إجمالي الاستثمار:' : 'Total Investment:'}
+                                </span>
+                                <span className="text-white font-mono">
+                                  {totalInvest.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">
+                                  🛑 {locale === 'ar' ? `أقصى خسارة (${userRiskPercent}%):` : `Max Loss (${userRiskPercent}%):`}
+                                </span>
+                                <span className="text-red-400 font-bold font-mono">
+                                  -{pos.maxLoss.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">
+                                  🎯 {locale === 'ar' ? 'ربح متوقع TP1:' : 'Expected TP1 Profit:'}
+                                </span>
+                                <span className="text-green-400 font-bold font-mono">
+                                  +{potentialTP1.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">
+                                  🎯🎯 {locale === 'ar' ? 'ربح متوقع TP2:' : 'Expected TP2 Profit:'}
+                                </span>
+                                <span className="text-emerald-400 font-bold font-mono">
+                                  +{potentialTP2.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between pt-1.5 border-t border-white/10">
+                                <span className="text-slate-400">
+                                  ⚖️ {locale === 'ar' ? 'نسبة ربح/خسارة:' : 'Reward/Risk:'}
+                                </span>
+                                <span className={`font-bold ${
+                                  potentialTP1 / (pos.maxLoss || 1) >= 2
+                                    ? 'text-green-400'
+                                    : potentialTP1 / (pos.maxLoss || 1) >= 1.5
+                                    ? 'text-yellow-400'
+                                    : 'text-red-400'
+                                }`}>
+                                  {pos.maxLoss > 0
+                                    ? (potentialTP1 / pos.maxLoss).toFixed(2)
+                                    : '∞'}:1
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {mlProb !== null && (
+                      <div className="flex justify-between items-center p-2 rounded-lg bg-white/5 border border-white/10 mt-1">
+                        <span className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                          <span>🤖</span>
+                          <span>{locale === 'ar' ? 'احتمال النجاح (AI):' : 'AI Success Probability:'}</span>
+                        </span>
+                        <span className={`font-bold text-sm ${
+                          mlProb >= 0.65 ? 'text-green-400'
+                          : mlProb >= 0.50 ? 'text-yellow-400'
+                          : 'text-red-400'
+                        }`}>
+                          {(mlProb * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+
+                    {dealSetup.indicatorRecs && (
+                      <div className="mt-3 border-t border-white/5 pt-3">
+                        <span className="text-[11px] font-bold text-text-primary block mb-2 flex items-center gap-1.5">
+                          <span>📊</span>
+                          <span>{locale === 'ar' ? 'توصيات المؤشرات الفردية:' : 'Individual Indicator Recommendations:'}</span>
+                        </span>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-[10px] text-text-secondary">
+                            <thead>
+                              <tr className="border-b border-white/5 text-text-secondary/70">
+                                <th className="pb-1 font-semibold">{locale === 'ar' ? 'المؤشر' : 'Indicator'}</th>
+                                <th className="pb-1 text-center font-semibold">{locale === 'ar' ? 'الإشارة' : 'Signal'}</th>
+                                <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'الوقف' : 'Stop'}</th>
+                                <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'هدف 1' : 'TP1'}</th>
+                                <th className="pb-1 text-right font-semibold">{locale === 'ar' ? 'هدف 2' : 'TP2'}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {dealSetup.indicatorRecs.map((rec, i) => (
+                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                  <td className="py-1.5 font-medium max-w-[95px] truncate text-text-primary">{rec.name}</td>
+                                  <td className="py-1.5 text-center">{rec.signal}</td>
+                                  <td className="py-1.5 text-right font-mono text-red-400">{rec.sl.toFixed(2)}</td>
+                                  <td className="py-1.5 text-right font-mono text-green-400">{rec.tp1.toFixed(2)}</td>
+                                  <td className="py-1.5 text-right font-mono text-green-400">{rec.tp2.toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-[9px] text-text-secondary/50 mt-1.5 leading-relaxed bg-white/5 p-1.5 rounded border border-white/5">
+                          💡 {locale === 'ar'
+                            ? 'يتم احتساب الأهداف النهائية للمجموعة عن طريق وسيط (Median) توصيات المؤشرات الـ ٥ أعلاه لاستبعاد القيم الشاذة وضمان أقصى دقة.'
+                            : 'Final consensus targets are calculated using the median of the 5 indicators above to eliminate outliers and maximize accuracy.'}
+                        </p>
+                        <p className="text-[9px] text-text-secondary/50 mt-1 leading-relaxed bg-white/5 p-1.5 rounded border border-white/5">
+                          ⏱️ {locale === 'ar'
+                            ? 'تتم تصفية وإغلاق التوصية تلقائياً عند سعر الإغلاق إذا استمرت لأكثر من ٢٠ يوم تداول دون تحقيق الأهداف أو ضرب الوقف كحد أقصى لإدارة رأس المال وتفادي تجميد السيولة.'
+                            : 'The trade setup is automatically closed at the close price if it remains active for more than 20 trading days without reaching targets or stop loss, to prevent capital lock-up.'}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="bg-accent-blue/10 border border-accent-blue/20 rounded-lg p-2.5 mt-1 flex flex-col gap-1">
+                      <div className="font-bold text-accent-blue flex items-center gap-1">
+                        <Info className="w-3 h-3" />
+                        {locale === 'ar' ? 'ملاحظة:' : 'Note:'}
+                      </div>
+                      <p className="text-text-secondary leading-relaxed whitespace-pre-wrap">
+                        {locale === 'ar' ? dealSetup.noteAR : dealSetup.noteEN}
                       </p>
                     </div>
-                  )}
 
-                  <div className="bg-accent-blue/10 border border-accent-blue/20 rounded-lg p-2.5 mt-1 flex flex-col gap-1">
-                    <div className="font-bold text-accent-blue flex items-center gap-1">
-                      <Info className="w-3 h-3" />
-                      {locale === 'ar' ? 'ملاحظة:' : 'Note:'}
+                    {/* Volume Score */}
+                    {volumeScore && (
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                          📊 {locale==='ar' ? 'قوة حجم التداول:' : 'Volume Strength:'}
+                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          volumeScore === 'strong'
+                            ? 'bg-green-400/15 text-green-400'
+                            : volumeScore === 'normal'
+                              ? 'bg-yellow-400/15 text-yellow-400'
+                              : 'bg-red-400/15 text-red-400'
+                        }`}>
+                          {volumeScore === 'strong'
+                            ? (locale==='ar' ? `🔥 قوي (${volumeRatio.toFixed(1)}×)` : `🔥 Strong (${volumeRatio.toFixed(1)}×)`)
+                            : volumeScore === 'normal'
+                              ? (locale==='ar' ? `✅ عادي (${volumeRatio.toFixed(1)}×)` : `✅ Normal (${volumeRatio.toFixed(1)}×)`)
+                              : (locale==='ar' ? `⚠️ ضعيف (${volumeRatio.toFixed(1)}×)` : `⚠️ Weak (${volumeRatio.toFixed(1)}×)`)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Candle Pattern */}
+                    {candlePattern.pattern && (
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                          🕯️ {locale==='ar' ? 'نمط الشمعة:' : 'Candle Pattern:'}
+                        </span>
+                        <span className={`text-xs font-bold ${
+                          candlePattern.bullish === true
+                            ? 'text-green-400'
+                            : candlePattern.bullish === false
+                              ? 'text-red-400'
+                              : 'text-yellow-400'
+                        }`}>
+                          {(() => {
+                            const patterns: Record<string, {ar:string; en:string}> = {
+                              hammer:            {ar:'🔨 Hammer ↑',      en:'🔨 Hammer ↑'},
+                              shooting_star:     {ar:'⭐ Shooting Star ↓',en:'⭐ Shooting Star ↓'},
+                              bullish_engulfing: {ar:'📈 ابتلاع صاعد ↑',  en:'📈 Bull Engulf ↑'},
+                              bearish_engulfing: {ar:'📉 ابتلاع هابط ↓',  en:'📉 Bear Engulf ↓'},
+                              doji:              {ar:'🔁 Doji',           en:'🔁 Doji'},
+                              morning_star:      {ar:'🌅 نجمة صباح ↑',   en:'🌅 Morning Star ↑'},
+                              evening_star:      {ar:'🌆 نجمة مساء ↓',   en:'🌆 Evening Star ↓'},
+                            };
+                            const p = patterns[candlePattern.pattern!];
+                            return locale==='ar' ? p?.ar : p?.en;
+                          })()}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* RSI Divergence */}
+                    {rsiDivergence && (
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                          📐 {locale==='ar' ? 'تباين RSI:' : 'RSI Divergence:'}
+                        </span>
+                        <span className={`text-xs font-bold ${
+                          rsiDivergence === 'bullish' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {rsiDivergence === 'bullish'
+                            ? (locale==='ar' ? '🟢 صاعد (انعكاس محتمل ↑)' : '🟢 Bullish Div ↑')
+                            : (locale==='ar' ? '🔴 هابط (انعكاس محتمل ↓)' : '🔴 Bearish Div ↓')}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Multi-Timeframe */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <span className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                        🕐 {locale==='ar' ? 'تأكيد الفريمات:' : 'TF Confirmation:'}
+                      </span>
+                      <span className={`text-xs font-bold ${
+                        mtfScore === 'strong_bull' ? 'text-green-400'
+                        : mtfScore === 'strong_bear' ? 'text-red-400'
+                        : mtfScore === 'mild_bull'  ? 'text-emerald-400'
+                        : mtfScore === 'mild_bear'  ? 'text-orange-400'
+                        : 'text-slate-400'
+                      }`}>
+                        {(() => {
+                          const labels: Record<string, {ar:string;en:string}> = {
+                            strong_bull: {ar:'🟢🟢 قوي جداً ↑',  en:'🟢🟢 Strong Bull'},
+                            mild_bull:   {ar:'🟢🟡 صاعد',         en:'🟢🟡 Mild Bull'},
+                            neutral:     {ar:'🟡🟡 محايد',         en:'🟡🟡 Neutral'},
+                            mild_bear:   {ar:'🔴🟡 هابط',          en:'🔴🟡 Mild Bear'},
+                            strong_bear: {ar:'🔴🔴 هابط قوي ↓',   en:'🔴🔴 Strong Bear'},
+                          };
+                          return locale==='ar' ? labels[mtfScore]?.ar : labels[mtfScore]?.en;
+                        })()}
+                      </span>
                     </div>
-                    <p className="text-text-secondary leading-relaxed whitespace-pre-wrap">
-                      {locale === 'ar' ? dealSetup.noteAR : dealSetup.noteEN}
-                    </p>
+
+                    {/* Signal Strength Summary */}
+                    {(() => {
+                      let score = 0;
+                      if (volumeScore === 'strong') score += 2;
+                      if (volumeScore === 'normal') score += 1;
+                      if (candlePattern.pattern &&
+                          candlePattern.bullish === (dealSetup?.action === 'buy')) score += 2;
+                      if (rsiDivergence === 'bullish' && dealSetup?.action === 'buy') score += 2;
+                      if (rsiDivergence === 'bearish' && dealSetup?.action === 'sell') score += 2;
+                      if (mtfScore === 'strong_bull' && dealSetup?.action === 'buy') score += 2;
+                      if (mtfScore === 'mild_bull' && dealSetup?.action === 'buy') score += 1;
+
+                      const label =
+                        score >= 6 ? {
+                          text: locale==='ar' ? '🔥 إشارة قوية جداً' : '🔥 Very Strong Signal',
+                          color: 'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400'
+                        } : score >= 4 ? {
+                          text: locale==='ar' ? '✅ إشارة جيدة' : '✅ Good Signal',
+                          color: 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400'
+                        } : score >= 2 ? {
+                          text: locale==='ar' ? '⚠️ إشارة متوسطة' : '⚠️ Moderate Signal',
+                          color: 'from-yellow-500/20 to-orange-500/20 border-yellow-500/30 text-yellow-400'
+                        } : {
+                          text: locale==='ar' ? '🔴 إشارة ضعيفة — تجنبها' : '🔴 Weak Signal — Avoid',
+                          color: 'from-red-500/20 to-rose-500/20 border-red-500/30 text-red-400'
+                        };
+
+                      return (
+                        <div className={`mt-2 p-3 rounded-xl bg-gradient-to-r border text-center font-bold text-xs ${label.color}`}>
+                          {label.text}
+                          <span className="text-[10px] opacity-70 block mt-0.5">
+                            {locale==='ar' ? `قوة الإشارة: ${score}/8` : `Signal Score: ${score}/8`}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* S/R Levels */}
+                    {srLevels.length > 0 && (
+                      <div className="mt-3 space-y-1.5 pt-2.5 border-t border-white/5">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
+                          {locale === 'ar' ? '📊 مستويات الدعم والمقاومة اللحظية:' : 'Support & Resistance:'}
+                        </p>
+                        <div className="space-y-1 font-mono">
+                          {srLevels.slice(0, 3).map((l, i) => (
+                            <div key={i} className="flex justify-between items-center text-[10px]">
+                              <span className={l.type === 'support' ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
+                                {l.type === 'support'
+                                  ? (locale === 'ar' ? '🟢 دعم' : '🟢 Support')
+                                  : (locale === 'ar' ? '🔴 مقاومة' : '🔴 Resistance')}
+                                {' '}{'★'.repeat(Math.min(l.strength, 3))}
+                              </span>
+                              <span className="text-white font-semibold">
+                                {l.price.toFixed(2)} EGP
+                                <span className={`mr-1 text-[9px] ${l.distance > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                  ({l.distance > 0 ? '+' : ''}{l.distance.toFixed(1)}%)
+                                </span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* تحذير لو TP1 قريب من مقاومة */}
+                        {tp1NearResistance && (
+                          <div className="mt-2.5 p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-[10px] text-orange-400 leading-normal">
+                            ⚠️ {locale === 'ar'
+                              ? 'الهدف الأول (TP1) قريب جداً من مستوى مقاومة قوية! فكّر في جني الأرباح مبكراً.'
+                              : 'TP1 is near strong resistance! Consider early profit-taking.'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(dealSetup.action === 'buy' || dealSetup.action === 'sell') && (
+                      <button
+                        onClick={() => {
+                          const pos = calcPositionSize(userCapital, currentPrice, dealSetup.sl, userRiskPercent);
+                          setTradeEntry(currentPrice || 0);
+                          setTradeShares(pos.shares > 0 ? pos.shares : 100);
+                          setShowTradeModal(true);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-2 mt-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/15 border border-transparent"
+                      >
+                        <span>🟢</span>
+                        <span>{locale === 'ar' ? 'تفعيل الصفقة في محفظتي' : 'Activate Trade in My Portfolio'}</span>
+                      </button>
+                    )}
+
+                    {showTradeModal && (
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm">
+                        <div className="bg-[#1E293B] rounded-2xl p-6 border border-white/10 w-80 shadow-2xl font-sans relative">
+                          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                            <span>🟢</span>
+                            <span>{locale === 'ar' ? 'تفعيل صفقة جديدة' : 'Activate New Trade'}</span>
+                          </h3>
+
+                          <div className="space-y-3.5">
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">
+                                {locale === 'ar' ? 'سعر الدخول الفعلي (EGP)' : 'Actual Entry Price (EGP)'}
+                              </label>
+                              <input
+                                type="number"
+                                step="any"
+                                value={tradeEntry}
+                                onChange={e => setTradeEntry(Number(e.target.value))}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:border-accent-blue outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-1">
+                                {locale === 'ar' ? 'عدد الأسهم' : 'Number of Shares'}
+                              </label>
+                              <input
+                                type="number"
+                                value={tradeShares}
+                                onChange={e => setTradeShares(Number(e.target.value))}
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:border-accent-blue outline-none"
+                              />
+                            </div>
+
+                            <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3 text-[10px] space-y-1.5">
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Target 1 (TP1)</span>
+                                <span className="text-green-400 font-mono font-semibold">
+                                  {dealSetup?.tp1?.toFixed(3)} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Target 2 (TP2)</span>
+                                <span className="text-green-400 font-mono font-semibold">
+                                  {dealSetup?.tp2?.toFixed(3)} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Stop Loss (SL)</span>
+                                <span className="text-red-400 font-mono font-semibold">
+                                  {dealSetup?.sl?.toFixed(3)} EGP
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1.5">
+                                <span className="text-slate-400">
+                                  {locale === 'ar' ? 'إجمالي الاستثمار:' : 'Total Investment:'}
+                                </span>
+                                <span className="text-white font-mono font-bold">
+                                  {(tradeEntry * tradeShares).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => setShowTradeModal(false)}
+                                className="flex-1 py-2 rounded-lg bg-white/5 text-slate-400 text-xs hover:bg-white/10 cursor-pointer"
+                              >
+                                {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const { data: { user } } = await supabase.auth.getUser();
+                                  if (!user) {
+                                    alert(locale === 'ar' ? '⚠️ يجب تسجيل الدخول أولاً' : '⚠️ You must sign in first');
+                                    return;
+                                  }
+                                  const { error } = await supabase.from('user_trades').insert([{
+                                    user_id:        user.id,
+                                    company_id:     companyId,
+                                    symbol:         symbol,
+                                    direction:      dealSetup.action,
+                                    entry_price:    tradeEntry,
+                                    shares_count:   tradeShares,
+                                    tp1:            dealSetup.tp1,
+                                    tp2:            dealSetup.tp2,
+                                    sl:             dealSetup.sl,
+                                    timeframe:      interval,
+                                    ml_probability: mlProb,
+                                  }]);
+                                  if (error) {
+                                    alert(locale === 'ar' ? `❌ فشل تفعيل الصفقة: ${error.message}` : `❌ Failed to activate trade: ${error.message}`);
+                                  } else {
+                                    setShowTradeModal(false);
+                                    alert(locale === 'ar' ? '✅ تم تفعيل الصفقة بنجاح في محفظتك!' : '✅ Trade successfully activated in your portfolio!');
+                                  }
+                                }}
+                                className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all cursor-pointer"
+                              >
+                                {locale === 'ar' ? 'تأكيد التفعيل' : 'Confirm'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               <p className="text-[9px] text-text-secondary/40 leading-relaxed border-t border-white/5 pt-2">

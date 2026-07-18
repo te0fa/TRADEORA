@@ -202,3 +202,287 @@ export function calcATR(candles: { high?: number; low?: number; close: number }[
   }
   return atrs;
 }
+
+// ══ Volume Score ══════════════════════
+export function calcVolumeScore(
+  candles: { volume: number }[],
+  period = 14
+): 'strong' | 'normal' | 'weak' | null {
+  if (candles.length < period + 1) return null;
+  const recent = candles[candles.length - 1].volume;
+  const avg = candles
+    .slice(-period - 1, -1)
+    .reduce((s, c) => s + (c.volume || 0), 0) / period;
+  if (!avg || avg === 0) return null;
+  const ratio = recent / avg;
+  if (ratio >= 2)   return 'strong';
+  if (ratio >= 0.7) return 'normal';
+  return 'weak';
+}
+
+export function calcVolumeRatio(
+  candles: { volume: number }[],
+  period = 14
+): number {
+  if (candles.length < period + 1) return 1;
+  const recent = candles[candles.length - 1].volume;
+  const avg = candles
+    .slice(-period - 1, -1)
+    .reduce((s, c) => s + (c.volume || 0), 0) / period;
+  return avg > 0 ? recent / avg : 1;
+}
+
+// ══ Candlestick Patterns ══════════════
+export type CandlePattern =
+  | 'hammer'
+  | 'shooting_star'
+  | 'bullish_engulfing'
+  | 'bearish_engulfing'
+  | 'doji'
+  | 'morning_star'
+  | 'evening_star'
+  | null;
+
+export function detectCandlePattern(
+  candles: {
+    open: number; close: number;
+    high: number; low:  number
+  }[]
+): { pattern: CandlePattern; bullish: boolean | null } {
+  if (candles.length < 3)
+    return { pattern: null, bullish: null };
+
+  const [c2, c1, c0] = candles.slice(-3);
+  const body0  = Math.abs(c0.close - c0.open);
+  const range0 = c0.high - c0.low;
+  const body1  = Math.abs(c1.close - c1.open);
+
+  // Doji
+  if (range0 > 0 && body0 / range0 < 0.1)
+    return { pattern: 'doji', bullish: null };
+
+  // Hammer (شمعة صاعدة مع ذيل سفلي طويل)
+  const lowerShadow0 =
+    Math.min(c0.open, c0.close) - c0.low;
+  const upperShadow0 =
+    c0.high - Math.max(c0.open, c0.close);
+  if (
+    lowerShadow0 > body0 * 2 &&
+    upperShadow0 < body0 * 0.5
+  ) return { pattern: 'hammer', bullish: true };
+
+  // Shooting Star (شمعة هابطة مع ذيل علوي طويل)
+  if (
+    upperShadow0 > body0 * 2 &&
+    lowerShadow0 < body0 * 0.5
+  ) return { pattern: 'shooting_star', bullish: false };
+
+  // Bullish Engulfing
+  if (
+    c1.close < c1.open &&       // c1 هابطة
+    c0.close > c0.open &&       // c0 صاعدة
+    c0.open  <= c1.close &&
+    c0.close >= c1.open &&
+    body0 > body1
+  ) return { pattern: 'bullish_engulfing', bullish: true };
+
+  // Bearish Engulfing
+  if (
+    c1.close > c1.open &&       // c1 صاعدة
+    c0.close < c0.open &&       // c0 هابطة
+    c0.open  >= c1.close &&
+    c0.close <= c1.open &&
+    body0 > body1
+  ) return { pattern: 'bearish_engulfing', bullish: false };
+
+  // Morning Star
+  if (
+    c2.close < c2.open &&
+    Math.abs(c1.close - c1.open) <
+      Math.abs(c2.close - c2.open) * 0.3 &&
+    c0.close > c0.open &&
+    c0.close > (c2.open + c2.close) / 2
+  ) return { pattern: 'morning_star', bullish: true };
+
+  // Evening Star
+  if (
+    c2.close > c2.open &&
+    Math.abs(c1.close - c1.open) <
+      Math.abs(c2.close - c2.open) * 0.3 &&
+    c0.close < c0.open &&
+    c0.close < (c2.open + c2.close) / 2
+  ) return { pattern: 'evening_star', bullish: false };
+
+  return { pattern: null, bullish: null };
+}
+
+// ══ RSI Divergence ════════════════════
+export function detectRSIDivergence(
+  candles: { close: number; low: number; high: number }[],
+  rsiValues: (number | null)[]
+): 'bullish' | 'bearish' | null {
+  const len = candles.length;
+  if (len < 20) return null;
+
+  // آخر 20 شمعة
+  const window = 20;
+  const priceSlice = candles.slice(-window);
+  const rsiSlice   = rsiValues.slice(-window)
+    .map(r => r ?? 50);
+
+  // Bullish Divergence: سعر أخفض + RSI أعلى
+  const firstLow  = priceSlice[0].low;
+  const lastLow   = priceSlice[window - 1].low;
+  const firstRSI  = rsiSlice[0];
+  const lastRSI   = rsiSlice[window - 1];
+
+  if (lastLow < firstLow * 0.99 &&
+      lastRSI  > firstRSI + 3)
+    return 'bullish';
+
+  // Bearish Divergence: سعر أعلى + RSI أخفض
+  const firstHigh = priceSlice[0].high;
+  const lastHigh  = priceSlice[window - 1].high;
+
+  if (lastHigh > firstHigh * 1.01 &&
+      lastRSI  < firstRSI - 3)
+    return 'bearish';
+
+  return null;
+}
+
+// ══ Multi-Timeframe Score ═════════════
+export type TFSignal = 'bullish' | 'bearish' | 'neutral';
+
+export function calcTFSignal(
+  candles: {
+    close: number; open: number;
+    high:  number; low:  number
+  }[],
+  rsi: (number | null)[]
+): TFSignal {
+  if (candles.length < 50) return 'neutral';
+  const lastRSI   = rsi[rsi.length - 1] ?? 50;
+  const lastClose = candles[candles.length - 1].close;
+  const sma20 = candles
+    .slice(-20)
+    .reduce((s, c) => s + c.close, 0) / 20;
+  const sma50 = candles
+    .slice(-50)
+    .reduce((s, c) => s + c.close, 0) / 50;
+
+  const bullScore =
+    (lastRSI > 50 ? 1 : 0) +
+    (lastClose > sma20 ? 1 : 0) +
+    (sma20 > sma50 ? 1 : 0);
+
+  if (bullScore >= 2) return 'bullish';
+  if (bullScore === 0) return 'bearish';
+  return 'neutral';
+}
+
+export function calcPositionSize(
+  capital: number,
+  entryPrice: number,
+  slPrice: number,
+  riskPercent: number = 2
+): {
+  shares:     number;
+  riskAmount: number;
+  maxLoss:    number;
+  riskRatio:  number;
+} {
+  const riskAmount = capital * (riskPercent / 100);
+  const slDistance = Math.abs(entryPrice - slPrice);
+  if (slDistance === 0)
+    return { shares: 0, riskAmount: 0, maxLoss: 0, riskRatio: 0 };
+  const shares     = Math.floor(riskAmount / slDistance);
+  const maxLoss    = shares * slDistance;
+  const riskRatio  = riskAmount / capital * 100;
+  return { shares, riskAmount, maxLoss, riskRatio };
+}
+
+export interface SRLevel {
+  price:    number;
+  type:     'support' | 'resistance';
+  strength: number;   // كمية الشموع اللي لمسته
+  distance: number;   // % بُعده عن السعر الحالي
+}
+
+export function detectSRLevels(
+  candles: { high: number; low: number; close: number }[],
+  currentPrice: number,
+  tolerance = 0.015,  // 1.5% tolerance
+  maxLevels = 5
+): SRLevel[] {
+  if (candles.length < 20) return [];
+
+  const levels: Map<number, {
+    count: number; type: 'support' | 'resistance';
+  }> = new Map();
+
+  // نحسب Pivot Points لكل شمعة
+  for (let i = 2; i < candles.length - 2; i++) {
+    const c = candles[i];
+
+    // Swing High (مقاومة)
+    if (
+      c.high > candles[i-1].high &&
+      c.high > candles[i-2].high &&
+      c.high > candles[i+1].high &&
+      c.high > candles[i+2].high
+    ) {
+      // نشوف هل في مستوى قريب
+      let merged = false;
+      for (const [price, data] of levels.entries()) {
+        if (Math.abs(price - c.high) / price < tolerance) {
+          levels.set(price, {
+            count: data.count + 1,
+            type:  'resistance'
+          });
+          merged = true;
+          break;
+        }
+      }
+      if (!merged)
+        levels.set(c.high, { count: 1, type: 'resistance' });
+    }
+
+    // Swing Low (دعم)
+    if (
+      c.low < candles[i-1].low &&
+      c.low < candles[i-2].low &&
+      c.low < candles[i+1].low &&
+      c.low < candles[i+2].low
+    ) {
+      let merged = false;
+      for (const [price, data] of levels.entries()) {
+        if (Math.abs(price - c.low) / price < tolerance) {
+          levels.set(price, {
+            count: data.count + 1,
+            type:  'support'
+          });
+          merged = true;
+          break;
+        }
+      }
+      if (!merged)
+        levels.set(c.low, { count: 1, type: 'support' });
+    }
+  }
+
+  // ترتيب حسب القوة وتصفية الأقرب للسعر
+  return Array.from(levels.entries())
+    .filter(([price]) =>
+      Math.abs(price - currentPrice) / currentPrice < 0.15
+    )
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, maxLevels)
+    .map(([price, data]) => ({
+      price,
+      type:     data.type,
+      strength: data.count,
+      distance: (price - currentPrice) / currentPrice * 100
+    }))
+    .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+}

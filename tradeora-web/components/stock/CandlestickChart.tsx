@@ -47,6 +47,7 @@ interface CandlestickChartProps {
   showBB: boolean;
   showVol: boolean;
   interval: '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m';
+  srLevels?: { price: number; type: 'support' | 'resistance'; strength: number; distance: number }[];
   onCrosshairMove?: (time: string | null, data?: {
     open: number;
     high: number;
@@ -57,7 +58,7 @@ interface CandlestickChartProps {
 }
 
 const CandlestickChartInner = (
-  { data, showSMA, showBB, showVol, interval, onCrosshairMove }: CandlestickChartProps,
+  { data, showSMA, showBB, showVol, interval, srLevels, onCrosshairMove }: CandlestickChartProps,
   ref: React.Ref<CandlestickChartHandle>
 ) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -247,6 +248,31 @@ const CandlestickChartInner = (
       bbMid.setData(data.filter(d => d.bbMiddle !== null).map(d => ({ time: d.time as Time, value: d.bbMiddle as number })));
       const bbLow = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
       bbLow.setData(data.filter(d => d.bbLower !== null).map(d => ({ time: d.time as Time, value: d.bbLower as number })));
+    }
+
+    // Draw Support & Resistance Levels (Part 6)
+    if (srLevels && srLevels.length > 0) {
+      srLevels.slice(0, 4).forEach((level) => {
+        const line = chart.addSeries(LineSeries, {
+          color: level.type === 'support'
+            ? 'rgba(34, 197, 94, 0.4)'
+            : 'rgba(239, 68, 68, 0.4)',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+
+        const firstTime = data[0]?.time as Time;
+        const lastTime  = data[data.length - 1]?.time as Time;
+
+        if (firstTime && lastTime) {
+          line.setData([
+            { time: firstTime, value: level.price },
+            { time: lastTime,  value: level.price },
+          ]);
+        }
+      });
     }
 
     // Scroll to the latest data
