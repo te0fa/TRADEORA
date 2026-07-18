@@ -366,6 +366,19 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     } catch (e) {
       console.error('Error loading config in PriceChart:', e);
     }
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('user_profiles')
+        .select('default_capital, default_risk_pct')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.default_capital) setUserCapital(Number(data.default_capital));
+          if (data?.default_risk_pct) setUserRiskPercent(Number(data.default_risk_pct));
+        });
+    });
   }, []);
 
   useEffect(() => {

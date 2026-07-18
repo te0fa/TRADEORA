@@ -1,19 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { usePushNotifications } from '@/lib/usePushNotifications';
 import { Settings, Shield, User, Bell, Percent, CreditCard, Check, Send } from 'lucide-react';
 
-interface SettingsPageProps {
-  params: Promise<{
-    locale: string;
-  }>;
-}
-
-export default function SettingsPage({ params }: SettingsPageProps) {
-  const { locale } = React.use(params);
+export default function SettingsPage() {
+  const { locale } = useParams();
   const router = useRouter();
+  const push = usePushNotifications();
   const isAr = locale === 'ar';
 
   const [loading, setLoading] = useState(true);
@@ -24,12 +20,6 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   const [fullName, setFullName] = useState('');
   const [capital, setCapital] = useState<number>(10000);
   const [riskPercent, setRiskPercent] = useState<number>(2);
-
-  // Notification states
-  const [notifyTP1, setNotifyTP1] = useState(true);
-  const [notifyTP2, setNotifyTP2] = useState(true);
-  const [notifySL, setNotifySL] = useState(true);
-  const [notifyPriceAlerts, setNotifyPriceAlerts] = useState(true);
 
   // Telegram Info
   const [telegramInfo, setTelegramInfo] = useState<any>(null);
@@ -46,7 +36,7 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       }
       setUser(user);
 
-      // Fetch user profile role and telegram info in parallel
+      // Fetch user profile and telegram info
       Promise.all([
         supabase
           .from('user_profiles')
@@ -62,6 +52,8 @@ export default function SettingsPage({ params }: SettingsPageProps) {
         if (profileRes.data) {
           setProfile(profileRes.data);
           setFullName(profileRes.data.full_name || '');
+          setCapital(Number(profileRes.data.default_capital ?? 10000));
+          setRiskPercent(Number(profileRes.data.default_risk_pct ?? 2));
         } else {
           setProfile({ full_name: user.email?.split('@')[0], role: 'user' });
           setFullName(user.email?.split('@')[0] || '');
@@ -74,27 +66,6 @@ export default function SettingsPage({ params }: SettingsPageProps) {
         setLoading(false);
       });
     });
-
-    // Load LocalStorage states
-    try {
-      const savedCap = localStorage.getItem('user_capital');
-      const savedRisk = localStorage.getItem('user_risk_percent');
-      
-      const savedNotifyTP1 = localStorage.getItem('notify_tp1');
-      const savedNotifyTP2 = localStorage.getItem('notify_tp2');
-      const savedNotifySL = localStorage.getItem('notify_sl');
-      const savedNotifyPriceAlerts = localStorage.getItem('notify_price_alerts');
-
-      if (savedCap) setCapital(Number(savedCap));
-      if (savedRisk) setRiskPercent(Number(savedRisk));
-      
-      if (savedNotifyTP1) setNotifyTP1(savedNotifyTP1 === 'true');
-      if (savedNotifyTP2) setNotifyTP2(savedNotifyTP2 === 'true');
-      if (savedNotifySL) setNotifySL(savedNotifySL === 'true');
-      if (savedNotifyPriceAlerts) setNotifyPriceAlerts(savedNotifyPriceAlerts === 'true');
-    } catch (e) {
-      console.error('Error loading config from localStorage:', e);
-    }
   }, [router, locale]);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -103,21 +74,20 @@ export default function SettingsPage({ params }: SettingsPageProps) {
     setSaveSuccess(false);
 
     try {
-      // 1. Save profile name to database
       if (user) {
         await supabase
           .from('user_profiles')
-          .update({ full_name: fullName })
-          .eq('id', user.id);
+          .upsert([{
+            id: user.id,
+            full_name: fullName,
+            default_capital: capital,
+            default_risk_pct: riskPercent,
+          }]);
       }
 
-      // 2. Save sizing and notifications to LocalStorage
+      // Also sync to localStorage for client-side instant computations
       localStorage.setItem('user_capital', String(capital));
       localStorage.setItem('user_risk_percent', String(riskPercent));
-      localStorage.setItem('notify_tp1', String(notifyTP1));
-      localStorage.setItem('notify_tp2', String(notifyTP2));
-      localStorage.setItem('notify_sl', String(notifySL));
-      localStorage.setItem('notify_price_alerts', String(notifyPriceAlerts));
 
       setSaving(false);
       setSaveSuccess(true);
@@ -127,6 +97,8 @@ export default function SettingsPage({ params }: SettingsPageProps) {
       setSaving(false);
     }
   };
+
+  const t = (ar: string, en: string) => (isAr ? ar : en);
 
   if (loading) {
     return (
@@ -138,21 +110,16 @@ export default function SettingsPage({ params }: SettingsPageProps) {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto font-sans text-text-primary">
+    <div className="w-full max-w-4xl mx-auto font-sans text-text-primary" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Title */}
       <div className="mb-8">
         <h1 className="text-2xl font-black text-white mb-1 flex items-center gap-2">
           <Settings className="w-6 h-6 text-accent-blue" />
-          <span>{isAr ? '⚙️ إعدادات الحساب وإدارة المخاطر' : 'Account Settings'}</span>
+          <span>{t('⚙️ الإعدادات', 'Settings')}</span>
         </h1>
-        <p className="text-xs text-text-secondary mt-1">
-          {isAr 
-            ? 'تخصيص معايير محفظتك وإدارة المخاطر وتعديل تنبيهات تيليجرام.'
-            : 'Configure your default portfolio preferences, telegram bot linking and notifications.'}
-        </p>
       </div>
 
-      <form onSubmit={handleSaveSettings} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Left Column: Sizing & Preferences */}
         <div className="md:col-span-2 space-y-6">
@@ -161,19 +128,32 @@ export default function SettingsPage({ params }: SettingsPageProps) {
           <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-transparent">
             <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
               <User className="w-4 h-4 text-accent-blue" />
-              <span>{isAr ? 'تحديث الملف الشخصي' : 'Update Profile'}</span>
+              <span>{t('👤 الملف الشخصي', 'Profile')}</span>
             </h2>
 
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-slate-400 block mb-1">
-                  {isAr ? 'الاسم بالكامل' : 'Full Name'}
+                  {t('الاسم بالكامل', 'Full Name')}
                 </label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
+                  placeholder={t('اسمك الكامل', 'Your name')}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs focus:border-accent-blue outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">
+                  {t('البريد الإلكتروني', 'Email')}
+                </label>
+                <input
+                  type="text"
+                  value={user?.email ?? ''}
+                  disabled
+                  className="w-full bg-white/3 border border-white/5 rounded-xl px-4 py-2.5 text-slate-500 text-xs cursor-not-allowed"
                 />
               </div>
             </div>
@@ -183,38 +163,51 @@ export default function SettingsPage({ params }: SettingsPageProps) {
           <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-transparent">
             <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
               <Percent className="w-4 h-4 text-accent-blue" />
-              <span>{isAr ? 'حاسبة إدارة المخاطر الافتراضية' : 'Default Position Sizing'}</span>
+              <span>{t('💰 إعدادات التداول وإدارة المخاطر', 'Trading & Position Sizing Settings')}</span>
             </h2>
 
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-slate-400 block mb-1">
-                  {isAr ? 'رأس المال الافتراضي للمحفظة (EGP)' : 'Default Available Capital (EGP)'}
+                  {t('رأس المال الافتراضي (EGP)', 'Default Capital (EGP)')}
                 </label>
                 <input
                   type="number"
                   value={capital}
                   onChange={e => setCapital(Number(e.target.value))}
+                  step={1000}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs focus:border-accent-blue outline-none"
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {t('يُستخدم تلقائياً في حاسبة إدارة المخاطر المخصصة صمن الرسم البياني.', 'Used automatically in the stock position risk calculator.')}
+                </p>
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">
-                  {isAr ? 'نسبة المخاطرة لكل صفقة (%)' : 'Risk Percentage Per Trade (%)'}
-                </label>
+                <div className="flex justify-between mb-2">
+                  <label className="text-xs text-slate-400">
+                    {t('نسبة المخاطرة الافتراضية', 'Default Risk %')}
+                  </label>
+                  <span className={`text-sm font-bold ${
+                    riskPercent <= 2 ? 'text-green-400'
+                    : riskPercent <= 4 ? 'text-yellow-400'
+                    : 'text-red-400'
+                  }`}>
+                    {riskPercent}%
+                  </span>
+                </div>
                 <input
-                  type="number"
-                  step="0.1"
+                  type="range"
+                  min={0.5} max={5} step={0.5}
                   value={riskPercent}
                   onChange={e => setRiskPercent(Number(e.target.value))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs focus:border-accent-blue outline-none"
+                  className="w-full accent-blue-500 cursor-pointer h-1.5 bg-white/10 rounded-lg appearance-none"
                 />
-                <p className="text-[10px] text-slate-500 mt-1.5 leading-normal">
-                  {isAr 
-                    ? '⚠️ ننصح بتثبيت نسبة المخاطرة عند 2% بحد أقصى لحماية محفظتك من تقلبات السوق المفاجئة.' 
-                    : '⚠️ We recommend keeping risk at 2% or less per trade to safeguard capital.'}
-                </p>
+                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>{t('محافظ 0.5%', 'Conservative 0.5%')}</span>
+                  <span>{t('متوسط 2%', 'Moderate 2%')}</span>
+                  <span>{t('عالي 5%', 'High 5%')}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -223,249 +216,233 @@ export default function SettingsPage({ params }: SettingsPageProps) {
           <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-transparent">
             <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
               <Bell className="w-4 h-4 text-accent-blue" />
-              <span>{isAr ? 'تنبيهات صفقات المحفظة والأسعار' : 'Signal & Price Alerts'}</span>
+              <span>{t('🔔 إشعارات النظام المتقدمة', 'System Notifications Settings')}</span>
             </h2>
 
-            <div className="space-y-3.5">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifyTP1}
-                  onChange={e => setNotifyTP1(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-blue focus:ring-accent-blue"
-                />
+            <div className="space-y-4">
+              {/* Push notifications switch panel */}
+              <div className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl">
                 <div>
-                  <span className="text-xs text-white block">{isAr ? 'تنبيهات الهدف الأول (TP1)' : 'Notify Target 1 (TP1) hit'}</span>
-                  <span className="text-[10px] text-slate-400">{isAr ? 'تنبيه فوري عند ضرب السعر للهدف الأول لتصفية 50% من الصفقة.' : 'Instant alert when TP1 is hit to secure partial profits.'}</span>
+                  <p className="text-white text-xs font-semibold">
+                    📱 {t('إشعارات المتصفح الفورية (Push)', 'Browser Push Notifications')}
+                  </p>
+                  <p className="text-slate-400 text-[10px] mt-0.5 leading-normal">
+                    {t('استقبل تنبيهات الأهداف ووقف الخسارة مباشرة على شاشتك فوراً.', 'Receive TP1/SL alerts directly on screen in real-time.')}
+                  </p>
                 </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifyTP2}
-                  onChange={e => setNotifyTP2(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-blue focus:ring-accent-blue"
-                />
-                <div>
-                  <span className="text-xs text-white block">{isAr ? 'تنبيهات الهدف الثاني (TP2)' : 'Notify Target 2 (TP2) hit'}</span>
-                  <span className="text-[10px] text-slate-400">{isAr ? 'تنبيه فوري عند وصول السعر للهدف الثاني وإغلاق الصفقة بالكامل.' : 'Instant alert when TP2 is hit to close trade at maximum profits.'}</span>
+                <div className="flex items-center gap-3">
+                  {push.subscribed && (
+                    <span className="text-green-400 text-xs font-bold font-mono">
+                      ✓ {t('مفعّل', 'Active')}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={push.subscribed ? push.unsubscribe : push.subscribe}
+                    disabled={!push.supported || push.loading}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      push.subscribed
+                        ? 'bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20'
+                    } disabled:opacity-40`}
+                  >
+                    {push.loading ? '...' : push.subscribed ? t('إلغاء', 'Disable') : t('تفعيل', 'Enable')}
+                  </button>
                 </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifySL}
-                  onChange={e => setNotifySL(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-blue focus:ring-accent-blue"
-                />
-                <div>
-                  <span className="text-xs text-white block">{isAr ? 'تنبيهات وقف الخسارة (Stop Loss)' : 'Notify Stop Loss'}</span>
-                  <span className="text-[10px] text-slate-400">{isAr ? 'تنبيه طارئ فوري عند كسر وقف الخسارة لحماية رأس مالك.' : 'Emergency alert when stop loss level is breached.'}</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifyPriceAlerts}
-                  onChange={e => setNotifyPriceAlerts(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-blue focus:ring-accent-blue"
-                />
-                <div>
-                  <span className="text-xs text-white block">{isAr ? 'تنبيهات الأسعار المخصصة' : 'Notify Price Alerts'}</span>
-                  <span className="text-[10px] text-slate-400">{isAr ? 'تنبيهك عند وصول الأسهم لمستويات الدعم/المقاومة التي حددتها.' : 'Alerts triggered by your customized target prices.'}</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Save Action */}
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              {saving ? (
-                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              ) : saveSuccess ? (
-                <>
-                  <Check className="w-4 h-4 text-green-300 animate-bounce" />
-                  <span>{isAr ? 'تم حفظ التغييرات!' : 'Changes Saved!'}</span>
-                </>
-              ) : (
-                <span>{isAr ? 'حفظ إعدادات محفظتي' : 'Save Preferences'}</span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column: Telegram & Account Info */}
-        <div className="space-y-6">
-          
-          {/* Telegram Linking Card */}
-          <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-blue-500/5 to-transparent relative overflow-hidden">
-            <div className="absolute -right-6 -top-6 w-16 h-16 bg-blue-500/10 rounded-full blur-xl"></div>
-            
-            <h2 className="text-sm font-bold text-blue-400 mb-3 flex items-center gap-2">
-              <Send className="w-4 h-4 text-blue-400" />
-              <span>✈️ ربط حساب تيليجرام (Telegram)</span>
-            </h2>
-
-            {telegramInfo && telegramInfo.verified ? (
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold flex items-center gap-2">
-                  <Check className="w-4 h-4" />
-                  <span>{isAr ? 'حسابك مرتبك وموثق!' : 'Telegram linked successfully!'}</span>
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono space-y-1">
-                  <div className="flex justify-between">
-                    <span>{isAr ? 'معرف الدردشة:' : 'Chat ID:'}</span>
-                    <span className="text-white font-bold">{telegramInfo.chat_id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{isAr ? 'تاريخ الربط:' : 'Linked at:'}</span>
-                    <span className="text-white">{new Date(telegramInfo.linked_at).toLocaleDateString('ar-EG')}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!confirm(isAr ? 'هل تريد إلغاء ربط بوت تيليجرام؟' : 'Are you sure you want to unlink Telegram?')) return;
-                    await supabase.from('user_telegram').delete().eq('user_id', user.id);
-                    setTelegramInfo(null);
-                  }}
-                  className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-xl text-[10px] font-bold transition cursor-pointer"
-                >
-                  {isAr ? 'إلغاء ربط الحساب' : 'Unlink Account'}
-                </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-slate-300 leading-normal">
-                  {isAr 
-                    ? 'قم بربط حسابك ببوت تيليجرام لتلقي إشارات البيع والهدف الفوري وتنبيهات كسر الوقف مباشرة في جيبك.'
-                    : 'Link your account to our Telegram bot to receive live signals and target alerts directly.'}
+
+              {!push.supported && (
+                <p className="text-yellow-400 text-[10px] bg-yellow-400/10 rounded-lg p-2 leading-normal">
+                  ⚠️ {t('متصفحك الحالي لا يدعم إشعارات المتصفح الفورية.', 'Your current browser does not support push notifications.')}
                 </p>
-                
-                {showTelegramLink ? (
-                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                    <p className="text-[10px] text-slate-400 leading-normal">
-                      {isAr 
-                        ? '1. اضغط على الرابط بالأسفل لفتح البوت.' 
-                        : '1. Click the link below to open the bot.'}
+              )}
+
+              {/* Telegram Link panel */}
+              <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-white text-xs font-semibold">
+                      ✈️ {t('إشعارات بوت تيليجرام (Telegram)', 'Telegram Alerts')}
                     </p>
-                    <a
-                      href={`https://t.me/TradeORA_EGX_bot?start=${user?.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-accent-blue font-bold hover:underline block break-all font-mono"
-                    >
-                      t.me/TradeORA_EGX_bot?start={user?.id}
-                    </a>
-                    <p className="text-[10px] text-slate-400 leading-normal">
-                      {isAr 
-                        ? '2. اضغط على زر البدء (/start) في تيليجرام وسيتم توثيق وربط حسابك فورياً!'
-                        : '2. Press Start (/start) inside Telegram and your account will link instantly!'}
+                    <p className="text-slate-400 text-[10px] mt-0.5 leading-normal">
+                      {telegramInfo?.verified ? t('مرتبط وموثق ✓', 'Connected & Verified ✓') : t('غير مرتبط', 'Not connected')}
                     </p>
+                  </div>
+                  {telegramInfo?.verified && (
+                    <span className="text-green-400 text-xs bg-green-400/10 px-2 py-0.5 rounded-full font-bold">
+                      ✓ {t('نشط', 'Active')}
+                    </span>
+                  )}
+                </div>
+
+                {!telegramInfo?.verified ? (
+                  <div className="space-y-3">
+                    <p className="text-slate-400 text-[10px] leading-normal">
+                      {t('لربط وتفعيل إشعارات تيليجرام على هاتفك، اضغط أدناه لإرسال كود التوثيق للبوت:', 'To enable telegram alerts, open the bot link and press start:')}
+                    </p>
+                    <div className="bg-black/30 rounded-lg p-3 font-mono text-[10px] text-blue-400 select-all break-all text-center">
+                      {user ? `t.me/TradeORA_EGX_bot?start=${user.id}` : '...'}
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
-                        // Refresh to check if verified now
-                        setLoading(true);
-                        supabase
-                          .from('user_telegram')
-                          .select('*')
-                          .eq('user_id', user.id)
-                          .maybeSingle()
-                          .then(({ data }) => {
-                            if (data) setTelegramInfo(data);
-                            setLoading(false);
-                          });
+                        if (user) {
+                          window.open(`https://t.me/TradeORA_EGX_bot?start=${user.id}`, '_blank');
+                          setShowTelegramLink(true);
+                        }
                       }}
-                      className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold transition cursor-pointer"
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-blue-600/15"
                     >
-                      {isAr ? '🔄 تحديث حالة التوثيق' : '🔄 Refresh Link Status'}
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{t('افتح تيليجرام واربط الحساب', 'Open Telegram')}</span>
                     </button>
+                    
+                    {showTelegramLink && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoading(true);
+                          supabase
+                            .from('user_telegram')
+                            .select('*')
+                            .eq('user_id', user.id)
+                            .maybeSingle()
+                            .then(({ data }) => {
+                              if (data) setTelegramInfo(data);
+                              setLoading(false);
+                            });
+                        }}
+                        className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-slate-400 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                      >
+                        {t('🔄 تحديث حالة الربط', '🔄 Refresh Link Status')}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setShowTelegramLink(true)}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
+                    onClick={async () => {
+                      if (!confirm(t('هل تريد إلغاء ربط بوت تيليجرام؟', 'Are you sure you want to unlink Telegram?'))) return;
+                      await supabase.from('user_telegram').delete().eq('user_id', user.id);
+                      setTelegramInfo(null);
+                    }}
+                    className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-xl text-[10px] font-bold transition cursor-pointer"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{isAr ? '🔗 ربط حساب تيليجرام' : '🔗 Link Telegram Account'}</span>
+                    {t('إلغاء ربط تيليجرام', 'Unlink Telegram')}
                   </button>
                 )}
-              </div>
-            )}
-          </div>
-
-          {/* Account Profile info */}
-          <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-transparent">
-            <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <User className="w-4 h-4 text-accent-blue" />
-              <span>{isAr ? 'بيانات الحساب الشخصي' : 'Profile Details'}</span>
-            </h2>
-
-            <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                <span className="text-slate-400">{isAr ? 'البريد الإلكتروني:' : 'Email Address:'}</span>
-                <span className="text-white font-mono font-medium">{user?.email}</span>
-              </div>
-              <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                <span className="text-slate-400">{isAr ? 'نوع الحساب:' : 'Account Role:'}</span>
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold capitalize text-[10px]">
-                  {profile?.role === 'admin' ? (isAr ? 'مشرف المنصة' : 'Admin') : profile?.role === 'premium' ? (isAr ? 'عميل مميز' : 'Premium') : (isAr ? 'مستخدم عادي' : 'Standard')}
-                </span>
               </div>
             </div>
           </div>
 
-          {/* Premium Subscription Status Card */}
+          {/* Save Action button */}
+          <button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${
+              saveSuccess
+                ? 'bg-green-600 text-white'
+                : 'bg-blue-600 hover:bg-blue-500 text-white'
+            }`}
+          >
+            {saving ? (
+              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            ) : saveSuccess ? (
+              <>
+                <Check className="w-4 h-4 text-green-300 animate-bounce" />
+                <span>{t('✅ تم حفظ التغييرات!', '✅ Saved!')}</span>
+              </>
+            ) : (
+              <span>{t('💾 حفظ الإعدادات المفضلة', '💾 Save Settings')}</span>
+            )}
+          </button>
+        </div>
+
+        {/* Right Column: Security, Admin & Subscription Info */}
+        <div className="space-y-6">
+          
+          {/* Security details section */}
+          <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-transparent">
+            <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+              <span>🔐</span>
+              <span>{t('الأمان وتغيير المرور', 'Security')}</span>
+            </h2>
+            
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await supabase.auth.resetPasswordForEmail(user?.email ?? '', {
+                    redirectTo: `${window.location.origin}/auth/reset`
+                  });
+                  alert(t('تم إرسال رابط إعادة تعيين كلمة السر لبريدك بنجاح ✅', 'Password reset link sent to your email ✅'));
+                } catch (e) {
+                  alert(t('فشل إرسال الرابط، يرجى المحاولة لاحقاً.', 'Failed to send reset link, try again later.'));
+                }
+              }}
+              className="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 text-xs hover:bg-white/10 transition cursor-pointer"
+            >
+              🔑 {t('إعادة تعيين كلمة السر', 'Reset Password')}
+            </button>
+          </div>
+
+          {/* Premium Subscription Card */}
           <div className="glass-card p-6 rounded-2xl border border-white/5 bg-gradient-to-br from-emerald-500/5 to-transparent relative overflow-hidden">
             <div className="absolute -right-6 -top-6 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl"></div>
             <h2 className="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-emerald-400" />
-              <span>{isAr ? 'حالة اشتراك TRADEORA' : 'Subscription Status'}</span>
+              <span>💳</span>
+              <span>{t('حالة اشتراك الحساب', 'Subscription Status')}</span>
             </h2>
 
             {profile?.role === 'premium' || profile?.role === 'admin' ? (
-              <div className="space-y-2">
-                <p className="text-xs text-white leading-normal">
-                  {isAr 
-                    ? '🎉 حسابك مفعل بالباقة المميزة (Premium) وتتمتع بوصول كامل لإشارات الذكاء الاصطناعي والمؤشرات المتقدمة.'
-                    : '🎉 Your account is active under the Premium plan with full access to indicators & ML recommendations.'}
+              <div className="space-y-2 text-xs">
+                <p className="text-white leading-normal">
+                  {t('🎉 أنت مشترك بالباقة المميزة (Premium) وتتمتع بوصول كامل لإشارات الذكاء الاصطناعي والمؤشرات المتقدمة.', '🎉 You are a Premium user with full access to indicators & recommendations.')}
                 </p>
                 {profile.subscription_end && (
                   <p className="text-[10px] text-slate-400 font-mono">
-                    {isAr ? 'ينتهي في: ' : 'Expires: '}{new Date(profile.subscription_end).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US')}
+                    {t('ينتهي في: ', 'Expires: ')}{new Date(profile.subscription_end).toLocaleDateString()}
                   </p>
                 )}
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-slate-300 leading-normal">
-                  {isAr 
-                    ? 'أنت تستخدم الباقة المجانية. اشترك في الباقة المميزة لمتابعة التحليلات المتقدمة الفورية وفلاتر التداول.'
-                    : 'You are currently using the Free plan. Upgrade to access premium features and ML filters.'}
+              <div className="space-y-3 text-xs">
+                <p className="text-slate-300 leading-normal">
+                  {t('أنت تستخدم الباقة المجانية. اشترك في المميز لتلقي التنبيهات وإشارات التداول الفنية الفورية.', 'Upgrade to get real-time recommendations and signal alerts.')}
                 </p>
                 <button
                   type="button"
-                  onClick={() => alert(isAr ? 'سيتم تحويلك لبوابة الدفع قريباً 💳' : 'Redirecting to payment gateway...')}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  onClick={() => alert(t('سيتم تحويلك لبوابة الدفع قريباً 💳', 'Redirecting to payment gateway...'))}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
                 >
-                  {isAr ? '⚡ ترقية الحساب للمميز' : '⚡ Upgrade to Premium'}
+                  {t('⚡ ترقية الحساب للمميز', 'Upgrade to Premium')}
                 </button>
               </div>
             )}
           </div>
+
+          {/* Danger zone */}
+          <div className="glass-card p-6 rounded-2xl border border-red-500/10 bg-gradient-to-br from-red-500/[0.01] to-transparent">
+            <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{t('منطقة الخطر', 'Danger Zone')}</span>
+            </h2>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (!confirm(t('هل أنت متأكد من تسجيل الخروج؟', 'Are you sure you want to sign out?'))) return;
+                await supabase.auth.signOut();
+                router.push(`/${locale}/auth`);
+              }}
+              className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs hover:bg-red-500/20 transition cursor-pointer font-bold"
+            >
+              🚪 {t('تسجيل الخروج', 'Sign Out')}
+            </button>
+          </div>
         </div>
 
-      </form>
+      </div>
     </div>
   );
 }

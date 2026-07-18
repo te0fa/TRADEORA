@@ -30,6 +30,26 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+NEXT_URL = os.getenv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000')
+
+def send_push(user_id, title, body, url='/'):
+    """يرسل Push Notification للمستخدم"""
+    try:
+        import requests
+        requests.post(
+            f"{NEXT_URL}/api/push/send",
+            json={
+                'user_id': user_id,
+                'title':   title,
+                'body':    body,
+                'url':     url,
+            },
+            timeout=10
+        )
+        logger.info(f"Push notification dispatched: {title} to user {user_id}")
+    except Exception as e:
+        logger.error(f"Push error: {e}")
+
 def get_current_price(symbol):
     """Fetches real-time price from Yahoo Finance for EGX stocks (.CA)"""
     try:
@@ -196,6 +216,34 @@ def track_user_trades():
                                 )
                     except Exception as tg_err:
                         logger.error(f"Failed to fetch telegram verification/send notification: {tg_err}")
+
+                # Dispatch Web Push Notifications
+                try:
+                    pnl_val = updates.get('pnl_percent') or 0.0
+                    if updates.get('status') == 'tp1_hit':
+                        send_push(
+                            t['user_id'],
+                            f"🎯 {t['symbol']} — الهدف الأول!",
+                            f"السعر وصل لـ {price:.2f} EGP (+{pnl_val:.1f}%)",
+                            f"/ar/my-trades"
+                        )
+                    elif updates.get('exit_reason') == 'trailing_sl' or updates.get('exit_reason') == 'sl':
+                        send_push(
+                            t['user_id'],
+                            f"⚠️ {t['symbol']} — وقف الخسارة",
+                            f"السعر ضرب الوقف عند {price:.2f} EGP",
+                            f"/ar/my-trades"
+                        )
+                    elif updates.get('exit_reason') == 'tp2':
+                        send_push(
+                            t['user_id'],
+                            f"🏆 {t['symbol']} — الهدف الثاني!",
+                            f"السعر وصل للهدف الثاني عند {price:.2f} EGP (+{pnl_val:.1f}%)",
+                            f"/ar/my-trades"
+                        )
+                except Exception as push_err:
+                    logger.error(f"Failed dispatching push notifications inside loop: {push_err}")
+
             except Exception as e:
                 logger.error(f"Failed to update user trade {t['id']}: {e}")
 

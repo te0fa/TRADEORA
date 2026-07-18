@@ -44,3 +44,22 @@ ALTER TABLE user_trades
   ADD COLUMN IF NOT EXISTS trailing_sl BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS trailing_pct NUMERIC DEFAULT 2,
   ADD COLUMN IF NOT EXISTS current_sl NUMERIC;
+
+-- Push Subscriptions Table
+DROP TABLE IF EXISTS push_subscriptions CASCADE;
+CREATE TABLE push_subscriptions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  endpoint    TEXT NOT NULL,
+  p256dh      TEXT NOT NULL,
+  auth_key    TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, endpoint)
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users_own_subs" ON push_subscriptions FOR ALL USING (auth.uid() = user_id);
+
+-- Alter user_profiles table for sizing settings
+ALTER TABLE user_profiles
+  ADD COLUMN IF NOT EXISTS default_capital NUMERIC DEFAULT 10000,
+  ADD COLUMN IF NOT EXISTS default_risk_pct NUMERIC DEFAULT 2;
