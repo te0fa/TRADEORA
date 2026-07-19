@@ -8,12 +8,15 @@ import yfinance as yf
 from pathlib import Path
 
 # Configure logging
+log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+os.makedirs(log_dir, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', 'track_trades.log'), encoding='utf-8')
+        logging.FileHandler(os.path.join(log_dir, 'track_trades.log'), encoding='utf-8')
     ]
 )
 logger = logging.getLogger(__name__)

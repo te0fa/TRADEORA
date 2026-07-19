@@ -15,12 +15,15 @@ import requests
 load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
 # Configure logging
+log_dir = Path(__file__).parent / 'logs'
+log_dir.mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(Path(__file__).parent / 'logs' / 'performance_analytics.log', encoding='utf-8')
+        logging.FileHandler(log_dir / 'performance_analytics.log', encoding='utf-8')
     ]
 )
 logger = logging.getLogger(__name__)
