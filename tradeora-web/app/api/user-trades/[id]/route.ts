@@ -57,7 +57,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Error in PATCH /api/user-trades/[id]:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
+      { error: 'حدث خطأ، حاول مرة أخرى' },
       { status: 500 }
     );
   }

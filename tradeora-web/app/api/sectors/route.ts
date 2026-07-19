@@ -82,6 +82,6 @@ export async function GET() {
     return NextResponse.json(result);
   } catch (err: any) {
     console.error('Sectors API Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ، حاول مرة أخرى' }, { status: 500 });
   }
 }

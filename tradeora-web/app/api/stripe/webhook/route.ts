@@ -88,6 +88,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error: any) {
     console.error('Webhook payload error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ، حاول مرة أخرى' }, { status: 500 });
   }
 }

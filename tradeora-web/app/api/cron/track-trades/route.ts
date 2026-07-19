@@ -253,6 +253,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, processed: processedCount });
   } catch (error: any) {
     console.error('Subevent cron execution failed:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ، حاول مرة أخرى' }, { status: 500 });
   }
 }

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
         if (error) {
           console.error('Error upserting user telegram info:', error);
-          return NextResponse.json({ ok: false, error: error.message });
+          return NextResponse.json({ ok: false, error: 'حدث خطأ، حاول مرة أخرى' });
         }
 
         // Welcome message via Bot API

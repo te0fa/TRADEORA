@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error sending Telegram notification:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' }, 
+      { error: 'حدث خطأ، حاول مرة أخرى' }, 
       { status: 500 }
     );
   }
