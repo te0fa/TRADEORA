@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { calcMarketRegime } from '@/lib/ta-utils';
+
 
 // GET: Fetch recommended trades and statistics
 export async function GET(req: NextRequest) {
@@ -136,6 +138,48 @@ export async function POST(req: NextRequest) {
         { error: `نسبة العائد إلى المخاطرة (R:R = ${calculatedRR.toFixed(2)}) أقل من الحد الأدنى المسموح به (${minRR.toFixed(2)})` },
         { status: 400 }
       );
+    }
+
+    // 3. Validate Market Regime (Market Regime Filter for Buy signals)
+    let resolvedCompanyId = company_id;
+    if (!resolvedCompanyId && symbol) {
+      const { data: compData } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('symbol', symbol.toUpperCase())
+        .maybeSingle();
+      if (compData) {
+        resolvedCompanyId = compData.id;
+      }
+    }
+
+    if (direction === 'buy' && resolvedCompanyId) {
+      const { data: priceData, error: priceError } = await supabase
+        .from('market_prices')
+        .select('high_price, low_price, close_price')
+        .eq('company_id', resolvedCompanyId)
+        .order('price_date', { ascending: false })
+        .limit(60);
+
+      if (!priceError && priceData && priceData.length >= 28) {
+        const prices = [...priceData].reverse();
+        const highs = prices.map(p => Number(p.high_price ?? p.close_price));
+        const lows = prices.map(p => Number(p.low_price ?? p.close_price));
+        const closes = prices.map(p => Number(p.close_price));
+
+        const regimeArr = calcMarketRegime(highs, lows, closes);
+        const lastRegime = regimeArr.at(-1) ?? 0;
+
+        if (lastRegime !== 1) {
+          const reason = lastRegime === -1 
+            ? 'اتجاه السوق هابط (Bearish)' 
+            : 'حركة السوق عرضية ضيقة (Sideways)';
+          return NextResponse.json(
+            { error: `لا يمكن توليد إشارة شراء لأن ${reason}. تم تفعيل فلتر حالة السوق لتجنب الإشارات الخاطئة (Whipsaws).` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const newTrade = {

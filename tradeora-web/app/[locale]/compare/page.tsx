@@ -162,12 +162,12 @@ export default function ComparePage() {
       {info.s1 && info.s2 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {[
-            { info: info.s1, color: 'text-blue-400', border: 'border-blue-500/20', sym: sym1 },
-            { info: info.s2, color: 'text-purple-400', border: 'border-purple-500/20', sym: sym2 },
-          ].map(({ info: stock, color, border, sym }) => (
-            <div key={sym} className={`bg-white/5 border ${border} rounded-2xl p-5`}>
+            { stock: info.s1, color: 'text-blue-400', border: 'border-blue-500/20' },
+            { stock: info.s2, color: 'text-purple-400', border: 'border-purple-500/20' },
+          ].map(({ stock, color, border }) => (
+            <div key={stock.id} className={`bg-white/5 border ${border} rounded-2xl p-5`}>
               <h3 className={`${color} font-black text-lg mb-3 font-mono`}>
-                {sym} — {isAr ? (stock.name_ar || stock.name_en) : (stock.name_en || stock.name_ar)}
+                {stock.symbol} — {isAr ? (stock.name_ar || stock.name_en) : (stock.name_en || stock.name_ar)}
               </h3>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center py-1.5 border-b border-white/5">
