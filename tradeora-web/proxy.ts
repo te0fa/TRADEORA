@@ -93,10 +93,21 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 2. Run next-intl middleware first to get the response with correct locale/headers
+  // 2. Define bypass paths to skip next-intl and auth for API and static files
+  const isBypass = path.includes('/_next') || 
+                   path.startsWith('/api') || 
+                   path.includes('/favicon.ico') || 
+                   path.includes('.') ||
+                   path.includes('/public/');
+
+  if (isBypass) {
+    return NextResponse.next();
+  }
+
+  // 3. Run next-intl middleware first to get the response with correct locale/headers
   let res = intlMiddleware(req);
 
-  // 3. Initialize Supabase Client using standard Server Side Client pattern
+  // 4. Initialize Supabase Client using standard Server Side Client pattern
   const supabaseClient = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
@@ -116,21 +127,11 @@ export async function proxy(req: NextRequest) {
     }
   );
 
-  // 4. Refresh session if expired
+  // 5. Refresh session if expired
   const { data: { session } } = await supabaseClient.auth.getSession();
 
-  // 5. Define bypass paths for UI routing validation
+  // 6. Define bypass paths for UI routing validation
   const isAuthPage = path.includes('/auth');
-  
-  const isBypass = path.includes('/_next') || 
-                   path.startsWith('/api') || 
-                   path.includes('/favicon.ico') || 
-                   path.includes('.') ||
-                   path.includes('/public/');
-
-  if (isBypass) {
-    return res;
-  }
 
   // 6. Authentication Routing Logic
   if (!session && !isAuthPage) {
