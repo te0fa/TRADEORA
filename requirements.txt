@@ -15,4 +15,4 @@ yfinance>=0.2.40
 vectorbt>=0.26.1
 quantstats>=0.0.62
 matplotlib>=3.7.0
-
+pandas-ta>=0.3.14b

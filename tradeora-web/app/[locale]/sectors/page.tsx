@@ -35,6 +35,28 @@ export default function SectorsPage() {
     );
   }
 
+  const getSectorRegime = (s: any) => {
+    const risingPct = s.total > 0 ? (s.rising / s.total) : 0;
+    const fallingPct = s.total > 0 ? (s.falling / s.total) : 0;
+    
+    if (risingPct >= 0.60) {
+      return {
+        text: locale === 'ar' ? 'صاعد' : 'Bullish',
+        color: 'bg-green-500/20 text-green-400 border border-green-500/20'
+      };
+    } else if (fallingPct >= 0.60) {
+      return {
+        text: locale === 'ar' ? 'هابط' : 'Bearish',
+        color: 'bg-red-500/20 text-red-400 border border-red-500/20'
+      };
+    } else {
+      return {
+        text: locale === 'ar' ? 'مختلط' : 'Mixed',
+        color: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'
+      };
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 font-sans text-text-primary" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
@@ -81,15 +103,22 @@ export default function SectorsPage() {
 
       {/* Sector Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sectors.map(s => (
-          <div
-            key={s.name}
-            className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/[0.08] hover:border-white/15 transition-all duration-200"
-          >
-            <div className="flex justify-between items-start mb-3">
-              <h3 className="text-white font-extrabold text-sm">
-                {s.name}
-              </h3>
+        {sectors.map(s => {
+          const regime = getSectorRegime(s);
+          return (
+            <div
+              key={s.name}
+              className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:bg-white/[0.08] hover:border-white/15 transition-all duration-200"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-white font-extrabold text-sm">
+                    {s.name}
+                  </h3>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md w-max ${regime.color}`}>
+                    {regime.text}
+                  </span>
+                </div>
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                 s.avgChange > 0
                   ? 'bg-green-500/20 text-green-400'
@@ -152,8 +181,9 @@ export default function SectorsPage() {
               />
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </div>
     </div>
   );
 }

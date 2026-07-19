@@ -6,7 +6,22 @@ import numpy as np
 try:
     tf = sys.argv[1]
     features = [float(x) for x in sys.argv[2].split(',')]
-    assert len(features) == 14, f"Expected 14 features, got {len(features)}"
+    if len(features) == 14:
+        # التوافقية الرجعية: إضافة قيمة 0 افتراضية لحالة السوق
+        features.append(0.0)
+    if len(features) == 15:
+        # التوافقية الرجعية: إضافة 6 قيم 0 افتراضية لميزات المشاعر والأخبار، وقيمة 1.0 افتراضية لحجم التداول النسبي
+        features.extend([0.0] * 6 + [1.0])
+    elif len(features) == 21:
+        # التوافقية الرجعية: إضافة قيمة 1.0 افتراضية لحجم التداول النسبي
+        features.append(1.0)
+        
+    expected_len = 30 if tf == '1d' else 22
+    if len(features) == 22 and expected_len == 30:
+        # التوافقية الرجعية للنموذج اليومي: إضافة 8 قيم افتراضية للميزات الأساسية
+        features.extend([0.0] * 7 + [1.0]) # PE, EPS, DE, PM, RevG, EarnG, DivY, and FV_ratio = 1.0
+        
+    assert len(features) == expected_len, f"Expected {expected_len} features for {tf}, got {len(features)}"
 
     # Attempt to load model and scaler
     model = joblib.load(f'models/model_{tf}.pkl')

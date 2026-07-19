@@ -9,8 +9,9 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+
 
 # General settings
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -20,6 +21,8 @@ DEFAULT_SOURCE = os.getenv("DEFAULT_SOURCE", "egx_bulletin")
 # Ensure directories exist
 os.makedirs(DATA_FOLDER, exist_ok=True)
 os.makedirs(str(BASE_DIR / "logs"), exist_ok=True)
+
+USE_NLP_SENTIMENT = os.getenv("USE_NLP_SENTIMENT", "False").lower() in ("true", "1", "yes")
 
 def validate_config() -> tuple[bool, str]:
     """Validates if essential configuration keys are set."""

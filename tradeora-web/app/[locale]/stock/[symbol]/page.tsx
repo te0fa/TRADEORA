@@ -6,6 +6,7 @@ import { useStockDetail } from '@/hooks/useStockDetail';
 import { StockHeader } from '@/components/stock/StockHeader';
 import { PriceChart } from '@/components/stock/PriceChart';
 import { DataSourcesPanel } from '@/components/stock/DataSourcesPanel';
+import { StockFundamentals } from '@/components/stock/StockFundamentals';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -137,9 +138,17 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         intradayData={intradayData} 
         historicalPrices={historicalPrices} 
         locale={locale} 
+        fundamentals={company.fundamentals}
       />
 
-      {/* 3. Real-time Comparison metrics */}
+      {/* 3. Financial Fundamentals analysis */}
+      <StockFundamentals
+        fundamentals={company.fundamentals}
+        currentPrice={company.priceRecord?.close_price ?? (historicalPrices && historicalPrices[0]?.close_price) ?? 0}
+        locale={locale}
+      />
+
+      {/* 4. Real-time Comparison metrics */}
       <div className="mb-6">
         <DataSourcesPanel
           company={company}

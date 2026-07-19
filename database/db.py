@@ -218,3 +218,30 @@ def upsert_market_prices(prices: list[dict]) -> tuple[int, int]:
         logger.error(f"Error upserting market prices: {e}")
         raise e
     return inserted, updated
+
+def upsert_company_fundamentals(fundamentals: list[dict]):
+    """Upserts company fundamentals into the database."""
+    if not fundamentals:
+        return
+    logger.info(f"Upserting {len(fundamentals)} fundamentals records...")
+    if is_dry_run():
+        return
+    client = get_db_client()
+    try:
+        client.table("company_fundamentals").upsert(fundamentals, on_conflict="company_id").execute()
+    except Exception as e:
+        logger.error(f"Error upserting company fundamentals: {e}")
+
+def get_company_fundamentals(company_id: str) -> dict | None:
+    """Fetches fundamentals for a specific company."""
+    if is_dry_run():
+        return None
+    client = get_db_client()
+    try:
+        res = client.table("company_fundamentals").select("*").eq("company_id", company_id).execute()
+        if res.data:
+            return res.data[0]
+    except Exception as e:
+        logger.error(f"Error fetching fundamentals for company {company_id}: {e}")
+    return None
+

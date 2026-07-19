@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS market_prices (
     price_date DATE NOT NULL,
     data_quality_flag TEXT DEFAULT NULL,
     fetched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    news_sentiment_score NUMERIC DEFAULT 0.0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT unique_company_price_date_source UNIQUE (company_id, price_date, source)
@@ -99,3 +100,26 @@ CREATE OR REPLACE TRIGGER update_market_prices_updated_at
     BEFORE UPDATE ON market_prices
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- 5. Table for Company News & Sentiment
+CREATE TABLE IF NOT EXISTS company_news (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT,
+    published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    source TEXT,
+    url TEXT NOT NULL,
+    category TEXT NOT NULL,
+    sentiment TEXT NOT NULL,
+    confidence NUMERIC DEFAULT 1.0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT unique_url UNIQUE (url),
+    CONSTRAINT chk_news_category CHECK (category IN ('corporate', 'macro_fx', 'macro_rate', 'macro_geopolitical')),
+    CONSTRAINT chk_news_sentiment CHECK (sentiment IN ('positive', 'negative', 'neutral'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_news_company_id ON company_news(company_id);
+CREATE INDEX IF NOT EXISTS idx_company_news_published_at ON company_news(published_at);
+CREATE INDEX IF NOT EXISTS idx_company_news_category ON company_news(category);
+

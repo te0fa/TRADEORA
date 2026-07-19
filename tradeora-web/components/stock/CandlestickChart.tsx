@@ -47,7 +47,7 @@ interface CandlestickChartProps {
   showBB: boolean;
   showVol: boolean;
   interval: '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m';
-  srLevels?: { price: number; type: 'support' | 'resistance'; strength: number; distance: number }[];
+  srLevels?: { price: number; type: 'support' | 'resistance'; strength: number; distance: number; isStrong?: boolean; isWeekly?: boolean }[];
   onCrosshairMove?: (time: string | null, data?: {
     open: number;
     high: number;
@@ -264,11 +264,11 @@ const CandlestickChartInner = (
     if (srLevels && srLevels.length > 0) {
       srLevels.slice(0, 4).forEach((level) => {
         const line = chart.addSeries(LineSeries, {
-          color: level.type === 'support'
-            ? 'rgba(34, 197, 94, 0.4)'
-            : 'rgba(239, 68, 68, 0.4)',
-          lineWidth: 1,
-          lineStyle: LineStyle.Dashed,
+          color: level.isStrong
+            ? (level.type === 'support' ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)')
+            : (level.type === 'support' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'),
+          lineWidth: level.isStrong ? 3 : 1,
+          lineStyle: level.isStrong ? LineStyle.Solid : LineStyle.Dashed,
           priceLineVisible: false,
           lastValueVisible: false,
         });

@@ -120,7 +120,7 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
 /**
  * Fetches detail information for a single stock by its symbol.
  */
-export async function fetchStockDetail(symbol: string): Promise<CompanyWithPrice | null> {
+export async function fetchStockDetail(symbol: string): Promise<any | null> {
   const { data: company, error: compError } = await supabase
     .from('companies')
     .select(`
@@ -141,6 +141,19 @@ export async function fetchStockDetail(symbol: string): Promise<CompanyWithPrice
   if (compError || !company) {
     console.error(`Error fetching stock detail company for ${symbol}:`, compError);
     return null;
+  }
+
+  // Fetch fundamentals
+  let fundamentals = null;
+  try {
+    const { data: fundData } = await supabase
+      .from('company_fundamentals')
+      .select('*')
+      .eq('company_id', company.id)
+      .maybeSingle();
+    fundamentals = fundData;
+  } catch (err) {
+    console.warn('Fundamentals table not loaded or missing:', err);
   }
 
   // Get the latest resolved price for this specific company using RPC
@@ -198,7 +211,8 @@ export async function fetchStockDetail(symbol: string): Promise<CompanyWithPrice
     priceRecord,
     isLastResort: false,
     sourceLabelAr: labelAr,
-    sourceLabelEn: labelEn
+    sourceLabelEn: labelEn,
+    fundamentals
   };
 }
 

@@ -1,5 +1,5 @@
 // @ts-ignore
-import { SMA, EMA, RSI, MACD, BollingerBands } from 'technicalindicators';
+import { SMA, EMA, RSI, MACD, BollingerBands, ADX } from 'technicalindicators';
 
 export function calcSMA(closes: number[], period: number): (number | null)[] {
   if (closes.length < period) {
@@ -407,13 +407,16 @@ export interface SRLevel {
   type:     'support' | 'resistance';
   strength: number;   // كمية الشموع اللي لمسته
   distance: number;   // % بُعده عن السعر الحالي
+  isStrong?: boolean;
+  isWeekly?: boolean;
 }
 
 export function detectSRLevels(
   candles: { high: number; low: number; close: number }[],
   currentPrice: number,
   tolerance = 0.015,  // 1.5% tolerance
-  maxLevels = 5
+  maxLevels = 5,
+  weeklyLevels?: SRLevel[]
 ): SRLevel[] {
   if (candles.length < 20) return [];
 
@@ -472,17 +475,53 @@ export function detectSRLevels(
   }
 
   // ترتيب حسب القوة وتصفية الأقرب للسعر
-  return Array.from(levels.entries())
+  const mappedLevels = Array.from(levels.entries())
     .filter(([price]) =>
       Math.abs(price - currentPrice) / currentPrice < 0.15
     )
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, maxLevels)
-    .map(([price, data]) => ({
-      price,
-      type:     data.type,
-      strength: data.count,
-      distance: (price - currentPrice) / currentPrice * 100
-    }))
+    .map(([price, data]) => {
+      const distance = (price - currentPrice) / currentPrice * 100;
+      const baseLevel: SRLevel = {
+        price,
+        type:     data.type,
+        strength: data.count,
+        distance
+      };
+
+      if (weeklyLevels && weeklyLevels.length > 0) {
+        const hasWeeklyConfluence = weeklyLevels.some(wl => Math.abs(wl.price - price) / price <= 0.02);
+        if (hasWeeklyConfluence) {
+          baseLevel.isStrong = true;
+        }
+      }
+
+      return baseLevel;
+    })
     .sort((a, b) => Math.abs(a.distance) - Math.abs(b.distance));
+
+  return mappedLevels;
 }
+
+export function calcMarketRegime(highs: number[], lows: number[], closes: number[], period = 14): number[] {
+  if (closes.length < period * 2) return Array(closes.length).fill(0);
+  try {
+    const adxResult = ADX.calculate({ period, close: closes, high: highs, low: lows });
+    const diff = closes.length - adxResult.length;
+    const padding = Array(diff).fill(0);
+    const mapped = adxResult.map(item => {
+      const adx = item.adx ?? 0;
+      const pdi = item.pdi ?? 0;
+      const mdi = item.mdi ?? 0;
+      if (adx > 25) {
+        return pdi > mdi ? 1 : -1;
+      }
+      return 0;
+    });
+    return padding.concat(mapped);
+  } catch (e) {
+    return Array(closes.length).fill(0);
+  }
+}
+

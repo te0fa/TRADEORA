@@ -31,6 +31,7 @@ import {
   calcTFSignal,
   calcPositionSize,
   detectSRLevels,
+  calcMarketRegime,
   type CandlePattern,
   type TFSignal
 } from '@/lib/ta-utils';
@@ -48,6 +49,7 @@ interface PriceChartProps {
   intradayData: any;
   historicalPrices: PriceRecord[];
   locale: string;
+  fundamentals?: any;
 }
 
 type Interval = '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m';
@@ -308,7 +310,7 @@ function generateIntradayForDay(day: PriceRecord, interval: string): any[] {
   return result;
 }
 
-export function PriceChart({ symbol, companyId, historicalPrices, locale }: PriceChartProps) {
+export function PriceChart({ symbol, companyId, historicalPrices, locale, fundamentals }: PriceChartProps) {
   const tTA = useTranslations('technicalAnalysis');
   const tGlobal = useTranslations();
 
@@ -340,6 +342,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
   const [visibleSRLines, setVisibleSRLines] = useState<Set<number>>(new Set());
   const [signalStats, setSignalStats] = useState<SignalStat[]>([]);
   const [mlProb, setMlProb] = useState<number | null>(null);
+  const [marketRegime, setMarketRegime] = useState<number>(0);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -357,6 +360,49 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
   const [userCapital, setUserCapital] = useState(10000);
   const [userRiskPercent, setUserRiskPercent] = useState(2);
   const [showAlertModal, setShowAlertModal] = useState(false);
+
+  const [newsSentimentData, setNewsSentimentData] = useState<{
+    sentimentScore: number;
+    sectorSentimentScore: number;
+    macroScores: { fx: number; rate: number; geo: number };
+  } | null>(null);
+
+  const [sectorRelativeVolSeries, setSectorRelativeVolSeries] = useState<{ date: string; val: number }[]>([]);
+  const [companySector, setCompanySector] = useState<string>('');
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/sector-volume?companyId=${companyId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.series) {
+          setSectorRelativeVolSeries(data.series);
+          setCompanySector(data.sector || '');
+        }
+      })
+      .catch(err => console.error("Error fetching sector volume:", err));
+  }, [companyId]);
+
+  const lastSectorRelativeVol = useMemo(() => {
+    if (sectorRelativeVolSeries.length === 0) return 1.0;
+    return sectorRelativeVolSeries[sectorRelativeVolSeries.length - 1].val;
+  }, [sectorRelativeVolSeries]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    fetch(`/api/news-sentiment?symbol=${symbol}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setNewsSentimentData({
+            sentimentScore: data.sentimentScore,
+            sectorSentimentScore: data.sectorSentimentScore,
+            macroScores: data.macroScores
+          });
+        }
+      })
+      .catch(err => console.error("Error fetching news sentiment:", err));
+  }, [symbol]);
 
   useEffect(() => {
     try {
@@ -983,9 +1029,32 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     return 'neutral';
   }, [dailySignal, currentTFSignal]);
 
+  const weeklyCandles = useMemo(() => {
+    const weeklyPrices = aggregateWeekly(dbPrices);
+    return weeklyPrices.map(p => ({
+      high: p.high_price ?? p.close_price,
+      low: p.low_price ?? p.close_price,
+      close: p.close_price
+    }));
+  }, [dbPrices]);
+
+  const weeklySRLevels = useMemo(() => {
+    if (weeklyCandles.length === 0) return [];
+    return detectSRLevels(weeklyCandles, currentPrice, 0.02, 5);
+  }, [weeklyCandles, currentPrice]);
+
   const srLevels = useMemo(() =>
-    detectSRLevels(analysisCandles, currentPrice)
-  , [analysisCandles, currentPrice]);
+    detectSRLevels(analysisCandles, currentPrice, 0.015, 5, weeklySRLevels)
+  , [analysisCandles, currentPrice, weeklySRLevels]);
+
+  const distToStrongLevel = useMemo(() => {
+    const strongLevels = srLevels.filter(l => l.isStrong);
+    if (strongLevels.length === 0) return null;
+    const closest = strongLevels.reduce((prev, curr) => 
+      Math.abs(curr.price - currentPrice) < Math.abs(prev.price - currentPrice) ? curr : prev
+    );
+    return Math.abs((closest.price - currentPrice) / currentPrice * 100);
+  }, [srLevels, currentPrice]);
 
   const analysisData = useMemo(() => {
     if (analysisCandles.length === 0) return null;
@@ -1312,7 +1381,41 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
     return { val: valStr, desc, score: scoreVal, signal };
   }, [analysisCandles, analysisData, locale]);
 
-  // Overall combined score (-8 to +8)
+  // Sector Relative Volume Analysis
+  const sectorVolumeDetails = useMemo(() => {
+    const val = lastSectorRelativeVol;
+    let scoreVal = 0;
+    let signal = '🟡';
+    let desc = '';
+
+    if (val > 1.5) {
+      desc = locale === 'ar' 
+        ? `حجم تداول نسبي قوي جداً للقطاع (${val.toFixed(2)}x) — السهم يتحرك بزخم داخلي خاص وقوي، وليس مجرد تبعية لقطاع ${companySector}`
+        : `Strong relative volume compared to sector (${val.toFixed(2)}x) — stock exhibits independent momentum in ${companySector}`;
+      scoreVal = 2;
+      signal = '🟢';
+    } else if (val >= 1.0) {
+      desc = locale === 'ar'
+        ? `حجم تداول طبيعي متوافق مع القطاع (${val.toFixed(2)}x) — السهم يتحرك مع بقية أسهم قطاع ${companySector}`
+        : `Normal volume relative to sector (${val.toFixed(2)}x) — stock aligns with ${companySector} trend`;
+      scoreVal = 0;
+      signal = '🟡';
+    } else {
+      desc = locale === 'ar'
+        ? `حجم تداول ضعيف مقارنة بالقطاع (${val.toFixed(2)}x) — السهم خامل حتى مع تحرك قطاع ${companySector}`
+        : `Underperforming sector volume (${val.toFixed(2)}x) — stock remains inactive relative to ${companySector}`;
+      scoreVal = -1;
+      signal = '🔴';
+    }
+
+    const valStr = locale === 'ar'
+      ? `حجم القطاع النسبي: ${val.toFixed(2)}×`
+      : `Sector Rel Vol: ${val.toFixed(2)}x`;
+
+    return { val: valStr, desc, score: scoreVal, signal };
+  }, [lastSectorRelativeVol, companySector, locale]);
+
+  // Overall combined score (-10 to +10)
   const scoreDetails = useMemo(() => {
     let sum = rsiDetails.score +
               macdDetails.score +
@@ -1321,7 +1424,47 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
               bbDetails.score +
               stochRsiDetails.score +
               athDetails.score +
-              volumeDetails.score;
+              volumeDetails.score +
+              sectorVolumeDetails.score;
+
+    // Market Regime Modifier
+    if (marketRegime === 1) sum += 1;
+    if (marketRegime === -1) sum -= 1;
+
+    // Fundamentals Modifiers (Mission 9)
+    if (fundamentals) {
+      // 1. Below Fair Value (Graham Number) -> Boost score by 2 points
+      if (fundamentals.fair_value && currentPrice < fundamentals.fair_value) {
+        sum += 2;
+      }
+      // 2. Attractive Dividend Yield (Yield >= 4%) -> Add 1 bonus point
+      if (fundamentals.dividend_yield && fundamentals.dividend_yield >= 4.0) {
+        sum += 1;
+      }
+    }
+
+    // News Sentiment Modifier
+    if (newsSentimentData && newsSentimentData.sentimentScore > 0.1) sum += 1;
+    if (newsSentimentData && newsSentimentData.sentimentScore < -0.1) sum -= 1;
+
+    // Strong level Confluence modifier
+    const strongLevels = srLevels.filter(l => l.isStrong);
+    if (strongLevels.length > 0) {
+      const closestStrong = strongLevels.reduce((prev, curr) => 
+        Math.abs(curr.price - currentPrice) < Math.abs(prev.price - currentPrice) ? curr : prev
+      );
+      const distPct = Math.abs((closestStrong.price - currentPrice) / currentPrice * 100);
+      if (distPct <= 2.0) {
+        if (closestStrong.type === 'support') {
+          // Boost score if near strong support
+          sum += 1;
+        } else if (closestStrong.type === 'resistance') {
+          // Damp score if near strong resistance
+          sum -= 1;
+        }
+      }
+    }
+
     const lastRSI = analysisData?.rsi ?? 50;
     
     let athWarning = '';
@@ -1338,9 +1481,9 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       }
     }
     
-    const finalScore = Math.max(-8, Math.min(8, sum));
+    const finalScore = Math.max(-10, Math.min(10, sum));
     return { finalScore, athWarning, lastRSI };
-  }, [rsiDetails.score, macdDetails.score, smaDetails.score, srDetails.score, bbDetails.score, stochRsiDetails.score, athDetails.score, volumeDetails.score, isNearATH, analysisData]);
+  }, [rsiDetails.score, macdDetails.score, smaDetails.score, srDetails.score, bbDetails.score, stochRsiDetails.score, athDetails.score, volumeDetails.score, sectorVolumeDetails.score, isNearATH, analysisData, marketRegime, newsSentimentData, srLevels, currentPrice, fundamentals]);
 
   const overallScore = scoreDetails.finalScore;
   const { athWarning, lastRSI } = scoreDetails;
@@ -1371,12 +1514,28 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       const sma50 = analysisData.sma50 ?? p;
       if (p > sma50) bullScore++; else bearScore++;
     }
+
+    // Market Regime input to probabilities
+    if (marketRegime === 1) bullScore++;
+    if (marketRegime === -1) bearScore++;
+
+    // News Sentiment input to probabilities
+    if (newsSentimentData && newsSentimentData.sentimentScore > 0.1) bullScore++;
+    if (newsSentimentData && newsSentimentData.sentimentScore < -0.1) bearScore++;
+
+    // Sector Relative Volume input to probabilities
+    if (lastSectorRelativeVol > 1.5) {
+      bullScore += 1;
+    } else if (lastSectorRelativeVol < 1.0) {
+      bearScore += 0.5;
+    }
+
     const total = bullScore + bearScore || 1;
     const rawBull = (bullScore / total) * 100;
     const bullPct = Math.round(20 + (rawBull / 100) * 60);
     const bearPct = 100 - bullPct;
     return { bullPct, bearPct };
-  }, [analysisData]);
+  }, [analysisData, marketRegime, newsSentimentData, lastSectorRelativeVol]);
 
   const dealSetup = useMemo(() => {
     const resistancesAbove = topLevels
@@ -1631,6 +1790,52 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       }
     }
     
+    // Adjust win rates based on proximity to strong S/R levels (confluence)
+    let adjustedWinRate = winRate;
+    let adjustedWinRate2 = winRate2;
+    let confluenceNoteAR = '';
+    let confluenceNoteEN = '';
+
+    const strongLevels = srLevels.filter(l => l.isStrong);
+    if (strongLevels.length > 0) {
+      const closestStrong = strongLevels.reduce((prev, curr) => 
+        Math.abs(curr.price - currentPrice) < Math.abs(prev.price - currentPrice) ? curr : prev
+      );
+      const distPct = Math.abs((closestStrong.price - currentPrice) / currentPrice * 100);
+      
+      if (distPct <= 2.0) {
+        if (action === 'buy') {
+          if (closestStrong.type === 'support') {
+            // Buying near strong support -> increase win rate
+            if (adjustedWinRate !== null) adjustedWinRate = Math.min(95, adjustedWinRate + 8);
+            if (adjustedWinRate2 !== null) adjustedWinRate2 = Math.min(95, adjustedWinRate2 + 8);
+            confluenceNoteAR = '⚡ تم ترقية نسبة النجاح المتوقعة للصفقة لوجود مستوى دعم قوي متفق عليه (Confluence) بالقرب من سعر الدخول.';
+            confluenceNoteEN = '⚡ Win rate upgraded due to a strong confluence support level near the entry price.';
+          } else {
+            // Buying right below strong resistance -> decrease win rate
+            if (adjustedWinRate !== null) adjustedWinRate = Math.max(10, adjustedWinRate - 12);
+            if (adjustedWinRate2 !== null) adjustedWinRate2 = Math.max(10, adjustedWinRate2 - 12);
+            confluenceNoteAR = '⚠️ تم خفض نسبة النجاح لوجود مستوى مقاومة قوي متفق عليه قريب جداً يعيق الصعود.';
+            confluenceNoteEN = '⚠️ Win rate downgraded due to a strong confluence resistance level close to the target path.';
+          }
+        } else if (action === 'sell') {
+          if (closestStrong.type === 'resistance') {
+            // Selling near strong resistance -> increase win rate
+            if (adjustedWinRate !== null) adjustedWinRate = Math.min(95, adjustedWinRate + 8);
+            if (adjustedWinRate2 !== null) adjustedWinRate2 = Math.min(95, adjustedWinRate2 + 8);
+            confluenceNoteAR = '⚡ تم ترقية نسبة النجاح المتوقعة للصفقة لوجود مستوى مقاومة قوي متفق عليه (Confluence) بالقرب من سعر الدخول.';
+            confluenceNoteEN = '⚡ Win rate upgraded due to a strong confluence resistance level near the entry price.';
+          } else {
+            // Selling right above strong support -> decrease win rate
+            if (adjustedWinRate !== null) adjustedWinRate = Math.max(10, adjustedWinRate - 12);
+            if (adjustedWinRate2 !== null) adjustedWinRate2 = Math.max(10, adjustedWinRate2 - 12);
+            confluenceNoteAR = '⚠️ تم خفض نسبة النجاح لوجود مستوى دعم قوي متفق عليه قريب جداً يعيق الهبوط.';
+            confluenceNoteEN = '⚠️ Win rate downgraded due to a strong confluence support level close to the target path.';
+          }
+        }
+      }
+    }
+
     return {
       action,
       entry: currentPrice,
@@ -1647,17 +1852,19 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       tradeDuration,
       timeToTP1,
       timeToTP2,
-      winRate,
-      winRate2,
+      winRate: adjustedWinRate,
+      winRate2: adjustedWinRate2,
       totalSignals,
       atr: currentATR,
       indicatorRecs,
       filteredByRR,
       filteredByML,
       filteredByVolume,
-      isFiltered
+      isFiltered,
+      confluenceNoteAR,
+      confluenceNoteEN
     };
-  }, [overallScore, topLevels, currentPrice, analysisData, isNearATH, lastRSI, locale, isIntradayInterval, analysisCandles, analysisRsiRaw, analysisMacdRaw, signalStats, bbDetails, rsiDetails, macdDetails, smaDetails, srDetails, settings, mlProb]);
+  }, [overallScore, topLevels, currentPrice, analysisData, isNearATH, lastRSI, locale, isIntradayInterval, analysisCandles, analysisRsiRaw, analysisMacdRaw, signalStats, bbDetails, rsiDetails, macdDetails, smaDetails, srDetails, settings, mlProb, srLevels]);
 
   // تحقق هل TP1 قريب من مقاومة قوية؟
   const tp1NearResistance = useMemo(() => {
@@ -1671,10 +1878,18 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
   useEffect(() => {
     if (!analysisData) {
       setMlProb(null);
+      setMarketRegime(0);
       return;
     }
 
     const dayOfWeek = new Date().getDay();
+
+    const highs = analysisCandles.map(c => c.high);
+    const lows = analysisCandles.map(c => c.low);
+    const closes = analysisCandles.map(c => c.close);
+    const regimeArr = calcMarketRegime(highs, lows, closes);
+    const lastRegime = regimeArr.at(-1) ?? 0;
+    setMarketRegime(lastRegime);
 
     const features = [
       analysisData.rsi ?? 50,
@@ -1693,6 +1908,14 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       analysisData.volSpike ?? 0,
       analysisData.distAth ?? 0,
       dayOfWeek,
+      lastRegime,
+      newsSentimentData?.sentimentScore ?? 0.0,
+      newsSentimentData?.sectorSentimentScore ?? 0.0,
+      newsSentimentData?.macroScores?.fx ?? 0.0,
+      newsSentimentData?.macroScores?.rate ?? 0.0,
+      newsSentimentData?.macroScores?.geo ?? 0.0,
+      0.0,
+      lastSectorRelativeVol ?? 1.0,
     ].join(',');
 
     fetch('/api/ml-predict', {
@@ -1703,7 +1926,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
       .then(r => r.json())
       .then(d => setMlProb(d.probability))
       .catch(() => setMlProb(null));
-  }, [analysisData, interval, dealSetup?.atr, currentPrice]);
+  }, [analysisData, interval, dealSetup?.atr, currentPrice, analysisCandles, newsSentimentData, lastSectorRelativeVol]);
 
   useEffect(() => {
     setIsSaved(false);
@@ -1842,6 +2065,22 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
             </span>
             <span className={`text-sm font-extrabold px-2 py-0.5 rounded-lg ${isUp ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
               {isUp ? '+' : ''}{priceChange.diff.toFixed(3)} ({isUp ? '+' : ''}{priceChange.pct.toFixed(2)}%) {isUp ? '↑' : '↓'}
+            </span>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${
+              marketRegime === 1
+                ? 'bg-green-500/20 text-green-400 border border-green-500/20'
+                : marketRegime === -1
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/20'
+                  : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'
+            }`}>
+              <span>{marketRegime === 1 ? '🟢' : marketRegime === -1 ? '🔴' : '🟡'}</span>
+              <span>
+                {marketRegime === 1
+                  ? (locale === 'ar' ? 'سوق اتجاهي صاعد' : 'Trending Up')
+                  : marketRegime === -1
+                    ? (locale === 'ar' ? 'سوق اتجاهي هابط' : 'Trending Down')
+                    : (locale === 'ar' ? 'سوق عرضي' : 'Range-bound')}
+              </span>
             </span>
           </div>
           {displayOHLCV && (
@@ -2321,6 +2560,28 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                 <div className="text-[9px] font-mono text-text-secondary/50 mt-0.5">{volumeDetails.val}</div>
               </div>
 
+              {/* Sector Relative Volume Scorecard */}
+              <div className="flex flex-col gap-1 pb-2.5 border-b border-white/5">
+                <div className="flex justify-between items-center text-[11px] font-bold">
+                  <span className="text-text-secondary flex items-center gap-1">
+                    {locale === 'ar' ? 'حجم التداول النسبي للقطاع:' : 'Sector-Relative Volume:'}
+                    <div className="group relative flex items-center">
+                      <Info className="w-3.5 h-3.5 cursor-help" />
+                      <div className="hidden group-hover:block absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 p-2.5 bg-surface-dark border border-white/10 rounded-xl shadow-2xl text-[10px] text-text-secondary font-normal whitespace-normal leading-relaxed">
+                        {locale === 'ar' ? 'يقارن نسبة حجم تداول السهم بنسبة تداول قطاعه بالكامل. إذا كانت النسبة > 1.5، فهذا يعني أن السهم يتحرك بزخم داخلي حقيقي خاص به وليس مجرد تبعية للقطاع.' : 'Compares stock volume ratio to its sector volume ratio. Ratio > 1.5 indicates genuine independent momentum.'}
+                      </div>
+                    </div>
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    sectorVolumeDetails.score > 0 ? 'bg-green-500/10 text-green-400' : sectorVolumeDetails.score < 0 ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-text-secondary'
+                  }`}>
+                    {sectorVolumeDetails.signal} {locale === 'ar' ? (sectorVolumeDetails.score > 0 ? 'شراء' : sectorVolumeDetails.score < 0 ? 'خامل/ضعيف' : 'محايد') : (sectorVolumeDetails.score > 0 ? 'Bullish' : sectorVolumeDetails.score < 0 ? 'Inactive' : 'Neutral')} ({sectorVolumeDetails.score >= 0 ? '+' : ''}{sectorVolumeDetails.score} {locale === 'ar' ? 'نقطة' : 'pts'})
+                  </span>
+                </div>
+                <p className="text-[10px] text-text-secondary/70">{sectorVolumeDetails.desc}</p>
+                <div className="text-[9px] font-mono text-text-secondary/50 mt-0.5">{sectorVolumeDetails.val}</div>
+              </div>
+
               {/* S/R Proximity Scorecard */}
               <div className="flex flex-col gap-1 pb-2.5 border-b border-white/5">
                 <div className="flex justify-between items-center text-[11px] font-bold">
@@ -2734,6 +2995,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                       </span>
                     </div>
 
+                    {(dealSetup.confluenceNoteAR || dealSetup.confluenceNoteEN) && (
+                      <div className="mt-1 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[9px] text-purple-300 leading-normal">
+                        {locale === 'ar' ? dealSetup.confluenceNoteAR : dealSetup.confluenceNoteEN}
+                      </div>
+                    )}
+
                     {dealSetup && (
                       <div className="mt-3 p-3 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20">
                         {/* Capital Input */}
@@ -3035,14 +3302,32 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale }: Pric
                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
                           {locale === 'ar' ? '📊 مستويات الدعم والمقاومة اللحظية:' : 'Support & Resistance:'}
                         </p>
+                        
+                        {distToStrongLevel !== null && (
+                          <div className="text-[9px] bg-purple-500/10 border border-purple-500/20 rounded-lg p-2 text-purple-300 font-sans mb-2 leading-relaxed">
+                            ⚡ {locale === 'ar' 
+                              ? `قرب السعر من أقرب مستوى قوي متفق عليه (Confluence): ${distToStrongLevel.toFixed(2)}%` 
+                              : `Price distance to nearest strong confluence level: ${distToStrongLevel.toFixed(2)}%`}
+                          </div>
+                        )}
+
                         <div className="space-y-1 font-mono">
                           {srLevels.slice(0, 3).map((l, i) => (
                             <div key={i} className="flex justify-between items-center text-[10px]">
-                              <span className={l.type === 'support' ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
-                                {l.type === 'support'
-                                  ? (locale === 'ar' ? '🟢 دعم' : '🟢 Support')
-                                  : (locale === 'ar' ? '🔴 مقاومة' : '🔴 Resistance')}
-                                {' '}{'★'.repeat(Math.min(l.strength, 3))}
+                              <span className={`${l.type === 'support' ? 'text-green-400 font-bold' : 'text-red-400 font-bold'} flex items-center gap-1`}>
+                                <span>
+                                  {l.type === 'support'
+                                    ? (locale === 'ar' ? '🟢 دعم' : '🟢 Support')
+                                    : (locale === 'ar' ? '🔴 مقاومة' : '🔴 Resistance')}
+                                </span>
+                                {l.isStrong && (
+                                  <span className="bg-purple-500/20 text-purple-300 text-[8px] px-1 py-0.2 rounded font-sans border border-purple-500/30">
+                                    {locale === 'ar' ? 'قوي متفق عليه' : 'Strong Confluence'}
+                                  </span>
+                                )}
+                                <span className="opacity-70">
+                                  {' '}{'★'.repeat(Math.min(l.strength, 3))}
+                                </span>
                               </span>
                               <span className="text-white font-semibold">
                                 {l.price.toFixed(2)} EGP
