@@ -247,6 +247,19 @@ export function DataSourcesPanel({
         </div>
       )}
 
+      {/* Consensus Calculation Explanation */}
+      <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-text-secondary leading-relaxed">
+        <p className="font-bold text-text-primary mb-1 flex items-center gap-1.5">
+          <span>ℹ️</span>
+          <span>{locale === 'ar' ? 'كيف يتم احتساب سعر الإجماع (Consensus) الرئيسي؟' : 'How is the main Consensus Price calculated?'}</span>
+        </p>
+        <p className="text-[11px] text-text-secondary/80">
+          {locale === 'ar'
+            ? 'سعر السهم الرئيسي المعروض في المنصة هو نتيجة خوارزمية "توافق الآراء" (Consensus). يقوم النظام بمقارنة الأسعار من مصادر متعددة، ويستبعد تلقائياً أي سعر شاذ (ينحرف بأكثر من 1.5% عن الوسيط)، ثم يحسب متوسط الأسعار المتبقية لضمان أعلى دقة ممكنة وحماية من انقطاع أو تجميد أي مصدر.'
+            : 'The main stock price displayed is the result of our "Consensus" algorithm. The system cross-validates prices from multiple sources, discards outliers (differing by >1.5% from the median), and averages the remaining prices to guarantee maximum accuracy and prevent source failures.'}
+        </p>
+      </div>
+
       <div className="mt-4 text-center text-[10px] text-text-secondary/60">
         {locale === 'ar'
           ? '⚡ EGX النشرة هي المصدر الرسمي للأسعار. الفروق بين المصادر طبيعية نتيجة تأخر تحديث كل مصدر.'

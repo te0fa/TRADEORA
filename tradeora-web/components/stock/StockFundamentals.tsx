@@ -89,7 +89,13 @@ export function StockFundamentals({ fundamentals, currentPrice, locale }: StockF
     }
   };
 
-  const peStatus = getPEStatus(fundamentals.pe_ratio);
+  const calculatedPE = fundamentals.pe_ratio ?? (
+    (fundamentals.eps && fundamentals.eps > 0 && currentPrice > 0)
+      ? (currentPrice / fundamentals.eps)
+      : null
+  );
+
+  const peStatus = getPEStatus(calculatedPE);
   const deStatus = getDEStatus(fundamentals.debt_equity);
   const divStatus = getDividendStatus(fundamentals.dividend_yield);
   const fvStatus = getFairValueStatus(fundamentals.fair_value, currentPrice);
@@ -97,7 +103,7 @@ export function StockFundamentals({ fundamentals, currentPrice, locale }: StockF
   const metrics = [
     {
       title: isAr ? 'مكرر الربحية (P/E Ratio)' : 'P/E Ratio',
-      value: formatVal(fundamentals.pe_ratio),
+      value: formatVal(calculatedPE),
       status: peStatus,
       explanation: isAr
         ? 'يقيس النسبة بين سعر السهم السوقي الحالي وصافي أرباح السهم السنوية.'
