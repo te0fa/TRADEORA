@@ -141,7 +141,16 @@ export default function AuthPage({ params }: AuthPageProps) {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[#0B1120] font-sans relative overflow-hidden">
+    <div className={`min-h-screen w-full flex ${isAr ? 'flex-row-reverse' : 'flex-row'} bg-[#0B1120] font-sans relative overflow-hidden`}>
+      
+      {/* ABSOLUTE LOGO TOP LEFT */}
+      <div className="absolute top-6 left-8 z-50 flex items-center gap-3" dir="ltr">
+        <Image src="/logo.png" alt="TRADEORA Logo" width={48} height={48} className="drop-shadow-lg object-contain" />
+        <span className="text-2xl font-black tracking-tight text-white select-none">
+          <span className="text-accent-blue">TRADE</span>
+          <span className="bg-gradient-to-r from-accent-blue to-emerald-400 bg-clip-text text-transparent">ORA</span>
+        </span>
+      </div>
       
       {/* LEFT COLUMN: AUTH FORM */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10 flex-col">
@@ -153,15 +162,13 @@ export default function AuthPage({ params }: AuthPageProps) {
         </div>
 
         <div className="w-full max-w-[440px] flex flex-col">
-          {/* LOGO AND BRANDING */}
+          {/* HEADER MESSAGING */}
           <div className="flex flex-col items-center mb-10">
-            <div className="mb-4">
-              <Image src="/logo.png" alt="TRADEORA Logo" width={80} height={80} className="drop-shadow-2xl" />
-            </div>
-            <div className="text-4xl font-black tracking-tight text-white mb-2 flex items-center gap-2 select-none">
-              <span className="text-accent-blue">TRADE</span>
-              <span className="bg-gradient-to-r from-accent-blue to-emerald-400 bg-clip-text text-transparent">ORA</span>
-            </div>
+            <h2 className="text-3xl font-bold text-white text-center mb-3">
+              {isAr 
+                ? (isLogin ? 'مرحباً بك مجدداً' : 'إنشاء حساب جديد') 
+                : (isLogin ? 'Welcome Back' : 'Create Account')}
+            </h2>
             <p className="text-sm text-text-secondary/70 text-center font-medium">
               {isAr ? 'المنصة الذكية المتكاملة لتحليل الأسهم وإدارة الصفقات' : 'Smart Platform for Stock Analysis & Trade Management'}
             </p>
@@ -186,11 +193,6 @@ export default function AuthPage({ params }: AuthPageProps) {
           ) : (
             /* FORM STATE */
             <div className="bg-slate-900/50 backdrop-blur-xl border border-white/5 rounded-3xl p-8 shadow-2xl">
-              <h2 className="text-2xl font-bold text-white text-center mb-8">
-                {isAr 
-                  ? (isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد') 
-                  : (isLogin ? 'Sign In' : 'Create Account')}
-              </h2>
 
               {errorMsg && (
                 <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
