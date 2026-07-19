@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { TradeoraLogo } from '@/components/ui/TradeoraLogo';
 
 interface AuthPageProps {
@@ -14,7 +14,10 @@ interface AuthPageProps {
 export default function AuthPage({ params }: AuthPageProps) {
   const { locale } = React.use(params);
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
