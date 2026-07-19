@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { TradeoraLogo } from '@/components/ui/TradeoraLogo';
 import { useMarketStatus } from '@/hooks/useMarketStatus';
 import { toEasternArabic } from '@/lib/formatters';
-import { supabase } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { 
   Globe, 
   Clock, 
@@ -40,6 +40,11 @@ export function Navbar({ locale }: NavbarProps) {
   const [userRole, setUserRole] = useState<string>('');
 
   const isAr = locale === 'ar';
+  
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // Listen to Auth state changes
   useEffect(() => {
