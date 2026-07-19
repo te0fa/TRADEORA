@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 export function useUserRole() {
+  const [supabase] = useState(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
   const [role, setRole] = useState<'user' | 'premium' | 'admin' | null>(null);
   const [loading, setLoading] = useState(true);
 

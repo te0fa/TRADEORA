@@ -41,10 +41,10 @@ export function Navbar({ locale }: NavbarProps) {
 
   const isAr = locale === 'ar';
   
-  const supabase = createBrowserClient(
+  const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  ));
 
   // Listen to Auth state changes
   useEffect(() => {
