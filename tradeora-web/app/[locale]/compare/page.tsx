@@ -19,6 +19,21 @@ export default function ComparePage() {
     s1: any; s2: any
   }>({ s1: null, s2: null });
 
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [search1, setSearch1] = useState('TMGH');
+  const [search2, setSearch2] = useState('HRHO');
+  const [showDropdown1, setShowDropdown1] = useState(false);
+  const [showDropdown2, setShowDropdown2] = useState(false);
+
+  useEffect(() => {
+    supabase.from('companies')
+      .select('id, symbol, name_ar, name_en')
+      .order('symbol')
+      .then(({ data }) => {
+        if (data) setCompanies(data);
+      });
+  }, []);
+
   async function loadData() {
     setLoading(true);
     try {
@@ -28,7 +43,7 @@ export default function ComparePage() {
         .in('symbol', [sym1.toUpperCase(), sym2.toUpperCase()]);
 
       if (!cos || cos.length < 2) {
-        alert(isAr ? '⚠️ يرجى التأكد من كتابة كود سهمين صحيحين للمقارنة.' : '⚠️ Please enter two valid stock symbols.');
+        alert(isAr ? '⚠️ يرجى التأكد من اختيار سهمين صحيحين للمقارنة.' : '⚠️ Please select two valid stock symbols.');
         setLoading(false);
         return;
       }
@@ -54,11 +69,9 @@ export default function ComparePage() {
           .limit(90),
       ]);
 
-      // Reverse to chronological order for line chart
       const prices1 = (p1 ?? []).reverse();
       const prices2 = (p2 ?? []).reverse();
 
-      // Normalize close prices based on starting price (first item)
       const base1 = prices1[0]?.close_price ?? 1;
       const base2 = prices2[0]?.close_price ?? 1;
 
@@ -79,7 +92,6 @@ export default function ComparePage() {
 
       setData(chartData);
 
-      // Fetch statistics (win_rate, signal_type)
       const [{ data: st1 }, { data: st2 }] = await Promise.all([
         supabase.from('signal_stats')
           .select('signal_type, win_rate_tp1, total_signals')
@@ -127,32 +139,109 @@ export default function ComparePage() {
     loadData();
   }, []);
 
+  const filteredCompanies1 = companies.filter(c =>
+    c.symbol.toLowerCase().includes(search1.toLowerCase()) ||
+    c.name_ar?.includes(search1) ||
+    c.name_en?.toLowerCase().includes(search1.toLowerCase())
+  );
+
+  const filteredCompanies2 = companies.filter(c =>
+    c.symbol.toLowerCase().includes(search2.toLowerCase()) ||
+    c.name_ar?.includes(search2) ||
+    c.name_en?.toLowerCase().includes(search2.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen p-6 font-sans text-text-primary" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen p-6 font-sans text-text-primary mb-20" dir={isAr ? 'rtl' : 'ltr'}>
       <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
         <span>⚖️</span>
         <span>{isAr ? 'مقارنة الأداء النسبي للأسهم' : 'Stock Relative Performance'}</span>
       </h1>
 
-      {/* Input panel */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <input
-          value={sym1}
-          onChange={e => setSym1(e.target.value.toUpperCase())}
-          placeholder="TMGH"
-          className="flex-1 bg-white/5 border border-blue-500/30 rounded-xl px-4 py-3 text-blue-400 font-extrabold text-lg outline-none focus:border-blue-500 text-center font-mono"
-        />
-        <span className="text-slate-500 text-2xl font-black self-center text-center">VS</span>
-        <input
-          value={sym2}
-          onChange={e => setSym2(e.target.value.toUpperCase())}
-          placeholder="HRHO"
-          className="flex-1 bg-white/5 border border-purple-500/30 rounded-xl px-4 py-3 text-purple-400 font-extrabold text-lg outline-none focus:border-purple-500 text-center font-mono"
-        />
+      {/* Input panel with Searchable Dropdowns */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6 z-30 relative">
+        {/* Dropdown 1 */}
+        <div className="flex-1 relative">
+          <input
+            value={search1}
+            onFocus={() => setShowDropdown1(true)}
+            onBlur={() => setTimeout(() => setShowDropdown1(false), 200)}
+            onChange={e => {
+              setSearch1(e.target.value);
+              setShowDropdown1(true);
+            }}
+            placeholder={isAr ? 'ابحث باسم السهم أو الرمز...' : 'Search stock name or symbol...'}
+            className="w-full bg-white/5 border border-blue-500/30 rounded-xl px-4 py-3 text-blue-400 font-extrabold text-sm outline-none focus:border-blue-500 text-center"
+          />
+          {showDropdown1 && (
+            <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin">
+              {filteredCompanies1.slice(0, 50).map(c => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    setSym1(c.symbol);
+                    setSearch1(`${c.symbol} - ${isAr ? c.name_ar : c.name_en}`);
+                    setShowDropdown1(false);
+                  }}
+                  className="px-4 py-2.5 text-xs text-slate-300 hover:bg-blue-600/20 hover:text-white cursor-pointer transition flex justify-between items-center"
+                >
+                  <span className="font-bold text-blue-400 font-mono">{c.symbol}</span>
+                  <span className="truncate max-w-[200px] text-slate-400 text-[10px]">{isAr ? c.name_ar : c.name_en}</span>
+                </div>
+              ))}
+              {filteredCompanies1.length === 0 && (
+                <div className="px-4 py-3 text-xs text-slate-500 text-center">
+                  {isAr ? 'لا توجد نتائج' : 'No results found'}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <span className="text-slate-500 text-xl font-black self-center text-center">VS</span>
+
+        {/* Dropdown 2 */}
+        <div className="flex-1 relative">
+          <input
+            value={search2}
+            onFocus={() => setShowDropdown2(true)}
+            onBlur={() => setTimeout(() => setShowDropdown2(false), 200)}
+            onChange={e => {
+              setSearch2(e.target.value);
+              setShowDropdown2(true);
+            }}
+            placeholder={isAr ? 'ابحث باسم السهم أو الرمز...' : 'Search stock name or symbol...'}
+            className="w-full bg-white/5 border border-purple-500/30 rounded-xl px-4 py-3 text-purple-400 font-extrabold text-sm outline-none focus:border-purple-500 text-center"
+          />
+          {showDropdown2 && (
+            <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin">
+              {filteredCompanies2.slice(0, 50).map(c => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    setSym2(c.symbol);
+                    setSearch2(`${c.symbol} - ${isAr ? c.name_ar : c.name_en}`);
+                    setShowDropdown2(false);
+                  }}
+                  className="px-4 py-2.5 text-xs text-slate-300 hover:bg-purple-600/20 hover:text-white cursor-pointer transition flex justify-between items-center"
+                >
+                  <span className="font-bold text-purple-400 font-mono">{c.symbol}</span>
+                  <span className="truncate max-w-[200px] text-slate-400 text-[10px]">{isAr ? c.name_ar : c.name_en}</span>
+                </div>
+              ))}
+              {filteredCompanies2.length === 0 && (
+                <div className="px-4 py-3 text-xs text-slate-500 text-center">
+                  {isAr ? 'لا توجد نتائج' : 'No results found'}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={loadData}
           disabled={loading}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl transition-all cursor-pointer text-xs"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl transition-all cursor-pointer text-xs self-stretch md:self-auto"
         >
           {loading ? '...' : (isAr ? 'قارن الآن' : 'Compare')}
         </button>

@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     }
 
     const batchSize = 15;
-    const results = [];
+    const results: any[] = [];
     
     for (let i = 0; i < companies.length; i += batchSize) {
       const chunk = companies.slice(i, i + batchSize);
