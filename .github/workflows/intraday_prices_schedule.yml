@@ -54,28 +54,30 @@ jobs:
         # bypass_session_guard is False by default for production safety
         python services/intraday_importer.py --run-type ${{ github.event.inputs.run_type || 'dynamic' }}
 
-    - name: Prune Old Intraday Snapshots (Older than 7 days)
+    - name: Prune Old Intraday Snapshots (Older than 90 days)
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
         python -c "
-        import os
+        import os, time
         from supabase import create_client
         from datetime import datetime, timezone, timedelta
         sb = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-        print('Pruning records created before:', cutoff)
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        print('Pruning snapshot times before:', cutoff)
         
-        # We perform deleting in chunks to prevent database transaction timeout locks
-        has_more = True
+        # We delete using company-by-company logic or query batches to prevent postgrest JSON buffer limits and timeouts
+        res_comp = sb.table('companies').select('id').execute()
+        companies = res_comp.data if res_comp.data else []
+        
         total_deleted = 0
-        while has_more:
-            res = sb.table('intraday_snapshots').delete().lt('created_at', cutoff).limit(5000).execute()
-            deleted = len(res.data) if res.data else 0
+        for co in companies:
+            cid = co['id']
+            del_res = sb.table('intraday_snapshots').delete().eq('company_id', cid).lt('snapshot_time', cutoff).execute()
+            deleted = len(del_res.data) if del_res.data else 0
             total_deleted += deleted
-            print(f'Deleted {deleted} rows. Total so far: {total_deleted}')
-            if deleted < 5000:
-                has_more = False
-        print('Pruning job completed successfully.')
+            if deleted > 0:
+                time.sleep(0.05)
+        print(f'Pruning job completed successfully. Total deleted: {total_deleted}')
         "
