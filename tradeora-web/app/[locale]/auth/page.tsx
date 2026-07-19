@@ -141,18 +141,52 @@ export default function AuthPage({ params }: AuthPageProps) {
   };
 
   return (
-    <div className={`min-h-screen w-full flex ${isAr ? 'flex-row-reverse' : 'flex-row'} bg-[#0B1120] font-sans relative overflow-hidden`}>
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#0B1120] font-sans relative overflow-hidden">
       
-      {/* ABSOLUTE LOGO TOP LEFT */}
+      {/* ABSOLUTE BRANDING TOP LEFT */}
       <div className="absolute top-6 left-8 z-50 flex items-center gap-3" dir="ltr">
-        <Image src="/logo-icon.png" alt="TRADEORA Logo" width={48} height={48} className="drop-shadow-lg object-contain" />
         <span className="text-2xl font-black tracking-tight text-white select-none">
           <span className="text-accent-blue">TRADE</span>
           <span className="bg-gradient-to-r from-accent-blue to-emerald-400 bg-clip-text text-transparent">ORA</span>
         </span>
       </div>
+
+      {/* LEFT COLUMN: PRO TRADING SCREEN MOCKUP */}
+      <div className="hidden lg:flex w-1/2 relative bg-black/40 overflow-hidden items-center justify-center border-r border-white/5">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/10 to-emerald-500/10 mix-blend-overlay z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-transparent z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0B1120]/10 via-transparent to-[#0B1120] z-10"></div>
+        
+        <Image 
+          src="/trading-mockup.jpg" 
+          alt="Professional Trading Interface" 
+          fill
+          className="object-cover opacity-80 scale-105 hover:scale-110 hover:opacity-100 transition-all duration-1000 ease-in-out"
+          priority
+        />
+
+        {/* Floating elements on top of image to make it look active */}
+        <div className="absolute z-20 bottom-12 left-12 right-12 p-8 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl translate-y-4 hover:translate-y-0 transition-transform duration-500">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-blue to-emerald-500 flex items-center justify-center shadow-lg">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-white font-bold text-xl">{isAr ? 'تحليل احترافي' : 'Professional Analysis'}</h4>
+              <p className="text-emerald-400 text-sm font-medium">+24.5% {isAr ? 'هذا الأسبوع' : 'This Week'}</p>
+            </div>
+          </div>
+          <p className="text-text-secondary/80 text-sm leading-relaxed mt-4">
+            {isAr 
+              ? 'انضم الآن إلى المنصة الأكثر تطوراً لتداول الأسهم والمتابعة اللحظية بأدوات تحليل تعتمد على الذكاء الاصطناعي.' 
+              : 'Join the most advanced stock trading and real-time tracking platform with AI-powered analysis tools.'}
+          </p>
+        </div>
+      </div>
       
-      {/* LEFT COLUMN: AUTH FORM */}
+      {/* RIGHT COLUMN: AUTH FORM */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10 flex-col">
         
         {/* Decorative background glows for form side */}
@@ -320,42 +354,8 @@ export default function AuthPage({ params }: AuthPageProps) {
           )}
         </div>
       </div>
-
-      {/* RIGHT COLUMN: PRO TRADING SCREEN MOCKUP */}
-      <div className="hidden lg:flex w-1/2 relative bg-black/40 overflow-hidden items-center justify-center border-l border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-blue/10 to-emerald-500/10 mix-blend-overlay z-10"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-transparent z-10"></div>
-        <div className="absolute inset-0 bg-gradient-to-l from-[#0B1120]/50 via-transparent to-transparent z-10"></div>
-        
-        <Image 
-          src="/trading-mockup.jpg" 
-          alt="Professional Trading Interface" 
-          fill
-          className="object-cover opacity-80 scale-105 hover:scale-110 hover:opacity-100 transition-all duration-1000 ease-in-out"
-          priority
-        />
-
-        {/* Floating elements on top of image to make it look active */}
-        <div className="absolute z-20 bottom-12 left-12 right-12 p-8 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl translate-y-4 hover:translate-y-0 transition-transform duration-500">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-blue to-emerald-500 flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-white font-bold text-xl">{isAr ? 'تحليل احترافي' : 'Professional Analysis'}</h4>
-              <p className="text-emerald-400 text-sm font-medium">+24.5% {isAr ? 'هذا الأسبوع' : 'This Week'}</p>
-            </div>
-          </div>
-          <p className="text-text-secondary/80 text-sm leading-relaxed mt-4">
-            {isAr 
-              ? 'انضم الآن إلى المنصة الأكثر تطوراً لتداول الأسهم والمتابعة اللحظية بأدوات تحليل تعتمد على الذكاء الاصطناعي.' 
-              : 'Join the most advanced stock trading and real-time tracking platform with AI-powered analysis tools.'}
-          </p>
-        </div>
-      </div>
       
     </div>
   );
+}
 }
