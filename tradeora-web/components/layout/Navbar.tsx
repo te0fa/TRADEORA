@@ -122,7 +122,7 @@ export function Navbar({ locale }: NavbarProps) {
               </Link>
 
               <Link 
-                href={`/${locale}`}
+                href={`/${locale}/screener`}
                 className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
                   pathname.includes('/stock') ? 'text-accent-blue bg-white/5' : ''
                 }`}
@@ -130,7 +130,6 @@ export function Navbar({ locale }: NavbarProps) {
                 <BarChart2 className="w-3.5 h-3.5" />
                 <span>{isAr ? '📊 الأسهم' : 'Stocks'}</span>
               </Link>
-
               <Link 
                 href={`/${locale}/screener`}
                 className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
