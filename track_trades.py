@@ -337,14 +337,19 @@ def track_recommended_trades():
             curr_close = float(c["close_price"])
             curr_date = c["price_date"]
 
+            # Select SL trigger logic based on timeframe (Scenario B: Close trigger for 1d and 1h)
+            use_close_trigger = timeframe in ['1d', '1h', 'D']
+
             if direction == "buy":
                 effective_sl = entry_price if (tp1_hit and trailing_stop_to_entry) else sl
-                if curr_low <= effective_sl:
+                sl_breached = (curr_close <= effective_sl) if use_close_trigger else (curr_low <= effective_sl)
+                
+                if sl_breached:
                     closed = True
-                    exit_price = effective_sl
+                    exit_price = curr_close if use_close_trigger else effective_sl
                     exit_reason = "trailing_sl" if (tp1_hit and trailing_stop_to_entry) else "sl"
                     close_date = curr_date
-                    pnl_percent = 0.5 * tp1_pnl + 0.5 * ((effective_sl - entry_price) / entry_price * 100) if tp1_hit else ((effective_sl - entry_price) / entry_price * 100)
+                    pnl_percent = 0.5 * tp1_pnl + 0.5 * ((exit_price - entry_price) / entry_price * 100) if tp1_hit else ((exit_price - entry_price) / entry_price * 100)
                     break
 
                 if tp1_hit and curr_high >= tp2:
@@ -371,12 +376,14 @@ def track_recommended_trades():
                         break
             else:
                 effective_sl = entry_price if (tp1_hit and trailing_stop_to_entry) else sl
-                if curr_high >= effective_sl:
+                sl_breached = (curr_close >= effective_sl) if use_close_trigger else (curr_high >= effective_sl)
+                
+                if sl_breached:
                     closed = True
-                    exit_price = effective_sl
+                    exit_price = curr_close if use_close_trigger else effective_sl
                     exit_reason = "trailing_sl" if (tp1_hit and trailing_stop_to_entry) else "sl"
                     close_date = curr_date
-                    pnl_percent = 0.5 * tp1_pnl + 0.5 * ((entry_price - effective_sl) / entry_price * 100) if tp1_hit else ((entry_price - effective_sl) / entry_price * 100)
+                    pnl_percent = 0.5 * tp1_pnl + 0.5 * ((entry_price - exit_price) / entry_price * 100) if tp1_hit else ((entry_price - exit_price) / entry_price * 100)
                     break
 
                 if tp1_hit and curr_low <= tp2:

@@ -12,4 +12,7 @@ playwright>=1.61.0
 pdfplumber>=0.11.10
 pytz>=2024.1
 yfinance>=0.2.40
+vectorbt>=0.26.1
+quantstats>=0.0.62
+matplotlib>=3.7.0
 
