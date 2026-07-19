@@ -145,7 +145,7 @@ export default function AuthPage({ params }: AuthPageProps) {
       
       {/* ABSOLUTE LOGO TOP LEFT */}
       <div className="absolute top-6 left-8 z-50 flex items-center gap-3" dir="ltr">
-        <Image src="/logo.png" alt="TRADEORA Logo" width={48} height={48} className="drop-shadow-lg object-contain" />
+        <Image src="/logo-icon.png" alt="TRADEORA Logo" width={48} height={48} className="drop-shadow-lg object-contain" />
         <span className="text-2xl font-black tracking-tight text-white select-none">
           <span className="text-accent-blue">TRADE</span>
           <span className="bg-gradient-to-r from-accent-blue to-emerald-400 bg-clip-text text-transparent">ORA</span>
