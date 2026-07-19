@@ -38,10 +38,10 @@ export default function AuthPage({ params }: AuthPageProps) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        router.replace(`/${locale}`);
+        window.location.href = `/${locale}/screener`;
       }
     });
-  }, [router, locale]);
+  }, [locale]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +60,7 @@ export default function AuthPage({ params }: AuthPageProps) {
         
         setSuccessMsg(isAr ? 'تم تسجيل الدخول بنجاح! جاري تحويلك...' : 'Logged in successfully! Redirecting...');
         setTimeout(() => {
-          router.replace(`/${locale}`);
+          window.location.href = `/${locale}/screener`;
         }, 1500);
       } else {
         // Sign Up
@@ -110,7 +110,7 @@ export default function AuthPage({ params }: AuthPageProps) {
             : 'Account created successfully! Logging you in.'
         );
         setTimeout(() => {
-          router.replace(`/${locale}`);
+          window.location.href = `/${locale}/screener`;
         }, 2000);
       }
     } catch (err: any) {
