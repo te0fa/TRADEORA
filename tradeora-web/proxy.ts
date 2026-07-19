@@ -37,7 +37,7 @@ const intlMiddleware = createMiddleware({
   localePrefix: 'always'
 });
 
-export default async function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const path = url.pathname;
 
@@ -165,6 +165,9 @@ export default async function proxy(req: NextRequest) {
 
   return res;
 }
+
+export default proxy;
+
 
 export const config = {
   matcher: [
