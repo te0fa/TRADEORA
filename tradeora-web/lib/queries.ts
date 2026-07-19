@@ -19,6 +19,7 @@ export interface CompanyWithPrice extends Company {
   isLastResort: boolean;
   sourceLabelAr: string;
   sourceLabelEn: string;
+  fundamentals?: any;
 }
 
 /**
