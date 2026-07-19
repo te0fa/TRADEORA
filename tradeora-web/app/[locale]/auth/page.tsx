@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import Image from 'next/image';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { TradeoraLogo } from '@/components/ui/TradeoraLogo';
 
 interface AuthPageProps {
   params: Promise<{
@@ -14,6 +14,7 @@ interface AuthPageProps {
 export default function AuthPage({ params }: AuthPageProps) {
   const { locale } = React.use(params);
   const router = useRouter();
+  const supabase = createClientComponentClient();
 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -145,14 +146,7 @@ export default function AuthPage({ params }: AuthPageProps) {
       
       {/* ABSOLUTE BRANDING TOP LEFT - Always on the Left regardless of language */}
       <div className="absolute top-6 left-8 z-50 flex items-center gap-3">
-        <Image 
-          src="/logo.png" 
-          alt="TRADEORA Logo" 
-          width={180} 
-          height={50} 
-          className="object-contain drop-shadow-2xl brightness-110" 
-          priority 
-        />
+        <TradeoraLogo width={200} height={65} />
       </div>
 
       {/* LEFT COLUMN: PROFESSIONAL ABSTRACT VISUALS */}
