@@ -181,6 +181,7 @@ def build_dataset(timeframe='1d',
 
     for co in companies:
         cid, sym = co['id'], co['symbol']
+        candles = []
 
         if timeframe == '1d':
             rows = sb.table('market_prices')\
@@ -197,19 +198,40 @@ def build_dataset(timeframe='1d',
             } for r in rows if r['close_price']]
         else:
             src = f'tradingview_{timeframe}'
-            rows = sb.table('intraday_snapshots')\
-                .select('open_price,high_price,'
-                        'low_price,price,volume')\
-                .eq('company_id', cid)\
-                .eq('source', src)\
-                .order('snapshot_time').execute().data
-            candles = [{
-                'open':  r['open_price']  or r['price'],
-                'high':  r['high_price']  or r['price'],
-                'low':   r['low_price']   or r['price'],
-                'close': r['price'],
-                'volume':r.get('volume') or 0
-            } for r in rows if r['price']]
+            parquet_path = Path('data/historical_exports') / f"export_{src}.parquet"
+            
+            # Use local Parquet data if file exists for rapid training
+            if parquet_path.exists():
+                try:
+                    # Load and filter by company
+                    df_local = pd.read_parquet(parquet_path)
+                    company_rows = df_local[df_local['company_id'] == cid].sort_values('snapshot_time')
+                    candles = [{
+                        'open':  float(r['open_price']) if r['open_price'] is not None else float(r['price']),
+                        'high':  float(r['high_price']) if r['high_price'] is not None else float(r['price']),
+                        'low':   float(r['low_price']) if r['low_price'] is not None else float(r['price']),
+                        'close': float(r['price']),
+                        'volume':int(r['volume']) if r['volume'] is not None else 0
+                    } for _, r in company_rows.iterrows()]
+                except Exception as e:
+                    print(f"Error reading local parquet for {sym}, falling back to Supabase: {e}", flush=True)
+                    candles = []
+            
+            # Fallback to Supabase if no parquet file found or read error
+            if not candles:
+                rows = sb.table('intraday_snapshots')\
+                    .select('open_price,high_price,'
+                            'low_price,price,volume')\
+                    .eq('company_id', cid)\
+                    .eq('source', src)\
+                    .order('snapshot_time').execute().data
+                candles = [{
+                    'open':  r['open_price']  or r['price'],
+                    'high':  r['high_price']  or r['price'],
+                    'low':   r['low_price']   or r['price'],
+                    'close': r['price'],
+                    'volume':r.get('volume') or 0
+                } for r in rows if r['price']]
 
         if len(candles) < 60:
             continue
