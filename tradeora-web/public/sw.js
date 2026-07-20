@@ -1,22 +1,21 @@
-const CACHE = 'tradeora-v1'
-
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['/']))
-  )
   self.skipWaiting()
 })
 
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim())
+  // Clear the old broken cache
+  e.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.map(key => caches.delete(key))
+      )
+    }).then(() => self.clients.claim())
+  )
 })
 
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return
-  e.respondWith(
-    caches.match(e.request)
-      .then(cached => cached || fetch(e.request))
-  )
+  // Do nothing to let the browser handle Next.js requests natively.
+  // Aggressive caching breaks Next.js App Router.
 })
 
 // ── Push Notification Handler ──────────
