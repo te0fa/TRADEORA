@@ -334,12 +334,10 @@ const CandlestickChartInner = (
 
     chart.timeScale().fitContent();
 
-    // إخفاء كل عناصر TradingView
+    // Hide only lightweight charts attribution link/logo if any
     const style = document.createElement('style');
     style.textContent = `
-      .tv-lightweight-charts table,
-      .tv-lightweight-charts a[href*="tradingview"],
-      .tv-lightweight-charts .watermark {
+      .tv-lightweight-charts a[href*="tradingview"] {
         display: none !important;
         opacity: 0 !important;
       }

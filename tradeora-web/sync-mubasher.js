@@ -82,7 +82,8 @@ async function run() {
           open_price: parseFloat(openPrice.toFixed(4)),
           high_price: data.price, // Fallback
           low_price: data.price,  // Fallback
-          volume: 0
+          volume: 0,
+          source: 'mubasher'
         };
       }
       return null;
