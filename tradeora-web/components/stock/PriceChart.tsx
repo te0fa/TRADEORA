@@ -102,10 +102,10 @@ function getYahooTicker(symbol: string): string {
   return exceptional_map[sym] || `${sym}.CA`;
 }
 
-async function fetchYahooCandles(symbol: string, interval: string): Promise<any[]> {
+async function fetchYahooCandles(symbol: string, interval: string): Promise<{ candles: any[], events: any }> {
   const parseYahooData = (json: any) => {
     const result = json?.chart?.result?.[0];
-    if (!result) return [];
+    if (!result) return { candles: [], events: {} };
     const timestamps = result.timestamp || [];
     const quotes = result.indicators?.quote?.[0] || {};
     const opens = quotes.open || [];
@@ -113,16 +113,23 @@ async function fetchYahooCandles(symbol: string, interval: string): Promise<any[
     const lows = quotes.low || [];
     const closes = quotes.close || [];
     const volumes = quotes.volume || [];
+    const adjcloses = result.indicators?.adjclose?.[0]?.adjclose || [];
+    const events = result.events || {};
 
     const rawPoints: any[] = [];
     for (let i = 0; i < timestamps.length; i++) {
       if (opens[i] === null || highs[i] === null || lows[i] === null || closes[i] === null) continue;
+      
+      const close = closes[i];
+      const adjclose = adjcloses[i];
+      const ratio = (adjclose && close && close > 0) ? (adjclose / close) : 1;
+      
       rawPoints.push({
         time: timestamps[i],
-        open: opens[i],
-        high: highs[i],
-        low: lows[i],
-        close: closes[i],
+        open: opens[i] * ratio,
+        high: highs[i] * ratio,
+        low: lows[i] * ratio,
+        close: close * ratio,
         volume: volumes[i] ?? 0
       });
     }
@@ -144,10 +151,10 @@ async function fetchYahooCandles(symbol: string, interval: string): Promise<any[
         });
         aggregated.push({ time: last.time, open: first.open, high: maxHigh, low: minLow, close: last.close, volume: sumVol });
       }
-      return aggregated;
+      return { candles: aggregated, events };
     }
 
-    return rawPoints;
+    return { candles: rawPoints, events };
   };
 
   const primaryTicker = getYahooTicker(symbol);
@@ -174,7 +181,7 @@ async function fetchYahooCandles(symbol: string, interval: string): Promise<any[
     console.error('Yahoo candles fetch error:', err);
   }
 
-  return [];
+  return { candles: [], events: {} };
 }
 
 
@@ -303,6 +310,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   // Intraday prices states
   const [dbIntradayCandles, setDbIntradayCandles] = useState<any[]>([]);
   const [yahooCandles, setYahooCandles] = useState<any[]>([]);
+  const [upcomingDividends, setUpcomingDividends] = useState<any[]>([]);
   const [isIntradayLoading, setIsIntradayLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -513,9 +521,20 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
 
         // 2. Fetch Yahoo Finance candles if DB candles are insufficient
         if (formattedDb.length < 10) {
-          const yfPoints = await fetchYahooCandles(symbol, interval);
-          const formattedYahoo = yfPoints.map(formatCandle);
+          const { candles: yfCandles, events: yfEvents } = await fetchYahooCandles(symbol, interval);
+          const formattedYahoo = yfCandles.map(formatCandle);
           setYahooCandles(formattedYahoo);
+          
+          if (yfEvents && yfEvents.dividends) {
+            // Find dividends in the next 30 days
+            const now = Date.now() / 1000;
+            const upcoming = Object.values(yfEvents.dividends).filter((d: any) => d.date >= now && d.date <= now + 30 * 24 * 60 * 60);
+            if (upcoming.length > 0) {
+              setUpcomingDividends(upcoming);
+            } else {
+              setUpcomingDividends([]);
+            }
+          }
         } else {
           setYahooCandles([]);
         }
@@ -1480,9 +1499,22 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     }
 
     // final consensus values
-    const tp1 = median([bb_tp1, rsi_tp1, macd_tp1, ma_tp1, sr_tp1]);
-    const tp2 = median([bb_tp2, rsi_tp2, macd_tp2, ma_tp2, sr_tp2]);
-    const sl = median([bb_sl, rsi_sl, macd_sl, ma_sl, sr_sl]);
+    let tp1 = median([bb_tp1, rsi_tp1, macd_tp1, ma_tp1, sr_tp1]);
+    let tp2 = median([bb_tp2, rsi_tp2, macd_tp2, ma_tp2, sr_tp2]);
+    let sl = median([bb_sl, rsi_sl, macd_sl, ma_sl, sr_sl]);
+
+    let dividendAdjustmentNoteAR = '';
+    let dividendAdjustmentNoteEN = '';
+    if (upcomingDividends.length > 0) {
+      const totalDividend = upcomingDividends.reduce((sum, d) => sum + (d.amount || 0), 0);
+      if (totalDividend > 0) {
+        tp1 = Math.max(0.01, tp1 - totalDividend);
+        tp2 = Math.max(0.01, tp2 - totalDividend);
+        sl = Math.max(0.01, sl - totalDividend);
+        dividendAdjustmentNoteAR = `\n\n⚠️ تم تخفيض الأهداف ومستوى الوقف بمقدار التوزيع النقدي القادم (${totalDividend.toFixed(2)}) لتفادي تأثير الفجوة السعرية.`;
+        dividendAdjustmentNoteEN = `\n\n⚠️ Targets and stop loss were reduced by the upcoming dividend amount (${totalDividend.toFixed(2)}) to account for the ex-dividend gap.`;
+      }
+    }
 
     const tp1Source = locale === 'ar' ? 'سعر توافقي (وسيط أهداف المؤشرات)' : 'Consensus price (median of indicator targets)';
     const tp2Source = locale === 'ar' ? 'سعر توافقي (وسيط أهداف المؤشرات الثاني)' : 'Consensus price (median of indicator second targets)';
@@ -1723,8 +1755,8 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       slSource,
       rr,
       isSell,
-      noteAR,
-      noteEN,
+      noteAR: noteAR + (dividendAdjustmentNoteAR || ''),
+      noteEN: noteEN + (dividendAdjustmentNoteEN || ''),
       tradeDuration,
       timeToTP1,
       timeToTP2,

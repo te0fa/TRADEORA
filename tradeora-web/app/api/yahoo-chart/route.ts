@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   };
 
   const fetchFromYahoo = async (symbolTicker: string) => {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbolTicker}?interval=${queryInterval}&range=${range}`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbolTicker}?interval=${queryInterval}&range=${range}&events=div,splits`;
     try {
       const res = await fetch(url, { headers, next: { revalidate: 30 } });
       if (!res.ok) return null;
