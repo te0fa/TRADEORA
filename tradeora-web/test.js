@@ -1,30 +1,22 @@
 const fs = require('fs');
+const env = fs.readFileSync('.env.local', 'utf8');
+const urlMatch = env.match(/NEXT_PUBLIC_SUPABASE_URL="?([^"\r\n]+)/);
+const keyMatch = env.match(/SUPABASE_SERVICE_ROLE_KEY="?([^"\r\n]+)/) || env.match(/NEXT_PUBLIC_SUPABASE_ANON_KEY="?([^"\r\n]+)/);
+const SUPABASE_URL = urlMatch[1].trim();
+const SUPABASE_KEY = keyMatch[1].trim();
 
-async function scrapeMubasher(symbol) {
-  try {
-    const res = await fetch(`https://english.mubasher.info/markets/EGX/stocks/${symbol}`);
-    if (!res.ok) return null;
-    const html = await res.text();
-    
-    const priceMatch = html.match(/class="market-summary__last-price[^"]*">\s*([\d.]+)/);
-    const changeMatch = html.match(/class="market-summary__change-percentage[^"]*">\s*([-\d.%+]+)/);
-    
-    if (priceMatch && changeMatch) {
-      const price = parseFloat(priceMatch[1]);
-      const changeStr = changeMatch[1].replace('%', '');
-      const change = parseFloat(changeStr);
-      return { symbol, price, change };
-    }
-  } catch (e) {
-    console.error(e);
-  }
-  return null;
-}
-
-async function run() {
-  const tmgh = await scrapeMubasher('TMGH');
-  const hrho = await scrapeMubasher('HRHO');
-  console.log('TMGH:', tmgh);
-  console.log('HRHO:', hrho);
-}
-run();
+fetch(`${SUPABASE_URL}/rest/v1/market_prices?source=is.null`, {
+  method: 'PATCH',
+  headers: {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  },
+  body: JSON.stringify({ source: 'mubasher' })
+})
+.then(r => r.json())
+.then(data => {
+  console.log('Fixed source=null rows count:', data.length);
+})
+.catch(console.error);

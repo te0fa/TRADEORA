@@ -59,8 +59,11 @@ function isMarketOpen(): boolean {
     const cairoTime = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
     const d = new Date(cairoTime);
     const day = d.getDay();
-    const mins = d.getHours() * 60 + d.getMinutes();
-    return day >= 0 && day <= 4 && mins >= 600 && mins <= 870;
+    const totalMinutes = d.getHours() * 60 + d.getMinutes();
+    const marketOpenMinutes = 10 * 60;
+    const marketCloseMinutes = 14 * 60 + 30; // 870 = 14:30
+    const isOpen = totalMinutes >= marketOpenMinutes && totalMinutes <= marketCloseMinutes;
+    return day >= 0 && day <= 4 && isOpen;
   } catch { return false; }
 }
 

@@ -37,7 +37,8 @@ class TradingViewScraper:
                 "volume",
                 "Value.Traded",
                 "change",
-                "change_abs"
+                "change_abs",
+                "close[1]"
             ],
             "sort": { "sortBy": "name", "sortOrder": "asc" },
             "range": [0, 1000]
@@ -60,6 +61,11 @@ class TradingViewScraper:
             if r_en.status_code != 200:
                 raise RuntimeError(f"TradingView English scan failed with status: {r_en.status_code}")
             rows_en = r_en.json().get("data", [])
+            if rows_en:
+                import json
+                print("--- DEBUG: TradingView scanner fields response_data[0] ---")
+                print(json.dumps(rows_en[0], indent=2, ensure_ascii=False))
+                print("---------------------------------------------------------")
             
             logger.info("Fetching Arabic descriptions from TradingView...")
             r_ar = requests.post(self.url, json=payload_ar, headers=self.headers, timeout=15)
@@ -86,20 +92,35 @@ class TradingViewScraper:
             d = row["d"]
             
             # Extract fields based on English payload columns index:
-            # 0: name, 1: description, 2: open, 3: high, 4: low, 5: close, 6: volume, 7: Value.Traded, 8: change, 9: change_abs
+            # 0: name, 1: description, 2: open, 3: high, 4: low, 5: close, 6: volume, 7: Value.Traded, 8: change, 9: change_abs, 10: close[1]
             open_price = d[2]
             high_price = d[3]
             low_price = d[4]
             close_price = d[5]
             volume = d[6]
             value_traded = d[7]
-            change_percent = d[8]
-            change_value = d[9]
             
-            # Mathematically compute previous close: previous_close = close - change_abs
-            previous_close = None
-            if close_price is not None and change_value is not None:
-                previous_close = round(close_price - change_value, 4)
+            previous_close = d[10]  # close[1] is index 10
+            
+            if previous_close is None:
+                import yfinance as yf
+                def get_prev_close_yahoo(symbol: str) -> float | None:
+                    try:
+                        ticker_yf = yf.Ticker(f"{symbol}.CA")
+                        hist = ticker_yf.history(period="5d")
+                        if len(hist) >= 2:
+                            return float(hist['Close'].iloc[-2])
+                    except: pass
+                    return None
+                previous_close = get_prev_close_yahoo(ticker)
+                
+            if previous_close and float(previous_close) > 0:
+                previous_close = float(previous_close)
+                change_value   = round(close_price - previous_close, 4)
+                change_percent = round((close_price - previous_close) / previous_close * 100, 4)
+            else:
+                change_value   = None
+                change_percent = None
                 
             name_en = d[1]
             name_ar = ar_desc_map.get(ticker, name_en)

@@ -63,7 +63,12 @@ export function StockHeader({ company }: StockHeaderProps) {
     
     // EGX is closed Friday (5) and Saturday (6)
     const isWeekend = [5, 6].includes(day);
-    const isMarketHours = !isWeekend && hour >= 10 && hour < 15;
+    
+    const totalMinutes = hour * 60 + d.getMinutes();
+    const marketOpenMinutes = 10 * 60; // 10:00
+    const marketCloseMinutes = 14 * 60 + 30; // 14:30 (870 minutes)
+    const isOpen = totalMinutes >= marketOpenMinutes && totalMinutes <= marketCloseMinutes;
+    const isMarketHours = !isWeekend && isOpen;
     
     if (isMarketHours) {
       return (

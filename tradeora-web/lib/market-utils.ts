@@ -53,12 +53,12 @@ export function isMarketOpen(): boolean {
   const isBusinessDay = dayOfWeek >= 0 && dayOfWeek <= 4;
   if (!isBusinessDay) return false;
   
-  // 10:00 to 14:30
-  const timeInMinutes = hour * 60 + minute;
-  const startInMinutes = 10 * 60; // 600
-  const endInMinutes = 14 * 60 + 30; // 870
+  const totalMinutes = hour * 60 + minute;
+  const marketOpenMinutes = 10 * 60;
+  const marketCloseMinutes = 14 * 60 + 30; // 870 = 14:30
+  const isOpen = totalMinutes >= marketOpenMinutes && totalMinutes <= marketCloseMinutes;
   
-  return timeInMinutes >= startInMinutes && timeInMinutes <= endInMinutes;
+  return isOpen;
 }
 
 export interface PriceRecord {

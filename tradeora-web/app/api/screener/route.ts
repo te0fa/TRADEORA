@@ -24,7 +24,7 @@ export async function GET() {
 
     const { data: prices, error: priceError } = await sb
       .from('market_prices')
-      .select('company_id, close_price, open_price, high_price, low_price, volume, price_date')
+      .select('company_id, close_price, open_price, high_price, low_price, volume, price_date, change_percent, change_value')
       .in('company_id', ids)
       .order('price_date', { ascending: false });
 
@@ -58,11 +58,6 @@ export async function GET() {
         const s = statsMap[c.id];
         if (!p) return null;
 
-        const change = p.open_price > 0
-          ? ((p.close_price - p.open_price)
-             / p.open_price * 100)
-          : 0;
-
         return {
           id:         c.id,
           symbol:     c.symbol,
@@ -70,7 +65,7 @@ export async function GET() {
           name_en:    c.name_en,
           sector:     c.sector,
           price:      p.close_price,
-          change:     parseFloat(change.toFixed(2)),
+          change:     p.change_percent ?? null,
           volume:     p.volume,
           date:       p.price_date,
           signal:     s?.signal_type ?? 'neutral',

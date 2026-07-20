@@ -9,7 +9,7 @@ export async function GET() {
 
     const { data: prices } = await supabase
       .from('market_prices')
-      .select('company_id, close_price, open_price, price_date')
+      .select('company_id, close_price, open_price, high_price, low_price, volume, price_date, change_percent, change_value')
       .order('price_date', { ascending: false });
 
     const { data: stats } = await supabase
@@ -42,9 +42,7 @@ export async function GET() {
       const s = statsMap[co.id];
       if (!p) continue;
 
-      const change = p.open_price > 0
-        ? (p.close_price - p.open_price) / p.open_price * 100
-        : 0;
+      const change = p.change_percent ?? null;
 
       if (!sectorMap[co.sector]) {
         sectorMap[co.sector] = {
@@ -57,9 +55,11 @@ export async function GET() {
 
       const sec = sectorMap[co.sector];
       sec.total++;
-      sec.changes.push(change);
-      if (change > 0) sec.rising++;
-      if (change < 0) sec.falling++;
+      if (change !== null) {
+        sec.changes.push(change);
+        if (change > 0) sec.rising++;
+        if (change < 0) sec.falling++;
+      }
       if (s?.signal_type === 'buy')  sec.buySignals++;
       if (s?.signal_type === 'sell') sec.sellSignals++;
       if (s?.win_rate_tp1) sec.winRates.push(s.win_rate_tp1);

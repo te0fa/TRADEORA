@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     if (results.length > 0) {
       const { error: upsertError } = await sb
         .from('market_prices')
-        .insert(results); // Standard insert appends new rows for today
+        .upsert(results, { onConflict: 'company_id,price_date,source' });
         
       if (upsertError) throw upsertError;
       return NextResponse.json({ success: true, count: results.length });

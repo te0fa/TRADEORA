@@ -18,4 +18,11 @@ data/
 *.xlsx
 *.xls
 *.csv
+*.log
 C:\Users\mosta\.gemini\antigravity\brain\*
+
+# Scratch/Local files
+scratch_test.py
+tradeora-web/env.vercel*
+tradeora-web/models/
+supabase/.temp/
