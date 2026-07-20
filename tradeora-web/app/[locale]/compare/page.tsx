@@ -400,6 +400,6 @@ export default function ComparePage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
