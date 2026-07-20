@@ -143,7 +143,23 @@ def main():
             if len(summary["errors"]) > 5:
                 print(f"  ... and {len(summary['errors']) - 5} more errors.")
         print("=" * 50 + "\n")
-        
+
+        # 5. Weekly Fundamentals Update (Sundays)
+        if now.weekday() == 6:  # 6 = Sunday in Python (0=Mon, 6=Sun)
+            try:
+                logger.info("Sunday detected — Running weekly fundamentals update from Yahoo Finance...")
+                from scrapers.fundamentals_scraper import fetch_fundamentals_yahoo
+                from database import db
+                companies = db.get_all_companies()
+                company_symbols = [c["symbol"] for c in companies] if companies else []
+                if company_symbols:
+                    fund_data = fetch_fundamentals_yahoo(company_symbols)
+                    if fund_data:
+                        db.upsert_company_fundamentals(fund_data)
+                        logger.info(f"Weekly fundamentals update completed ({len(fund_data)} companies updated).")
+            except Exception as e:
+                logger.warning(f"Fundamentals update failed (non-fatal): {e}")
+
         logger.info("Tradeora EGX Importer Pipeline Completed Successfully.")
         
     except Exception as e:

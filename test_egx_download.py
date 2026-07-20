@@ -30,7 +30,7 @@ PDF_PATTERNS = [
     "https://egx.com.eg/ar/EGX_Reports/Daily_Bulletin.pdf",
 ]
 
-OUTPUT_DIR = r"E:\TRADEORA\data"
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 def test_page_access(client, name, url):
     print(f"\n{'='*50}")

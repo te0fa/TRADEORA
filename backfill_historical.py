@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from scrapers.utils import get_yahoo_ticker
 
 # Load environment variables
-load_dotenv(dotenv_path="E:\\TRADEORA\\.env")
+load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")

@@ -1,26 +1,51 @@
 import React from 'react';
+import { motion, HTMLMotionProps } from 'framer-motion';
 
-interface BadgeProps {
-  children: React.ReactNode;
+export interface BadgeProps extends HTMLMotionProps<"span"> {
   variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'glass';
-  className?: string;
+  pulsing?: boolean;
 }
 
-export function Badge({ children, variant = 'glass', className = '' }: BadgeProps) {
-  const baseStyle = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide transition-colors duration-200";
+export function Badge({ 
+  children, 
+  variant = 'glass', 
+  pulsing = false,
+  className = '',
+  ...props 
+}: BadgeProps) {
+  const baseStyle = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors duration-300";
   
   const variants = {
-    primary: "bg-accent-blue/15 text-accent-blue border border-accent-blue/30 shadow-[0_0_10px_-3px_rgba(59,130,246,0.25)]",
-    secondary: "bg-gray-500/10 text-gray-400 border border-gray-500/20",
-    success: "bg-up-green/15 text-up-green border border-up-green/30 shadow-[0_0_10px_-3px_rgba(16,185,129,0.25)]",
-    danger: "bg-down-red/15 text-down-red border border-down-red/30 shadow-[0_0_10px_-3px_rgba(239,68,68,0.25)]",
-    warning: "bg-amber-500/15 text-amber-500 border border-amber-500/30 shadow-[0_0_10px_-3px_rgba(245,158,11,0.25)]",
-    glass: "bg-white/5 text-text-secondary border border-white/10 hover:bg-white/10 hover:text-text-primary"
+    primary: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+    secondary: "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20",
+    success: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+    danger: "bg-red-500/10 text-red-400 border border-red-500/20",
+    warning: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
+    glass: "glass-panel text-zinc-300"
+  };
+
+  const dotColors = {
+    primary: "bg-blue-400",
+    secondary: "bg-zinc-400",
+    success: "bg-emerald-400",
+    danger: "bg-red-400",
+    warning: "bg-yellow-400",
+    glass: "bg-zinc-300"
   };
 
   return (
-    <span className={`${baseStyle} ${variants[variant]} ${className}`}>
+    <motion.span 
+      whileHover={{ scale: 1.05 }}
+      className={`${baseStyle} ${variants[variant]} ${className}`}
+      {...props}
+    >
+      {pulsing && (
+        <span className="relative flex h-1.5 w-1.5">
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dotColors[variant]}`}></span>
+          <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColors[variant]}`}></span>
+        </span>
+      )}
       {children}
-    </span>
+    </motion.span>
   );
 }

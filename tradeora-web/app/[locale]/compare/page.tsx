@@ -4,9 +4,13 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import {
   LineChart, Line, XAxis, YAxis,
-  Tooltip, Legend, ResponsiveContainer
+  Tooltip, Legend, ResponsiveContainer, CartesianGrid
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 
 export default function ComparePage() {
   const { locale } = useParams();
@@ -85,8 +89,8 @@ export default function ComparePage() {
 
         chartData.push({
           date: new Date(date).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric' }),
-          [sym1]: item1 ? parseFloat(((item1.close_price / base1 - 1) * 100).toFixed(2)) : 0,
-          [sym2]: item2 ? parseFloat(((item2.close_price / base2 - 1) * 100).toFixed(2)) : 0,
+          [sym1]: item1 ? parseFloat(((item1.close_price / base1 - 1) * 100).toFixed(2)) : null,
+          [sym2]: item2 ? parseFloat(((item2.close_price / base2 - 1) * 100).toFixed(2)) : null,
         });
       }
 
@@ -151,17 +155,38 @@ export default function ComparePage() {
     c.name_en?.toLowerCase().includes(search2.toLowerCase())
   );
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="min-h-screen p-6 font-sans text-text-primary mb-20" dir={isAr ? 'rtl' : 'ltr'}>
-      <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-        <span>⚖️</span>
-        <span>{isAr ? 'مقارنة الأداء النسبي للأسهم' : 'Stock Relative Performance'}</span>
-      </h1>
+    <motion.div 
+      initial="hidden"
+      animate="show"
+      variants={containerVariants}
+      className="min-h-screen pb-20 font-sans text-text-primary" 
+      dir={isAr ? 'rtl' : 'ltr'}
+    >
+      <motion.div variants={itemVariants} className="mb-8">
+        <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+          <span className="text-accent-blue">⚖️</span>
+          <span>{isAr ? 'مقارنة الأداء النسبي' : 'Relative Performance'}</span>
+        </h1>
+        <p className="text-sm text-zinc-400">
+          {isAr ? 'قارن أداء سهمين على مدار 90 يوماً واكتشف الفروقات الجوهرية.' : 'Compare two assets over 90 days to spot divergence and momentum.'}
+        </p>
+      </motion.div>
 
       {/* Input panel with Searchable Dropdowns */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6 z-30 relative">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row gap-4 mb-8 z-30 relative items-center">
         {/* Dropdown 1 */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative w-full">
           <input
             value={search1}
             onFocus={() => setShowDropdown1(true)}
@@ -171,10 +196,10 @@ export default function ComparePage() {
               setShowDropdown1(true);
             }}
             placeholder={isAr ? 'ابحث باسم السهم أو الرمز...' : 'Search stock name or symbol...'}
-            className="w-full bg-white/5 border border-blue-500/30 rounded-xl px-4 py-3 text-blue-400 font-extrabold text-sm outline-none focus:border-blue-500 text-center"
+            className="w-full glass-input rounded-xl px-5 py-4 text-accent-blue font-black text-base outline-none focus:border-accent-blue text-center uppercase tracking-wider"
           />
           {showDropdown1 && (
-            <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin">
+            <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-surface-elevated border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin backdrop-blur-xl">
               {filteredCompanies1.slice(0, 50).map(c => (
                 <div
                   key={c.id}
@@ -183,14 +208,14 @@ export default function ComparePage() {
                     setSearch1(`${c.symbol} - ${isAr ? c.name_ar : c.name_en}`);
                     setShowDropdown1(false);
                   }}
-                  className="px-4 py-2.5 text-xs text-slate-300 hover:bg-blue-600/20 hover:text-white cursor-pointer transition flex justify-between items-center"
+                  className="px-5 py-3 text-sm text-zinc-300 hover:bg-accent-blue/10 hover:text-white cursor-pointer transition flex justify-between items-center"
                 >
-                  <span className="font-bold text-blue-400 font-mono">{c.symbol}</span>
-                  <span className="truncate max-w-[200px] text-slate-400 text-[10px]">{isAr ? c.name_ar : c.name_en}</span>
+                  <span className="font-black text-accent-blue font-mono">{c.symbol}</span>
+                  <span className="truncate max-w-[200px] text-zinc-500 text-[11px]">{isAr ? c.name_ar : c.name_en}</span>
                 </div>
               ))}
               {filteredCompanies1.length === 0 && (
-                <div className="px-4 py-3 text-xs text-slate-500 text-center">
+                <div className="px-5 py-4 text-sm text-zinc-500 text-center">
                   {isAr ? 'لا توجد نتائج' : 'No results found'}
                 </div>
               )}
@@ -198,10 +223,12 @@ export default function ComparePage() {
           )}
         </div>
 
-        <span className="text-slate-500 text-xl font-black self-center text-center">VS</span>
+        <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-lg shadow-black/20">
+          <span className="text-zinc-500 text-sm font-black italic">VS</span>
+        </div>
 
         {/* Dropdown 2 */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative w-full">
           <input
             value={search2}
             onFocus={() => setShowDropdown2(true)}
@@ -211,10 +238,10 @@ export default function ComparePage() {
               setShowDropdown2(true);
             }}
             placeholder={isAr ? 'ابحث باسم السهم أو الرمز...' : 'Search stock name or symbol...'}
-            className="w-full bg-white/5 border border-purple-500/30 rounded-xl px-4 py-3 text-purple-400 font-extrabold text-sm outline-none focus:border-purple-500 text-center"
+            className="w-full glass-input rounded-xl px-5 py-4 text-accent-gold font-black text-base outline-none focus:border-accent-gold text-center uppercase tracking-wider"
           />
           {showDropdown2 && (
-            <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin">
+            <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-surface-elevated border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin backdrop-blur-xl">
               {filteredCompanies2.slice(0, 50).map(c => (
                 <div
                   key={c.id}
@@ -223,14 +250,14 @@ export default function ComparePage() {
                     setSearch2(`${c.symbol} - ${isAr ? c.name_ar : c.name_en}`);
                     setShowDropdown2(false);
                   }}
-                  className="px-4 py-2.5 text-xs text-slate-300 hover:bg-purple-600/20 hover:text-white cursor-pointer transition flex justify-between items-center"
+                  className="px-5 py-3 text-sm text-zinc-300 hover:bg-accent-gold/10 hover:text-white cursor-pointer transition flex justify-between items-center"
                 >
-                  <span className="font-bold text-purple-400 font-mono">{c.symbol}</span>
-                  <span className="truncate max-w-[200px] text-slate-400 text-[10px]">{isAr ? c.name_ar : c.name_en}</span>
+                  <span className="font-black text-accent-gold font-mono">{c.symbol}</span>
+                  <span className="truncate max-w-[200px] text-zinc-500 text-[11px]">{isAr ? c.name_ar : c.name_en}</span>
                 </div>
               ))}
               {filteredCompanies2.length === 0 && (
-                <div className="px-4 py-3 text-xs text-slate-500 text-center">
+                <div className="px-5 py-4 text-sm text-zinc-500 text-center">
                   {isAr ? 'لا توجد نتائج' : 'No results found'}
                 </div>
               )}
@@ -238,96 +265,141 @@ export default function ComparePage() {
           )}
         </div>
 
-        <button
+        <Button
           onClick={loadData}
           disabled={loading}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl transition-all cursor-pointer text-xs self-stretch md:self-auto"
+          size="lg"
+          className="w-full md:w-auto self-stretch"
         >
-          {loading ? '...' : (isAr ? 'قارن الآن' : 'Compare')}
-        </button>
-      </div>
+          {loading ? (
+            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          ) : (
+            <span>{isAr ? 'قارن الآن' : 'Compare'}</span>
+          )}
+        </Button>
+      </motion.div>
 
       {/* Statistics info row */}
-      {info.s1 && info.s2 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          {[
-            { stock: info.s1, color: 'text-blue-400', border: 'border-blue-500/20' },
-            { stock: info.s2, color: 'text-purple-400', border: 'border-purple-500/20' },
-          ].map(({ stock, color, border }) => (
-            <div key={stock.id} className={`bg-white/5 border ${border} rounded-2xl p-5`}>
-              <h3 className={`${color} font-black text-lg mb-3 font-mono`}>
-                {stock.symbol} — {isAr ? (stock.name_ar || stock.name_en) : (stock.name_en || stock.name_ar)}
-              </h3>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                  <span className="text-slate-400">{isAr ? 'آخر سعر:' : 'Last Price:'}</span>
-                  <span className="text-white font-bold font-mono">{stock.price?.toFixed(2)} EGP</span>
-                </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                  <span className="text-slate-400">{isAr ? 'التغير اليومي:' : 'Daily Change:'}</span>
-                  <span className={`font-bold font-mono ${stock.change > 0 ? 'text-green-400' : stock.change < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                    {stock.change > 0 ? '+' : ''}{stock.change?.toFixed(2)}%
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                  <span className="text-slate-400">{isAr ? 'الإشارة الحالية:' : 'Current Signal:'}</span>
-                  <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                    stock.stats?.signal_type === 'buy' ? 'bg-green-500/10 text-green-400' : stock.stats?.signal_type === 'sell' ? 'bg-red-500/10 text-red-400' : 'bg-slate-500/10 text-slate-400'
-                  }`}>
-                    {stock.stats?.signal_type?.toUpperCase() ?? '—'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-1.5">
-                  <span className="text-slate-400">{isAr ? 'نسبة نجاح الإشارات:' : 'Signal Win Rate (TP1):'}</span>
-                  <span className="text-white font-bold font-mono">{stock.stats?.win_rate_tp1 ? `${stock.stats.win_rate_tp1.toFixed(0)}%` : '—'}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        {info.s1 && info.s2 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8"
+          >
+            {[
+              { stock: info.s1, color: 'text-accent-blue', border: 'border-accent-blue/30', bg: 'bg-accent-blue/5' },
+              { stock: info.s2, color: 'text-accent-gold', border: 'border-accent-gold/30', bg: 'bg-accent-gold/5' },
+            ].map(({ stock, color, border, bg }) => {
+              const sigType = stock.stats?.signal_type;
+              return (
+                <Card hoverEffect={false} key={stock.id} className={`p-6 border-2 ${border} ${bg}`}>
+                  <h3 className={`${color} font-black text-2xl mb-1 font-mono tracking-tight`}>
+                    {stock.symbol}
+                  </h3>
+                  <p className="text-zinc-400 text-xs mb-5 font-medium">
+                    {isAr ? (stock.name_ar || stock.name_en) : (stock.name_en || stock.name_ar)}
+                  </p>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center py-2.5 border-b border-white/5">
+                      <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">{isAr ? 'آخر سعر' : 'Last Price'}</span>
+                      <span className="text-white font-black font-mono text-sm">{stock.price?.toFixed(2)} EGP</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2.5 border-b border-white/5">
+                      <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">{isAr ? 'التغير اليومي' : 'Daily Change'}</span>
+                      <span className={`font-black font-mono text-sm ${stock.change > 0 ? 'text-up-green' : stock.change < 0 ? 'text-down-red' : 'text-zinc-400'}`}>
+                        {stock.change > 0 ? '+' : ''}{stock.change?.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2.5 border-b border-white/5">
+                      <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">{isAr ? 'الإشارة الحالية' : 'Current Signal'}</span>
+                      <Badge variant={sigType === 'buy' ? 'success' : sigType === 'sell' ? 'danger' : 'warning'}>
+                        {sigType?.toUpperCase() ?? '—'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center py-2.5">
+                      <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">{isAr ? 'نسبة نجاح الإشارات' : 'Signal Win Rate'}</span>
+                      <span className="text-white font-black font-mono text-sm">{stock.stats?.win_rate_tp1 ? `${stock.stats.win_rate_tp1.toFixed(0)}%` : '—'}</span>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chart Panel */}
-      {data.length > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-          <h3 className="text-white font-bold text-sm mb-4">
-            {isAr ? 'الأداء النسبي التراكمي (آخر 90 يوم)' : 'Relative Performance Trend (Last 90 Days)'}
-          </h3>
-          <div className="w-full h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data}>
-                <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <YAxis tickFormatter={v => `${v}%`} tick={{ fill: '#64748b', fontSize: 10 }} />
-                <Tooltip
-                  formatter={(v: any) => [`${v}%`, '']}
-                  contentStyle={{
-                    background: '#1e293b',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    color: 'white',
-                    fontSize: '11px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Line
-                  type="monotone"
-                  dataKey={sym1}
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey={sym2}
-                  stroke="#a855f7"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {data.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Card hoverEffect={false} className="p-6">
+              <h3 className="text-white font-bold text-sm mb-6 uppercase tracking-wider">
+                {isAr ? 'الأداء النسبي التراكمي (%)' : 'Relative Performance Trend (%)'}
+              </h3>
+              <div className="w-full h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fill: '#71717A', fontSize: 10 }} 
+                      axisLine={false} 
+                      tickLine={false}
+                      dy={10}
+                    />
+                    <YAxis 
+                      tickFormatter={v => `${v}%`} 
+                      tick={{ fill: '#71717A', fontSize: 10 }} 
+                      axisLine={false}
+                      tickLine={false}
+                      dx={-10}
+                    />
+                    <Tooltip
+                      formatter={(v: any) => [`${v}%`, '']}
+                      contentStyle={{
+                        background: 'rgba(11, 15, 25, 0.9)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px',
+                        color: 'white',
+                        fontSize: '12px',
+                        backdropFilter: 'blur(10px)',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                      }}
+                      labelStyle={{ color: '#9CA3AF', marginBottom: '4px' }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '20px', fontWeight: 'bold' }} 
+                      iconType="circle"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey={sym1}
+                      stroke="#3B82F6"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#3B82F6', stroke: '#0B0F19', strokeWidth: 2 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey={sym2}
+                      stroke="#FCD34D"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#FCD34D', stroke: '#0B0F19', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

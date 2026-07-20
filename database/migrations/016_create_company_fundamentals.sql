@@ -1,17 +1,34 @@
 -- Migration: Create company_fundamentals table
+DROP TABLE IF EXISTS company_fundamentals CASCADE;
+
 CREATE TABLE IF NOT EXISTS company_fundamentals (
-    company_id UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
     pe_ratio NUMERIC,
+    pb_ratio NUMERIC,
     eps NUMERIC,
-    debt_equity NUMERIC,
-    profit_margin NUMERIC, -- operating margin
-    revenue_growth NUMERIC,
-    earnings_growth NUMERIC,
+    book_value_ps NUMERIC,
+    roe NUMERIC,
+    roa NUMERIC,
+    profit_margin NUMERIC,
+    debt_to_equity NUMERIC,
+    current_ratio NUMERIC,
+    revenue NUMERIC,
+    net_income NUMERIC,
     dividend_yield NUMERIC,
-    book_value NUMERIC,
-    fair_value NUMERIC, -- calculated via Graham Number
-    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    shares_outstanding BIGINT,
+    market_cap NUMERIC,
+    fiscal_year INTEGER,
+    source TEXT DEFAULT 'yahoo_finance',
+    fetched_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index on company_id for fast join queries
-CREATE INDEX IF NOT EXISTS idx_company_fundamentals_company_id ON company_fundamentals(company_id);
+ALTER TABLE company_fundamentals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "public_read_fundamentals" ON company_fundamentals 
+FOR SELECT USING (true);
+
+CREATE INDEX IF NOT EXISTS idx_fundamentals_company_id 
+ON company_fundamentals(company_id);
+

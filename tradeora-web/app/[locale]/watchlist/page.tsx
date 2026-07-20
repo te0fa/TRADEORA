@@ -3,7 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Star, AlertTriangle, TrendingUp, Search, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Star, Search, Trash2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 
 export default function WatchlistPage() {
   const { locale } = useParams();
@@ -26,7 +29,6 @@ export default function WatchlistPage() {
         return;
       }
 
-      // Fetch watchlist items with company details
       const { data, error } = await supabase
         .from('watchlists')
         .select(`
@@ -40,7 +42,6 @@ export default function WatchlistPage() {
 
       if (error) throw error;
 
-      // Enrich with last close/open prices to calculate daily percent change
       const enriched = await Promise.all(
         (data ?? []).map(async (w: any) => {
           if (!w.companies?.id) return { ...w, close: 0, change: 0 };
@@ -78,103 +79,140 @@ export default function WatchlistPage() {
     }
   }
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, x: -20 },
+    show: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } },
+    exit: { opacity: 0, x: 20, transition: { duration: 0.2 } }
+  };
+
   return (
-    <div className="w-full max-w-4xl mx-auto font-sans text-text-primary" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="w-full max-w-4xl mx-auto font-sans text-text-primary pb-20" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Title */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-white mb-1 flex items-center gap-2">
-          <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
-          <span>{isAr ? '⭐ قائمة المراقبة الشخصية' : 'Personal Watchlist'}</span>
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-10"
+      >
+        <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+          <Star className="w-8 h-8 text-accent-gold fill-accent-gold" />
+          <span>{isAr ? 'قائمة المراقبة الشخصية' : 'Personal Watchlist'}</span>
         </h1>
-        <p className="text-xs text-text-secondary mt-1">
+        <p className="text-sm text-zinc-400 mt-2">
           {isAr 
             ? `تتبع الأسعار والتغير اليومي لـ ${stocks.length} سهم قمت بمراقبتها.`
             : `Track prices and daily variations for your ${stocks.length} monitored assets.`}
         </p>
-      </div>
+      </motion.div>
 
       {loading ? (
-        <div className="w-full py-20 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-3 border-accent-blue/30 border-t-accent-blue rounded-full animate-spin"></div>
-          <span className="text-xs text-slate-400">{isAr ? 'جاري تحميل قائمة المراقبة...' : 'Loading watchlist...'}</span>
+        <div className="w-full py-20 flex flex-col items-center justify-center gap-4">
+          <div className="w-10 h-10 border-4 border-white/10 border-t-accent-gold rounded-full animate-spin"></div>
+          <span className="text-sm text-zinc-400">{isAr ? 'جاري تحميل قائمة المراقبة...' : 'Loading watchlist...'}</span>
         </div>
       ) : stocks.length === 0 ? (
-        <div className="text-center py-20 glass-card rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.01] to-transparent p-10 max-w-lg mx-auto">
-          <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
-            <Star className="w-6 h-6" />
-          </div>
-          <p className="text-sm text-slate-300 font-bold mb-2">
-            {isAr ? 'قائمة المراقبة فارغة حالياً' : 'Your watchlist is empty'}
-          </p>
-          <p className="text-xs text-slate-500 max-w-xs mx-auto leading-normal mb-6">
-            {isAr 
-              ? 'لم تقم بإضافة أي سهم للمراقبة بعد. انتقل لفرز الأسهم وابدأ بإضافة شركاتك المفضلة.' 
-              : 'You haven\'t added any stocks yet. Use the screener to explore and add your favorite assets.'}
-          </p>
-          <button
-            onClick={() => router.push(`/${locale}/screener`)}
-            className="px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 mx-auto"
-          >
-            <Search className="w-4 h-4" />
-            <span>{isAr ? 'استكشف وافرز الأسهم' : 'Explore Stocks'}</span>
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {stocks.map(s => (
-            <div key={s.id}
-              onClick={() => router.push(`/${locale}/stock/${s.symbol}`)}
-              className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/[0.08] hover:border-white/15 cursor-pointer transition-all duration-200 group relative overflow-hidden"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/5 flex items-center justify-center text-white font-extrabold text-xs tracking-wide">
-                  {s.symbol.slice(0, 3)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-white font-extrabold group-hover:text-accent-blue transition-colors">
-                      {s.symbol}
-                    </p>
-                    <span className="text-[9px] text-slate-500 font-mono">
-                      {new Date(s.added_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US')}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    {isAr ? s.companies?.name_ar : s.companies?.name_en}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div className="text-left font-mono">
-                  <p className="text-sm text-white font-bold">
-                    {s.close > 0 ? `${s.close.toFixed(2)} EGP` : '—'}
-                  </p>
-                  {s.close > 0 && (
-                    <p className={`text-[10px] font-bold mt-0.5 flex items-center justify-end gap-0.5 ${
-                      s.change > 0 ? 'text-green-400' : s.change < 0 ? 'text-red-400' : 'text-slate-400'
-                    }`}>
-                      {s.change > 0 ? <ArrowUpRight className="w-3 h-3" /> : s.change < 0 ? <ArrowDownRight className="w-3 h-3" /> : null}
-                      <span>{s.change > 0 ? '+' : ''}{s.change.toFixed(2)}%</span>
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={e => {
-                    e.stopPropagation();
-                    removeFromWatchlist(s.id);
-                  }}
-                  className="p-2 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded-xl transition cursor-pointer border border-transparent hover:border-red-500/20 shrink-0"
-                  title={isAr ? 'حذف من القائمة' : 'Remove item'}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Card hoverEffect={false} className="text-center py-20 p-10 max-w-lg mx-auto flex flex-col items-center justify-center">
+            <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-6 text-accent-gold">
+              <Star className="w-8 h-8" />
             </div>
-          ))}
-        </div>
+            <p className="text-lg text-white font-bold mb-3">
+              {isAr ? 'قائمة المراقبة فارغة حالياً' : 'Your watchlist is empty'}
+            </p>
+            <p className="text-sm text-zinc-400 max-w-xs leading-relaxed mb-8">
+              {isAr 
+                ? 'لم تقم بإضافة أي سهم للمراقبة بعد. انتقل لفرز الأسهم وابدأ بإضافة شركاتك المفضلة.' 
+                : 'You haven\'t added any stocks yet. Use the screener to explore and add your favorite assets.'}
+            </p>
+            <Button variant="gold" onClick={() => router.push(`/${locale}/screener`)}>
+              <Search className="w-4 h-4" />
+              {isAr ? 'استكشف وافرز الأسهم' : 'Explore Stocks'}
+            </Button>
+          </Card>
+        </motion.div>
+      ) : (
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="space-y-4"
+        >
+          <AnimatePresence>
+            {stocks.map(s => (
+              <motion.div 
+                variants={itemVariants}
+                key={s.id}
+                layout
+                initial="hidden"
+                animate="show"
+                exit="exit"
+              >
+                <Card 
+                  hoverEffect={true}
+                  className="flex items-center justify-between p-5 cursor-pointer group"
+                  onClick={() => router.push(`/${locale}/stock/${s.symbol}`)}
+                >
+                  <div className="flex items-center gap-5">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-blue/20 to-purple-500/20 border border-white/10 flex items-center justify-center text-white font-black text-sm tracking-widest shadow-lg shadow-accent-blue/10">
+                      {s.symbol.slice(0, 3)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <p className="text-base text-white font-extrabold group-hover:text-accent-blue transition-colors font-mono">
+                          {s.symbol}
+                        </p>
+                        <span className="text-[10px] text-zinc-500 font-mono px-2 py-0.5 bg-surface-dark rounded-md border border-white/5">
+                          {new Date(s.added_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 mt-1 max-w-[200px] truncate">
+                        {isAr ? s.companies?.name_ar : s.companies?.name_en}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-8">
+                    <div className="text-left font-mono">
+                      <p className="text-lg text-white font-bold">
+                        {s.close > 0 ? `${s.close.toFixed(2)} EGP` : '—'}
+                      </p>
+                      {s.close > 0 && (
+                        <p className={`text-xs font-bold mt-1 flex items-center justify-end gap-1 ${
+                          s.change > 0 ? 'text-up-green' : s.change < 0 ? 'text-down-red' : 'text-zinc-400'
+                        }`}>
+                          {s.change > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : s.change < 0 ? <ArrowDownRight className="w-3.5 h-3.5" /> : null}
+                          <span>{s.change > 0 ? '+' : ''}{s.change.toFixed(2)}%</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        removeFromWatchlist(s.id);
+                      }}
+                      className="p-3 bg-white/5 hover:bg-down-red/10 text-zinc-500 hover:text-down-red rounded-xl transition-all cursor-pointer border border-transparent hover:border-down-red/20 shrink-0"
+                      title={isAr ? 'حذف من القائمة' : 'Remove item'}
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
       )}
     </div>
   );

@@ -2,10 +2,14 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Search, SlidersHorizontal, TrendingUp, TrendingDown, RefreshCw, BarChart3, Star, Percent } from 'lucide-react';
+import { Search, SlidersHorizontal, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { useUserRole } from '@/lib/useUserRole';
 import Link from 'next/link';
 import { ScreenerRowSkeleton } from '@/components/ui/ScreenerRowSkeleton';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 
 export default function ScreenerPage() {
   const params = useParams();
@@ -21,6 +25,7 @@ export default function ScreenerPage() {
   const [filterSignal, setFilterSignal] = useState<'all' | 'buy' | 'sell' | 'neutral'>('all');
   const [filterSector, setFilterSector] = useState('all');
   const [filterChange, setFilterChange] = useState<'all' | 'up' | 'down'>('all');
+  const [filterShariah, setFilterShariah] = useState(false);
   const [sortBy, setSortBy] = useState<'symbol' | 'price' | 'change' | 'win_rate' | 'volume'>('change');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -69,6 +74,9 @@ export default function ScreenerPage() {
     if (filterChange === 'down') {
       list = list.filter(s => s.change < 0);
     }
+    if (filterShariah) {
+      list = list.filter(s => Boolean(s.is_shariah_compliant));
+    }
 
     list.sort((a, b) => {
       const va = a[sortBy] ?? 0;
@@ -85,22 +93,7 @@ export default function ScreenerPage() {
         : (va as number) - (vb as number);
     });
     return list;
-  }, [stocks, search, filterSignal, filterSector, filterChange, sortBy, sortDir]);
-
-  const signalColor = (sig: string) => {
-    const colors: Record<string, string> = {
-      buy: 'text-green-400 bg-green-400/10 border-green-500/20',
-      sell: 'text-red-400 bg-red-400/10 border-red-500/20',
-      neutral: 'text-slate-400 bg-slate-400/10 border-slate-500/20'
-    };
-    return colors[sig] || colors.neutral;
-  };
-
-  const signalLabel = (sig: string) => {
-    const ar: Record<string, string> = { buy: 'شراء', sell: 'بيع', neutral: 'محايد' };
-    const en: Record<string, string> = { buy: 'Buy', sell: 'Sell', neutral: 'Neutral' };
-    return isAr ? ar[sig] || sig : en[sig] || sig;
-  };
+  }, [stocks, search, filterSignal, filterSector, filterChange, filterShariah, sortBy, sortDir]);
 
   const toggleSort = (key: typeof sortBy) => {
     if (sortBy === key) {
@@ -111,132 +104,152 @@ export default function ScreenerPage() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const rowVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="w-full font-sans text-text-primary">
+    <div className="w-full text-text-primary pb-20">
       {/* Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-white mb-1 flex items-center gap-2">
-            <span>🔍</span>
-            <span>{isAr ? 'فرز وفلترة الأسهم الذكي (Screener)' : 'Stock Screener'}</span>
+          <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+            <span className="text-accent-blue">🔍</span>
+            {isAr ? 'فرز وفلترة الأسهم الذكي' : 'Smart Stock Screener'}
           </h1>
-          <p className="text-slate-400 text-xs mt-1">
+          <p className="text-zinc-400 text-sm">
             {isAr 
               ? `تم العثور على ${filtered.length} سهم من أصل ${stocks.length}`
               : `Found ${filtered.length} of ${stocks.length} stocks`}
           </p>
         </div>
 
-        <button 
-          onClick={fetchStocks}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg text-xs font-semibold border border-white/5 transition self-start cursor-pointer"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>{isAr ? 'تحديث البيانات' : 'Refresh'}</span>
-        </button>
+        <Button variant="glass" size="sm" onClick={fetchStocks}>
+          <RefreshCw className="w-4 h-4" />
+          {isAr ? 'تحديث البيانات' : 'Refresh Data'}
+        </Button>
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           {
-            label: isAr ? 'إشارات الشراء (Buy)' : 'Buy Signals',
+            label: isAr ? 'إشارات الشراء' : 'Buy Signals',
             value: stocks.filter(s => s.signal === 'buy').length,
-            color: 'text-green-400 bg-green-500/5 border-green-500/10',
-            icon: <TrendingUp className="w-4 h-4 text-green-400" />
+            color: 'text-up-green',
+            bgClass: 'bg-up-green-bg border-up-green/20',
+            icon: <TrendingUp className="w-5 h-5" />
           },
           {
-            label: isAr ? 'إشارات البيع (Sell)' : 'Sell Signals',
+            label: isAr ? 'إشارات البيع' : 'Sell Signals',
             value: stocks.filter(s => s.signal === 'sell').length,
-            color: 'text-red-400 bg-red-500/5 border-red-500/10',
-            icon: <TrendingDown className="w-4 h-4 text-red-400" />
+            color: 'text-down-red',
+            bgClass: 'bg-down-red-bg border-down-red/20',
+            icon: <TrendingDown className="w-5 h-5" />
           },
           {
-            label: isAr ? 'الأسهم الصاعدة اليوم' : 'Rising Stocks',
+            label: isAr ? 'الأسهم الصاعدة' : 'Rising Stocks',
             value: stocks.filter(s => s.change > 0).length,
-            color: 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10',
+            color: 'text-emerald-400',
+            bgClass: 'glass-panel',
             icon: <span>▲</span>
           },
           {
-            label: isAr ? 'الأسهم الهابطة اليوم' : 'Falling Stocks',
+            label: isAr ? 'الأسهم الهابطة' : 'Falling Stocks',
             value: stocks.filter(s => s.change < 0).length,
-            color: 'text-rose-400 bg-rose-500/5 border-rose-500/10',
+            color: 'text-red-400',
+            bgClass: 'glass-panel',
             icon: <span>▼</span>
           }
         ].map(card => (
-          <div key={card.label} className={`glass-card p-4 rounded-xl border flex justify-between items-center ${card.color}`}>
+          <Card key={card.label} hoverEffect={false} className={`p-5 flex justify-between items-center ${card.bgClass}`}>
             <div>
-              <p className="text-slate-400 text-[10px] sm:text-xs mb-1 font-semibold">{card.label}</p>
-              <p className="text-xl sm:text-2xl font-black font-sans">{card.value}</p>
+              <p className="text-zinc-400 text-xs mb-1.5 font-semibold">{card.label}</p>
+              <p className={`text-3xl font-black font-mono ${card.color}`}>{card.value}</p>
             </div>
-            <div className="p-2 rounded-lg bg-white/5">{card.icon}</div>
-          </div>
+            <div className={`p-3 rounded-xl bg-white/5 ${card.color}`}>{card.icon}</div>
+          </Card>
         ))}
       </div>
 
       {/* Filters Control Panel */}
-      <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] mb-6 flex flex-col gap-4">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-accent-blue" />
+      <Card hoverEffect={false} className="p-5 mb-8 flex flex-col gap-5">
+        <div className="flex items-center gap-2 text-sm font-bold text-white">
+          <SlidersHorizontal className="w-4 h-4 text-accent-blue" />
           <span>{isAr ? 'لوحة التحكم بالتصفية والبحث' : 'Filter Control Panel'}</span>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {/* Search bar */}
+        <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[240px] relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+            <Search className="w-4 h-4 text-zinc-500 absolute left-4 top-3.5" />
             <input
               placeholder={isAr ? 'ابحث برمز السهم أو الاسم...' : 'Search stock symbol or name...'}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-white text-xs placeholder:text-slate-500 focus:border-accent-blue outline-none"
+              className="w-full glass-input rounded-xl pl-11 pr-4 py-3 text-sm focus:border-accent-blue"
             />
           </div>
 
-          {/* Change Filter Dropdown */}
           <select
             value={filterChange}
             onChange={e => setFilterChange(e.target.value as any)}
-            className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-slate-300 text-xs focus:border-accent-blue outline-none cursor-pointer"
+            className="glass-input rounded-xl px-4 py-3 text-sm cursor-pointer appearance-none min-w-[150px]"
           >
-            <option value="all">{isAr ? '📊 كل اتجاهات السعر' : 'All Changes'}</option>
-            <option value="up">{isAr ? '▲ الأسهم الصاعدة' : '▲ Rising'}</option>
-            <option value="down">{isAr ? '▼ الأسهم الهابطة' : '▼ Falling'}</option>
+            <option value="all" className="bg-surface-dark">{isAr ? '📊 كل اتجاهات السعر' : 'All Changes'}</option>
+            <option value="up" className="bg-surface-dark">{isAr ? '▲ الأسهم الصاعدة' : '▲ Rising'}</option>
+            <option value="down" className="bg-surface-dark">{isAr ? '▼ الأسهم الهابطة' : '▼ Falling'}</option>
           </select>
 
-          {/* Sector Filter Dropdown */}
           <select
             value={filterSector}
             onChange={e => setFilterSector(e.target.value)}
-            className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-slate-300 text-xs focus:border-accent-blue outline-none cursor-pointer"
+            className="glass-input rounded-xl px-4 py-3 text-sm cursor-pointer appearance-none min-w-[180px]"
           >
             {sectors.map(s => (
-              <option key={s} value={s}>
-                {s === 'all' 
-                  ? (isAr ? '🏢 كل القطاعات الاقتصادية' : 'All Sectors') 
-                  : s}
+              <option key={s} value={s} className="bg-surface-dark">
+                {s === 'all' ? (isAr ? '🏢 كل القطاعات' : 'All Sectors') : s}
               </option>
             ))}
           </select>
+
+          <button
+            onClick={() => setFilterShariah(v => !v)}
+            className={`px-5 py-3 rounded-xl text-sm font-bold transition-all border flex items-center gap-2 cursor-pointer ${
+              filterShariah
+                ? 'bg-up-green-bg border-up-green/50 text-up-green shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]'
+                : 'glass-input'
+            }`}
+          >
+            <span>☪️</span>
+            <span>{isAr ? 'متوافق مع الشريعة فقط' : 'Shariah Only'}</span>
+          </button>
         </div>
 
-        {/* Signals quick-filters pill bar */}
-        <div className="flex flex-wrap gap-2 pt-1.5 border-t border-white/5">
-          <span className="text-[10px] text-slate-500 font-bold self-center mr-1">
+        <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
+          <span className="text-xs text-zinc-500 font-bold self-center mr-2">
             {isAr ? 'فلترة الإشارة خوارزمياً:' : 'Filter Signal:'}
           </span>
           {(['all', 'buy', 'sell', 'neutral'] as const).map(sig => (
             <button
               key={sig}
               onClick={() => setFilterSignal(sig)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                 filterSignal === sig
                   ? sig === 'buy'
-                    ? 'bg-green-500/20 border-green-500/50 text-green-400'
+                    ? 'bg-up-green-bg border-up-green/50 text-up-green'
                     : sig === 'sell'
-                    ? 'bg-red-500/20 border-red-500/50 text-red-400'
-                    : 'bg-blue-500/20 border-blue-500/50 text-blue-400'
-                  : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                    ? 'bg-down-red-bg border-down-red/50 text-down-red'
+                    : 'bg-accent-blue/20 border-accent-blue/50 text-accent-blue'
+                  : 'glass-input'
               }`}
             >
               {sig === 'all'
@@ -249,164 +262,172 @@ export default function ScreenerPage() {
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
       {/* Main Table View */}
       {loading ? (
-        <div className="glass-card rounded-2xl border border-white/5 overflow-hidden p-2">
-          {Array.from({ length: 15 }).map((_, i) => (
+        <Card hoverEffect={false} className="p-2">
+          {Array.from({ length: 10 }).map((_, i) => (
             <ScreenerRowSkeleton key={i} />
           ))}
-        </div>
+        </Card>
       ) : (
-        <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
+        <Card hoverEffect={false} className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-xs select-none">
+            <table className="w-full text-right border-collapse text-sm select-none">
               <thead>
-                <tr className="bg-white/[0.02] border-b border-white/5 text-slate-400/80">
-                  <th className="py-4 px-4 font-semibold text-start">
+                <tr className="bg-white/5 border-b border-white/10 text-zinc-400">
+                  <th className="py-5 px-5 font-semibold text-start">
                     <button onClick={() => toggleSort('symbol')} className="hover:text-white transition flex items-center gap-1">
                       <span>{isAr ? 'السهم' : 'Stock'}</span>
                       {sortBy === 'symbol' && (sortDir === 'desc' ? '▼' : '▲')}
                     </button>
                   </th>
-                  <th className="py-4 px-3 font-semibold">
+                  <th className="py-5 px-4 font-semibold">
                     <button onClick={() => toggleSort('price')} className="hover:text-white transition flex items-center gap-1 justify-end w-full">
                       <span>{isAr ? 'السعر' : 'Price'}</span>
                       {sortBy === 'price' && (sortDir === 'desc' ? '▼' : '▲')}
                     </button>
                   </th>
-                  <th className="py-4 px-3 font-semibold">
+                  <th className="py-5 px-4 font-semibold">
                     <button onClick={() => toggleSort('change')} className="hover:text-white transition flex items-center gap-1 justify-end w-full">
                       <span>{isAr ? 'التغير%' : 'Change%'}</span>
                       {sortBy === 'change' && (sortDir === 'desc' ? '▼' : '▲')}
                     </button>
                   </th>
-                  <th className="py-4 px-3 font-semibold hidden md:table-cell">
+                  <th className="py-5 px-4 font-semibold hidden md:table-cell">
                     <button onClick={() => toggleSort('volume')} className="hover:text-white transition flex items-center gap-1 justify-end w-full">
                       <span>{isAr ? 'الحجم' : 'Volume'}</span>
                       {sortBy === 'volume' && (sortDir === 'desc' ? '▼' : '▲')}
                     </button>
                   </th>
-                  <th className="py-4 px-3 font-semibold text-center">{isAr ? 'القطاع' : 'Sector'}</th>
-                  <th className="py-4 px-3 font-semibold text-center">{isAr ? 'الإشارة خوارزمياً' : 'Signal'}</th>
-                  <th className="py-4 px-4 font-semibold text-center hidden md:table-cell">
+                  <th className="py-5 px-4 font-semibold text-center">{isAr ? 'القطاع' : 'Sector'}</th>
+                  <th className="py-5 px-4 font-semibold text-center">{isAr ? 'الإشارة خوارزمياً' : 'Signal'}</th>
+                  <th className="py-5 px-5 font-semibold text-center hidden md:table-cell">
                     <button onClick={() => toggleSort('win_rate')} className="hover:text-white transition flex items-center gap-1 justify-center w-full">
-                      <span>{isAr ? 'معدل النجاح' : 'Win Rate'}</span>
+                      <span>{isAr ? 'نسبة النجاح' : 'Win Rate'}</span>
                       {sortBy === 'win_rate' && (sortDir === 'desc' ? '▼' : '▲')}
                     </button>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
-                {filtered.map((stock, idx) => {
-                  const isLocked = !isPremium && idx >= 5;
-                  const isUp = stock.change > 0;
-                  const isDown = stock.change < 0;
+              <motion.tbody 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="divide-y divide-white/5"
+              >
+                <AnimatePresence>
+                  {filtered.map((stock, idx) => {
+                    const isLocked = !isPremium && idx >= 5;
+                    const isUp = stock.change > 0;
+                    const isDown = stock.change < 0;
 
-                  return (
-                    <tr 
-                      key={stock.id}
-                      onClick={() => {
-                        if (isLocked) {
-                          router.push(`/${locale}/pricing`);
-                        } else {
-                          router.push(`/${locale}/stock/${stock.symbol}`);
-                        }
-                      }}
-                      className={`hover:bg-white/[0.01] transition-colors cursor-pointer group ${isLocked ? 'blur-[3px] select-none pointer-events-none opacity-40' : ''}`}
-                    >
-                      {/* Symbol + Name */}
-                      <td className="py-3.5 px-4 text-start">
-                        <div className="font-bold text-white group-hover:text-accent-blue transition">
-                          {stock.symbol}
-                        </div>
-                        <div className="text-[10px] text-slate-500 max-w-[120px] truncate">
-                          {isAr ? stock.name_ar : stock.name_en}
-                        </div>
-                      </td>
-
-                      {/* Price */}
-                      <td className="py-3.5 px-3 font-mono font-bold text-white text-end">
-                        {stock.price ? stock.price.toFixed(2) : '-'}
-                        <span className="text-[9px] text-slate-500 font-sans font-normal ml-0.5">EGP</span>
-                      </td>
-
-                      {/* Change */}
-                      <td className="py-3.5 px-3 font-mono font-bold text-end">
-                        <span className={isUp ? 'text-green-400' : isDown ? 'text-red-400' : 'text-slate-400'}>
-                          {isUp ? '+' : ''}
-                          {stock.change ? stock.change.toFixed(2) : '0.00'}%
-                        </span>
-                      </td>
-
-                      {/* Volume */}
-                      <td className="py-3.5 px-3 font-mono text-slate-400 text-end hidden md:table-cell">
-                        {stock.volume 
-                          ? (stock.volume >= 1000000 
-                            ? `${(stock.volume / 1000000).toFixed(1)}M` 
-                            : stock.volume.toLocaleString()) 
-                          : '-'}
-                      </td>
-
-                      {/* Sector */}
-                      <td className="py-3.5 px-3 text-center text-[10px] text-slate-400">
-                        {stock.sector || '-'}
-                      </td>
-
-                      {/* Signal */}
-                      <td className="py-3.5 px-3 text-center">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${signalColor(stock.signal)}`}>
-                          {stock.signal === 'buy' ? '▲ ' : stock.signal === 'sell' ? '▼ ' : '• '}
-                          {signalLabel(stock.signal)}
-                        </span>
-                      </td>
-
-                      {/* Win Rate */}
-                      <td className="py-3.5 px-4 text-center hidden md:table-cell">
-                        {stock.win_rate ? (
-                          <div className={`font-mono font-bold ${
-                            stock.win_rate >= 60 
-                              ? 'text-green-400' 
-                              : stock.win_rate >= 45 
-                              ? 'text-yellow-400' 
-                              : 'text-red-400'
-                          }`}>
-                            {stock.win_rate.toFixed(0)}%
+                    return (
+                      <motion.tr 
+                        variants={rowVariants}
+                        layout
+                        key={stock.id}
+                        onClick={() => {
+                          if (isLocked) {
+                            router.push(`/${locale}/pricing`);
+                          } else {
+                            router.push(`/${locale}/stock/${stock.symbol}`);
+                          }
+                        }}
+                        className={`hover:bg-white/5 transition-colors cursor-pointer group ${isLocked ? 'blur-[4px] select-none pointer-events-none opacity-40' : ''}`}
+                      >
+                        <td className="py-4 px-5 text-start">
+                          <div className="font-bold text-white group-hover:text-accent-blue transition flex items-center gap-2">
+                            <span className="font-mono text-base">{stock.symbol}</span>
+                            {stock.is_shariah_compliant && (
+                              <Badge variant="success" className="scale-75 origin-left">☪️ {isAr ? 'شرعي' : 'Halal'}</Badge>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-slate-600 font-mono">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+                          <div className="text-xs text-zinc-500 max-w-[160px] truncate">
+                            {isAr ? stock.name_ar : stock.name_en}
+                          </div>
+                        </td>
+
+                        <td className="py-4 px-4 font-mono font-bold text-white text-end text-base">
+                          {stock.price ? stock.price.toFixed(2) : '-'}
+                          <span className="text-[10px] text-zinc-600 font-sans font-normal ml-1">EGP</span>
+                        </td>
+
+                        <td className="py-4 px-4 font-mono font-bold text-end">
+                          <span className={isUp ? 'text-up-green' : isDown ? 'text-down-red' : 'text-zinc-400'}>
+                            {isUp ? '+' : ''}
+                            {stock.change ? stock.change.toFixed(2) : '0.00'}%
+                          </span>
+                        </td>
+
+                        <td className="py-4 px-4 font-mono text-zinc-400 text-end hidden md:table-cell">
+                          {stock.volume 
+                            ? (stock.volume >= 1000000 
+                              ? `${(stock.volume / 1000000).toFixed(1)}M` 
+                              : stock.volume.toLocaleString()) 
+                            : '-'}
+                        </td>
+
+                        <td className="py-4 px-4 text-center text-xs text-zinc-400">
+                          {stock.sector || '-'}
+                        </td>
+
+                        <td className="py-4 px-4 text-center">
+                          {stock.signal ? (
+                            <Badge 
+                              variant={stock.signal === 'buy' ? 'success' : stock.signal === 'sell' ? 'danger' : 'glass'}
+                              pulsing={stock.signal === 'buy' || stock.signal === 'sell'}
+                            >
+                              {stock.signal === 'buy' ? 'شراء' : stock.signal === 'sell' ? 'بيع' : 'محايد'}
+                            </Badge>
+                          ) : (
+                            <span className="text-zinc-600 font-mono">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-4 px-5 text-center hidden md:table-cell">
+                          {stock.win_rate ? (
+                            <div className={`font-mono font-bold text-sm ${
+                              stock.win_rate >= 60 
+                                ? 'text-accent-gold' 
+                                : stock.win_rate >= 45 
+                                ? 'text-zinc-300' 
+                                : 'text-zinc-500'
+                            }`}>
+                              {stock.win_rate.toFixed(0)}%
+                            </div>
+                          ) : (
+                            <span className="text-zinc-600 font-mono">-</span>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
+              </motion.tbody>
             </table>
           </div>
 
           {!isPremium && filtered.length > 5 && (
-            <div className="text-center py-8 border-t border-white/5 bg-[#111E2E]/60 flex flex-col items-center justify-center">
-              <p className="text-[#C9A84C] font-bold text-xs mb-3 flex items-center gap-1.5">
+            <div className="text-center py-12 border-t border-white/5 bg-surface-dark/80 flex flex-col items-center justify-center">
+              <p className="text-accent-gold font-bold text-sm mb-4 flex items-center gap-2">
                 <span>🔒</span>
-                <span>{isAr ? 'للوصول لكامل الأسهم (314 سهم)' : 'Unlock all 314 EGX stocks'}</span>
+                <span>{isAr ? 'اشترك للوصول للنسخة الكاملة (314 سهم)' : 'Upgrade to unlock all 314 EGX stocks'}</span>
               </p>
-              <Link
-                href={`/${locale}/pricing`}
-                className="px-6 py-2 rounded-xl text-xs font-bold btn-gold transition-all shadow-md shadow-[#C9A84C]/10 cursor-pointer"
-              >
+              <Button variant="gold" onClick={() => router.push(`/${locale}/pricing`)}>
                 ⭐ {isAr ? 'اشترك Premium' : 'Upgrade Premium'}
-              </Link>
+              </Button>
             </div>
           )}
 
           {filtered.length === 0 && (
-            <div className="text-center py-20 text-slate-500">
-              <span className="text-4xl block mb-2">🔍</span>
-              <p className="text-xs">{isAr ? 'عذراً، لم نعثر على أي أسهم تطابق شروط الفرز الحالية.' : 'No stocks match your search criteria.'}</p>
+            <div className="text-center py-20 text-zinc-500">
+              <span className="text-5xl block mb-4">🔍</span>
+              <p className="text-sm">{isAr ? 'عذراً، لم نعثر على أي أسهم تطابق شروط الفرز الحالية.' : 'No stocks match your search criteria.'}</p>
             </div>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );

@@ -1,10 +1,10 @@
-const EASTERN_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+const EASTERN_DIGITS = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
 
 /**
  * Translates Western Arabic numerals (0-9) to Eastern Arabic numerals (٠-٩).
  */
-export function toEasternArabic(numStr: string | number): string {
-  return String(numStr);
+export function toEasternArabic(n: string | number): string {
+  return String(n).replace(/[0-9]/g, d => EASTERN_DIGITS[parseInt(d)]);
 }
 
 /**

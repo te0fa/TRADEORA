@@ -49,13 +49,17 @@ export async function GET(req: NextRequest) {
 
     const companyIds = companies.map(c => c.id);
 
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+
     // 3. Fetch latest 200 days of price records for all companies in the sector
     const { data: prices, error: pricesError } = await supabase
       .from('market_prices')
       .select('company_id, volume, price_date')
       .in('company_id', companyIds)
       .in('source', ['egx_bulletin', 'tradingview', 'yahoo_historical', 'mubasher', 'investing'])
-      .order('price_date', { ascending: true });
+      .gte('price_date', thirtyDaysAgo)
+      .order('price_date', { ascending: true })
+      .limit(300);
 
     if (pricesError || !prices) {
       return NextResponse.json({ error: 'Failed to fetch market prices' }, { status: 500 });

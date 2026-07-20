@@ -9,6 +9,7 @@ import { TradeoraLogo } from '@/components/ui/TradeoraLogo';
 import { useMarketStatus } from '@/hooks/useMarketStatus';
 import { toEasternArabic } from '@/lib/formatters';
 import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
+import { motion } from 'framer-motion';
 import { 
   Globe, 
   Clock, 
@@ -24,6 +25,7 @@ import {
   Shield,
   Star
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 
 interface NavbarProps {
   locale: string;
@@ -46,7 +48,6 @@ export function Navbar({ locale }: NavbarProps) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
 
-  // Listen to Auth state changes
   useEffect(() => {
     const fetchRole = async (userId: string) => {
       try {
@@ -88,7 +89,6 @@ export function Navbar({ locale }: NavbarProps) {
     router.push(`/${locale}/auth`);
   };
 
-  // Swapping the locale prefix in the URL path
   const toggleLocale = () => {
     const nextLocale = locale === 'ar' ? 'en' : 'ar';
     const pathSegments = pathname.split('/');
@@ -102,117 +102,73 @@ export function Navbar({ locale }: NavbarProps) {
 
   const formattedTime = locale === 'ar' ? toEasternArabic(cairoTime) : cairoTime;
 
+  const navLinks = [
+    { href: `/${locale}`, icon: Home, label: isAr ? 'الرئيسية' : 'Home', exact: true },
+    { href: `/${locale}/screener`, icon: Search, label: isAr ? 'الفرز' : 'Screener' },
+    { href: `/${locale}/sectors`, icon: Briefcase, label: isAr ? 'القطاعات' : 'Sectors', color: 'text-blue-400' },
+    { href: `/${locale}/compare`, icon: TrendingUp, label: isAr ? 'مقارنة' : 'Compare', color: 'text-purple-400' },
+    { href: `/${locale}/watchlist`, icon: Star, label: isAr ? 'المراقبة' : 'Watchlist', color: 'text-accent-gold fill-accent-gold' },
+    { href: `/${locale}/my-trades`, icon: Briefcase, label: isAr ? 'صفقاتي' : 'Trades' },
+    { href: `/${locale}/performance`, icon: TrendingUp, label: isAr ? 'الأداء' : 'Performance' },
+  ];
+
   return (
-    <header className="sticky top-0 z-50 w-full glass-card border-b border-white/5 backdrop-blur-md font-sans">
+    <header className="sticky top-0 z-50 w-full bg-surface-elevated/80 backdrop-blur-xl border-b border-white/5 shadow-lg shadow-black/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Left Side: Logo & Main Navigation Links */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 lg:gap-8">
           {/* Logo */}
-          <Link href={`/${locale}`} className="flex items-center gap-2">
-            <TradeoraLogo width={160} height={45} showSubtitle={false} />
+          <Link href={`/${locale}`} className="flex items-center gap-2 transition-transform hover:scale-105 active:scale-95">
+            <TradeoraLogo width={140} height={40} showSubtitle={false} />
           </Link>
 
           {/* Navigation Links (Visible only if logged in) */}
           {session && (
-            <nav className="hidden lg:flex items-center gap-4 text-xs font-semibold text-text-secondary">
-              <Link 
-                href={`/${locale}`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname === `/${locale}` ? 'text-accent-blue bg-white/5' : ''
-                }`}
-              >
-                <Home className="w-3.5 h-3.5" />
-                <span>{isAr ? '🏠 الرئيسية' : 'Home'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/screener`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/stock') ? 'text-accent-blue bg-white/5' : ''
-                }`}
-              >
-                <BarChart2 className="w-3.5 h-3.5" />
-                <span>{isAr ? '📊 الأسهم' : 'Stocks'}</span>
-              </Link>
-              <Link 
-                href={`/${locale}/screener`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/screener') ? 'text-accent-blue bg-white/5' : ''
-                }`}
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>{isAr ? '🔍 فرز الأسهم' : 'Screener'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/sectors`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/sectors') ? 'text-accent-blue bg-white/5 font-bold' : ''
-                }`}
-              >
-                <Briefcase className="w-3.5 h-3.5 text-blue-400" />
-                <span>{isAr ? '🏭 القطاعات' : 'Sectors'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/compare`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/compare') ? 'text-accent-blue bg-white/5 font-bold' : ''
-                }`}
-              >
-                <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
-                <span>{isAr ? '⚖️ مقارنة' : 'Compare'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/watchlist`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/watchlist') ? 'text-accent-blue bg-white/5 font-bold' : ''
-                }`}
-              >
-                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-                <span>{isAr ? '⭐ المراقبة' : 'Watchlist'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/my-trades`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/my-trades') ? 'text-accent-blue bg-white/5' : ''
-                }`}
-              >
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>{isAr ? '💼 صفقاتي' : 'My Trades'}</span>
-              </Link>
-
-              <Link 
-                href={`/${locale}/performance`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/performance') ? 'text-accent-blue bg-white/5' : ''
-                }`}
-              >
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span>{isAr ? '📈 الأداء' : 'Performance'}</span>
-              </Link>
+            <nav className="hidden lg:flex items-center gap-2 text-[13px] font-bold text-zinc-400">
+              {navLinks.map((link) => {
+                const isActive = link.exact 
+                  ? pathname === link.href 
+                  : pathname.includes(link.href.split('/').pop()!);
+                
+                return (
+                  <Link 
+                    key={link.href}
+                    href={link.href}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 relative group ${
+                      isActive ? 'text-white' : 'hover:text-white'
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.div 
+                        layoutId="navIndicator" 
+                        className="absolute inset-0 bg-white/10 rounded-xl"
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      />
+                    )}
+                    <link.icon className={`w-4 h-4 z-10 transition-colors ${link.color || ''} ${isActive && !link.color ? 'text-accent-blue' : ''} group-hover:${link.color ? link.color.split(' ')[0] : 'text-accent-blue'}`} />
+                    <span className="z-10">{link.label}</span>
+                  </Link>
+                );
+              })}
 
               {userRole === 'admin' && (
                 <Link 
                   href={`/${locale}/admin`}
-                  className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/30 transition-all flex items-center gap-1"
+                  className="px-3 py-2 rounded-xl bg-down-red/10 border border-down-red/20 text-down-red text-xs font-black hover:bg-down-red/20 transition-all flex items-center gap-1.5 ml-2"
                 >
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>{isAr ? '🛡️ الإدارة' : 'Admin'}</span>
+                  <Shield className="w-4 h-4" />
+                  <span>{isAr ? 'الإدارة' : 'Admin'}</span>
                 </Link>
               )}
 
               <Link 
                 href={`/${locale}/settings`}
-                className={`flex items-center gap-1 hover:text-text-primary px-2.5 py-1.5 rounded-lg transition-colors ${
-                  pathname.includes('/settings') ? 'text-accent-blue bg-white/5 font-bold' : 'text-slate-300'
+                className={`flex items-center gap-1.5 hover:text-white px-3 py-2 rounded-xl transition-all ml-2 ${
+                  pathname.includes('/settings') ? 'text-white bg-white/10' : ''
                 }`}
               >
-                <Settings className="w-3.5 h-3.5" />
-                <span>{isAr ? '⚙️ الإعدادات' : 'Settings'}</span>
+                <Settings className="w-4 h-4" />
               </Link>
             </nav>
           )}
@@ -222,146 +178,109 @@ export function Navbar({ locale }: NavbarProps) {
         <div className="flex items-center gap-3 sm:gap-4">
           
           {/* Live Status and Clock (Desktop) */}
-          <div className="hidden xl:flex items-center gap-4 text-xs text-text-secondary mr-2">
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="font-medium">
+          <div className="hidden xl:flex items-center gap-4 text-xs text-zinc-400 mr-2 bg-black/20 px-4 py-1.5 rounded-full border border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                {isOpen && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-up-green opacity-75"></span>}
+                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOpen ? 'bg-up-green' : 'bg-down-red'}`}></span>
+              </span>
+              <span className="font-bold tracking-wide">
                 {isOpen ? (t('sessionStatus.open') || 'Session Open') : (t('sessionStatus.closed') || 'Session Closed')}
               </span>
             </div>
             <div className="w-[1px] h-3 bg-white/10" />
-            <div className="flex items-center gap-1.5 font-mono">
-              <Clock className="w-3.5 h-3.5 text-accent-blue" />
-              <span className="text-text-primary font-bold">{formattedTime}</span>
-              <span className="text-[10px]">({t('clockCairo') || 'Cairo'})</span>
+            <div className="flex items-center gap-1.5 font-mono font-bold text-zinc-300">
+              <Clock className="w-4 h-4 text-accent-blue" />
+              <span>{formattedTime}</span>
+              <span className="text-[10px] text-zinc-500">({t('clockCairo') || 'Cairo'})</span>
             </div>
           </div>
-
-          {/* Watchlist Quick Link */}
-          {session && (
-            <Link 
-              href={`/${locale}/watchlist`}
-              className={`text-xs font-semibold text-text-secondary hover:text-text-primary px-2.5 py-1.5 rounded-lg border border-white/5 hover:border-white/10 transition-all duration-200 ${
-                pathname.includes('/watchlist') ? 'border-accent-blue/30 text-accent-blue bg-accent-blue/5' : ''
-              }`}
-            >
-              ⭐️ {isAr ? 'المتابعة' : 'Watchlist'}
-            </Link>
-          )}
 
           {/* Language Switcher */}
           <button
             onClick={toggleLocale}
-            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary border border-white/5 transition-all duration-200 cursor-pointer"
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/5 transition-all duration-200 cursor-pointer"
             title={isAr ? 'Switch to English' : 'تحويل للغة العربية'}
           >
-            <Globe className="w-3.5 h-3.5 text-accent-blue" />
+            <Globe className="w-4 h-4 text-accent-blue" />
             <span>{isAr ? 'EN' : 'عربي'}</span>
           </button>
 
           {/* User Profile & LogOut */}
           {session ? (
-            <div className="flex items-center gap-2 border-l border-white/10 pl-2 sm:pl-3">
+            <div className="flex items-center gap-3 border-l border-white/10 pl-3">
               {/* Notification Bell */}
               <button 
-                className="p-1.5 hover:bg-white/5 rounded-lg text-text-secondary hover:text-text-primary transition-colors cursor-pointer relative"
+                className="p-2 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer relative"
                 title={isAr ? 'التنبيهات' : 'Notifications'}
               >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-accent-blue rounded-full"></span>
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-blue rounded-full border-2 border-[#0B0F19]"></span>
               </button>
 
               {/* Username display */}
-              <div className="hidden md:flex flex-col text-right ml-1">
-                <span className="text-[10px] text-text-secondary">{isAr ? 'مرحباً،' : 'Welcome,'}</span>
-                <span className="text-xs font-bold text-text-primary max-w-[90px] truncate">{userName}</span>
+              <div className="hidden md:flex flex-col text-right ml-1 mr-2">
+                <span className="text-[10px] text-zinc-500 font-medium leading-none">{isAr ? 'مرحباً،' : 'Welcome,'}</span>
+                <span className="text-sm font-black text-white max-w-[100px] truncate leading-tight mt-0.5">{userName}</span>
               </div>
 
               {/* User Avatar / Profile Icon */}
-              <div className="w-8 h-8 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center text-accent-blue font-bold text-xs select-none">
-                <User className="w-4 h-4" />
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-blue to-purple-600 p-[1.5px] select-none shadow-lg shadow-accent-blue/20">
+                <div className="w-full h-full bg-surface-dark rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
               </div>
 
               {/* Sign Out Button */}
               <button
                 onClick={handleSignOut}
-                className="p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-lg text-text-secondary transition-colors cursor-pointer"
+                className="p-2 hover:bg-down-red/10 hover:text-down-red rounded-xl text-zinc-400 transition-colors cursor-pointer ml-1"
                 title={isAr ? 'خروج' : 'Sign Out'}
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           ) : (
             pathname !== `/${locale}/auth` && (
-              <Link
-                href={`/${locale}/auth`}
-                className="text-xs font-bold px-4 py-2 rounded-xl bg-accent-blue hover:bg-accent-blue/80 text-white transition-all shadow-md shadow-accent-blue/10"
-              >
+              <Button onClick={() => router.push(`/${locale}/auth`)}>
                 {isAr ? 'تسجيل الدخول' : 'Sign In'}
-              </Link>
+              </Button>
             )
           )}
         </div>
       </div>
       
       {/* Mobile Clock & Status Bar */}
-      <div className="md:hidden flex items-center justify-between px-4 py-2 bg-black/20 border-t border-white/5 text-[10px] text-text-secondary font-mono">
-        <span className="font-semibold flex items-center gap-1">
-          <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+      <div className="md:hidden flex items-center justify-between px-4 py-2 bg-black/40 border-t border-white/5 text-[11px] text-zinc-400 font-mono">
+        <span className="font-bold flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-up-green animate-pulse' : 'bg-down-red'}`} />
           {isOpen ? (t('sessionStatus.open') || 'Session Open') : (t('sessionStatus.closed') || 'Session Closed')}
         </span>
-        <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3 text-accent-blue" />
-          <span className="text-text-primary font-bold">{formattedTime}</span>
-          <span>({t('clockCairo') || 'Cairo'})</span>
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-accent-blue" />
+          <span className="text-white font-bold">{formattedTime}</span>
         </div>
       </div>
 
       {/* Mobile Navigation Links */}
       {session && (
-        <div className="lg:hidden flex items-center justify-around border-t border-white/5 px-2 py-1.5 bg-slate-900/40 text-[9px] font-semibold text-text-secondary overflow-x-auto gap-1">
-          <Link href={`/${locale}`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Home className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الرئيسية' : 'Home'}</span>
-          </Link>
-          <Link href={`/${locale}`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <BarChart2 className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الأسهم' : 'Stocks'}</span>
-          </Link>
-          <Link href={`/${locale}/screener`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Search className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الفرز' : 'Screener'}</span>
-          </Link>
-          <Link href={`/${locale}/sectors`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Briefcase className="w-3.5 h-3.5 text-blue-400" />
-            <span>{isAr ? 'القطاعات' : 'Sectors'}</span>
-          </Link>
-          <Link href={`/${locale}/compare`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
-            <span>{isAr ? 'مقارنة' : 'Compare'}</span>
-          </Link>
-          <Link href={`/${locale}/watchlist`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-            <span>{isAr ? 'المراقبة' : 'Watchlist'}</span>
-          </Link>
-          <Link href={`/${locale}/my-trades`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Briefcase className="w-3.5 h-3.5" />
-            <span>{isAr ? 'صفقاتي' : 'Trades'}</span>
-          </Link>
-          <Link href={`/${locale}/performance`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الأداء' : 'Performance'}</span>
-          </Link>
-          <Link href={`/${locale}/settings`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px]">
-            <Settings className="w-3.5 h-3.5" />
-            <span>{isAr ? 'الإعدادات' : 'Settings'}</span>
-          </Link>
-          {userRole === 'admin' && (
-            <Link href={`/${locale}/admin`} className="flex flex-col items-center gap-0.5 hover:text-text-primary min-w-[45px] text-red-400">
-              <Shield className="w-3.5 h-3.5" />
-              <span>{isAr ? 'التحكم' : 'Admin'}</span>
-            </Link>
-          )}
+        <div className="lg:hidden flex items-center justify-between border-t border-white/5 px-4 py-2 bg-surface-elevated/90 backdrop-blur-xl text-[10px] font-bold text-zinc-400 overflow-x-auto gap-4 scrollbar-none">
+          {navLinks.map((link) => {
+            const isActive = link.exact 
+              ? pathname === link.href 
+              : pathname.includes(link.href.split('/').pop()!);
+
+            return (
+              <Link 
+                key={link.href}
+                href={link.href} 
+                className={`flex flex-col items-center gap-1 min-w-[50px] transition-colors ${isActive ? 'text-white' : 'hover:text-white'}`}
+              >
+                <link.icon className={`w-5 h-5 ${link.color || ''} ${isActive && !link.color ? 'text-accent-blue' : ''}`} />
+                <span className={isActive ? 'text-accent-blue' : ''}>{link.label}</span>
+              </Link>
+            )
+          })}
         </div>
       )}
     </header>

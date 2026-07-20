@@ -335,7 +335,8 @@ export async function fetchHistoricalPrices(companyId: string, limit: number = 5
     .select('*')
     .eq('company_id', companyId)
     .in('source', ['egx_bulletin', 'tradingview', 'yahoo_historical', 'mubasher', 'investing'])
-    .order('price_date', { ascending: false }); // get latest first
+    .order('price_date', { ascending: false })
+    .limit(600); // get latest first
 
   if (error || !data) {
     console.error('Error fetching historical prices:', error);
@@ -376,7 +377,8 @@ export async function fetchPriceHistoryTable(companyId: string): Promise<PriceRe
     .from('market_prices')
     .select('*')
     .eq('company_id', companyId)
-    .order('price_date', { ascending: false });
+    .order('price_date', { ascending: false })
+    .limit(500);
 
   if (error || !data) {
     console.error('Error fetching full price history:', error);

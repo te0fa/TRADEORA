@@ -18,8 +18,11 @@ import {
 import { toEasternArabic } from '@/lib/formatters';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
-import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface RecommendedTrade {
   id: string;
@@ -68,7 +71,6 @@ export default function PerformancePage() {
   const [personalStats, setPersonalStats] = useState<any>(null);
 
   useEffect(() => {
-    // Fetch both datasets concurrently
     setLoading(true);
     Promise.all([
       fetch('/api/trades?limit=150').then(res => res.json()),
@@ -91,10 +93,9 @@ export default function PerformancePage() {
       });
   }, []);
 
-  // Format Helpers
   const formatNum = (num: number | null | undefined, precision: number = 2) => {
     if (num === null || num === undefined) return '-';
-    return parseFloat(num.toFixed(precision)).toLocaleString('ar-EG');
+    return parseFloat(num.toFixed(precision)).toLocaleString('en-US');
   };
 
   const formatPercent = (num: number | null | undefined) => {
@@ -102,12 +103,11 @@ export default function PerformancePage() {
     return `${num > 0 ? '+' : ''}${formatNum(num, 1)}%`;
   };
 
-  // Recharts calculations for Platform
   const platformPieData = useMemo(() => {
     if (!platformStats) return [];
     return [
-      { name: 'صفقات رابحة', value: platformStats.winning_trades, color: '#10B981' },
-      { name: 'صفقات خاسرة', value: platformStats.losing_trades, color: '#EF4444' }
+      { name: 'Winning Trades', value: platformStats.winning_trades, color: '#10B981' },
+      { name: 'Losing Trades', value: platformStats.losing_trades, color: '#EF4444' }
     ].filter(item => item.value > 0);
   }, [platformStats]);
 
@@ -121,19 +121,18 @@ export default function PerformancePage() {
       sum += t.pnl_percent || 0;
       return {
         tradeIndex: i + 1,
-        date: new Date(t.closed_at!).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+        date: new Date(t.closed_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         pnl: parseFloat(sum.toFixed(1)),
         symbol: t.symbol
       };
     });
   }, [platformTrades]);
 
-  // Recharts calculations for Personal
   const personalPieData = useMemo(() => {
     if (!personalStats) return [];
     return [
-      { name: 'صفقات رابحة', value: personalStats.winning_trades, color: '#10B981' },
-      { name: 'صفقات خاسرة', value: personalStats.losing_trades, color: '#EF4444' }
+      { name: 'Winning Trades', value: personalStats.winning_trades, color: '#10B981' },
+      { name: 'Losing Trades', value: personalStats.losing_trades, color: '#EF4444' }
     ].filter(item => item.value > 0);
   }, [personalStats]);
 
@@ -147,334 +146,437 @@ export default function PerformancePage() {
       sum += t.pnl_amount || 0;
       return {
         tradeIndex: i + 1,
-        date: new Date(t.closed_at!).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+        date: new Date(t.closed_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         pnl: parseFloat(sum.toFixed(1)),
         symbol: t.symbol
       };
     });
   }, [personalTrades]);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   if (loading) {
     return (
-      <div className="flex flex-col gap-6 w-full animate-pulse">
-        <Skeleton className="h-16 w-1/3" />
-        <Skeleton className="h-28 w-full" />
+      <div className="flex flex-col gap-6 w-full animate-pulse p-4">
+        <Skeleton className="h-16 w-1/3 bg-white/5 rounded-xl" />
+        <Skeleton className="h-28 w-full bg-white/5 rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 col-span-2 w-full" />
+          <Skeleton className="h-64 w-full bg-white/5 rounded-2xl" />
+          <Skeleton className="h-64 col-span-2 w-full bg-white/5 rounded-2xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full font-sans text-text-primary">
-      {/* Title */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="w-full font-sans text-text-primary pb-20">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6"
+      >
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            <span>📊</span>
-            <span>مركز قياس الأداء والثقة</span>
+          <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3 mb-2">
+            <span className="text-accent-blue">📊</span>
+            <span>Performance Metrics</span>
           </h1>
-          <p className="text-xs text-text-secondary mt-1">
-            إحصائيات تفصيلية لمعدلات نجاح صفقات التوصيات الآلية والصفقات الفعلية بمحفظتك.
+          <p className="text-sm text-zinc-400">
+            Detailed analytics for platform signals and your personal portfolio execution.
           </p>
         </div>
 
-        {/* Tabs Control */}
-        <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 text-xs self-start">
+        <div className="flex p-1 bg-surface-elevated border border-white/10 rounded-xl">
           <button
             onClick={() => setActiveTab('platform')}
-            className={`px-4 py-2 rounded-lg font-bold transition-all cursor-pointer ${
-              activeTab === 'platform' ? 'bg-accent-blue text-white' : 'text-text-secondary hover:text-white'
+            className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'platform' ? 'bg-accent-blue text-white shadow-lg shadow-accent-blue/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
-            📢 إشارات المنصة العامة
+            Platform Signals
           </button>
           <button
             onClick={() => setActiveTab('personal')}
-            className={`px-4 py-2 rounded-lg font-bold transition-all cursor-pointer ${
-              activeTab === 'personal' ? 'bg-accent-blue text-white' : 'text-text-secondary hover:text-white'
+            className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'personal' ? 'bg-accent-gold text-surface-dark shadow-lg shadow-accent-gold/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
-            💼 محفظتي وصفقاتي الحقيقية
+            My Portfolio
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {activeTab === 'platform' ? (
-        /* PLATFORM VIEW */
-        <>
-          {platformStats ? (
-            <>
-              {/* Cards Deck */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">معدل النجاح</span>
-                    <Award className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-emerald-400 font-sans">
-                      {platformStats.win_rate.toFixed(1)}%
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      بناءً على {toEasternArabic(platformStats.closed_trades)} صفقة مغلقة
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">إجمالي العائد التراكمي</span>
-                    <TrendingUp className="w-4 h-4 text-accent-blue" />
-                  </div>
-                  <div>
-                    <div className={`text-2xl font-black font-sans ${platformStats.total_pnl >= 0 ? 'text-accent-blue' : 'text-red-400'}`}>
-                      {platformStats.total_pnl > 0 ? '+' : ''}{platformStats.total_pnl.toFixed(1)}%
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      الربح/الخسارة التراكمية المئوية
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">إجمالي التوصيات</span>
-                    <Activity className="w-4 h-4 text-indigo-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-white font-sans">
-                      {toEasternArabic(platformStats.total_trades)}
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1 flex gap-2">
-                      <span className="text-emerald-400">رابحة: {toEasternArabic(platformStats.winning_trades)}</span>
-                      <span className="text-red-400">خاسرة: {toEasternArabic(platformStats.losing_trades)}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">متوسط عائد الصفقة</span>
-                    <BarChart2 className="w-4 h-4 text-violet-400" />
-                  </div>
-                  <div>
-                    <div className={`text-2xl font-black font-sans ${platformStats.avg_pnl >= 0 ? 'text-violet-400' : 'text-red-400'}`}>
-                      {platformStats.avg_pnl > 0 ? '+' : ''}{platformStats.avg_pnl.toFixed(1)}%
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      متوسط الأداء للصفقة الواحدة
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div className="glass-card p-5 rounded-2xl border border-white/5 flex flex-col">
-                  <h2 className="text-xs font-bold text-text-primary mb-4">توزيع نتائج صفقات التوصيات</h2>
-                  <div className="flex-1 flex flex-col items-center justify-center min-h-[220px]">
-                    {platformPieData.length > 0 ? (
-                      <div className="relative w-full h-48 flex justify-center items-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={platformPieData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={75}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              {platformPieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: '#1E1E2E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '11px' }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute flex flex-col items-center justify-center font-sans">
-                          <span className="text-[9px] text-text-secondary">Win Rate</span>
-                          <span className="text-lg font-black text-emerald-400">{platformStats.win_rate.toFixed(0)}%</span>
-                        </div>
+      <AnimatePresence mode="wait">
+        {activeTab === 'platform' ? (
+          <motion.div 
+            key="platform"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+          >
+            {platformStats ? (
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Win Rate</span>
+                        <Award className="w-5 h-5 text-up-green" />
                       </div>
-                    ) : (
-                      <span className="text-xs text-text-secondary">لا توجد تداولات مغلقة</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="glass-card p-5 rounded-2xl border border-white/5 lg:col-span-2 flex flex-col">
-                  <h2 className="text-xs font-bold text-text-primary mb-4">منحنى نمو الأرباح التراكمية (%)</h2>
-                  <div className="flex-1 min-h-[220px]">
-                    {platformLineData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={platformLineData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                          <XAxis dataKey="date" stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} reversed={true} />
-                          <YAxis stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} orientation="right" />
-                          <Tooltip contentStyle={{ backgroundColor: '#1E1E2E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '11px' }} />
-                          <Line type="monotone" dataKey="pnl" stroke="#3B82F6" strokeWidth={2} dot={{ fill: '#3B82F6', r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-text-secondary">لا توجد بيانات نمو كافية</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-20 text-text-secondary">لا توجد إحصائيات متوفرة للتوصيات.</div>
-          )}
-        </>
-      ) : (
-        /* PERSONAL PORTFOLIO VIEW */
-        <>
-          {personalStats ? (
-            <>
-              {/* Personal Cards Deck */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">نسبة نجاح محفظتي</span>
-                    <Award className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-emerald-400 font-sans">
-                      {personalStats.win_rate.toFixed(1)}%
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      بناءً على {toEasternArabic(personalStats.closed_trades)} صفقة منتهية
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">الأرباح والخسائر</span>
-                    <TrendingUp className="w-4 h-4 text-accent-blue" />
-                  </div>
-                  <div>
-                    <div className={`text-2xl font-black font-sans ${personalStats.total_pnl_amount >= 0 ? 'text-accent-blue' : 'text-red-400'}`}>
-                      {personalStats.total_pnl_amount > 0 ? '+' : ''}{personalStats.total_pnl_amount.toLocaleString()} EGP
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      صافي الأرباح المحققة بالجنيه
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">أفضل صفقة</span>
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="text-xl font-black text-emerald-400 font-sans">
-                      {personalStats.best_trade_symbol}
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      بعائد {formatPercent(personalStats.best_trade_pct)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">أسوأ صفقة</span>
-                    <XCircle className="w-4 h-4 text-red-400" />
-                  </div>
-                  <div>
-                    <div className="text-xl font-black text-red-400 font-sans">
-                      {personalStats.worst_trade_symbol}
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      بعائد {formatPercent(personalStats.worst_trade_pct)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="glass-card p-4 rounded-xl border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.002] flex flex-col justify-between">
-                  <div className="flex items-center justify-between text-text-secondary mb-1">
-                    <span className="text-xs font-bold">نشط بالمحفظة</span>
-                    <Activity className="w-4 h-4 text-indigo-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black text-white font-sans">
-                      {toEasternArabic(personalStats.active_trades)}
-                    </div>
-                    <p className="text-[10px] text-text-secondary/60 mt-1">
-                      صفقات قيد المتابعة حالياً
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Personal Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div className="glass-card p-5 rounded-2xl border border-white/5 flex flex-col">
-                  <h2 className="text-xs font-bold text-text-primary mb-4">توزيع نتائج تداولاتي</h2>
-                  <div className="flex-1 flex flex-col items-center justify-center min-h-[220px]">
-                    {personalPieData.length > 0 ? (
-                      <div className="relative w-full h-48 flex justify-center items-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={personalPieData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={50}
-                              outerRadius={75}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              {personalPieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: '#1E1E2E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '11px' }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute flex flex-col items-center justify-center font-sans">
-                          <span className="text-[9px] text-text-secondary">نجاح المحفظة</span>
-                          <span className="text-lg font-black text-emerald-400">{personalStats.win_rate.toFixed(0)}%</span>
+                      <div>
+                        <div className="text-3xl font-black text-up-green font-mono">
+                          {platformStats.win_rate.toFixed(1)}%
                         </div>
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium">
+                          Based on {platformStats.closed_trades} closed trades
+                        </p>
                       </div>
-                    ) : (
-                      <span className="text-xs text-text-secondary">لا توجد صفقات مغلقة بعد</span>
-                    )}
-                  </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Cum. Return</span>
+                        <TrendingUp className="w-5 h-5 text-accent-blue" />
+                      </div>
+                      <div>
+                        <div className={`text-3xl font-black font-mono ${platformStats.total_pnl >= 0 ? 'text-accent-blue' : 'text-down-red'}`}>
+                          {platformStats.total_pnl > 0 ? '+' : ''}{platformStats.total_pnl.toFixed(1)}%
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium">
+                          Total compounded PnL percentage
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Total Signals</span>
+                        <Activity className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="text-3xl font-black text-white font-mono">
+                          {platformStats.total_trades}
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium flex gap-3">
+                          <span className="text-up-green">W: {platformStats.winning_trades}</span>
+                          <span className="text-down-red">L: {platformStats.losing_trades}</span>
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wider">Avg Return</span>
+                        <BarChart2 className="w-5 h-5 text-accent-gold" />
+                      </div>
+                      <div>
+                        <div className={`text-3xl font-black font-mono ${platformStats.avg_pnl >= 0 ? 'text-accent-gold' : 'text-down-red'}`}>
+                          {platformStats.avg_pnl > 0 ? '+' : ''}{platformStats.avg_pnl.toFixed(1)}%
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium">
+                          Average return per trade
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
                 </div>
 
-                <div className="glass-card p-5 rounded-2xl border border-white/5 lg:col-span-2 flex flex-col">
-                  <h2 className="text-xs font-bold text-text-primary mb-4">نمو الرصيد الفعلي التراكمي (EGP)</h2>
-                  <div className="flex-1 min-h-[220px]">
-                    {personalLineData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={personalLineData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                          <XAxis dataKey="date" stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} reversed={true} />
-                          <YAxis stroke="rgba(255,255,255,0.4)" fontSize={9} tickLine={false} orientation="right" />
-                          <Tooltip contentStyle={{ backgroundColor: '#1E1E2E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '11px' }} />
-                          <Line type="monotone" dataKey="pnl" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', r: 3 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-text-secondary">لا توجد صفقات منتهية كافية بالجنيه</div>
-                    )}
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                  <motion.div variants={itemVariants} className="lg:col-span-1">
+                    <Card className="p-6 h-full flex flex-col">
+                      <h2 className="text-sm font-bold text-white mb-6 uppercase tracking-wider">Signal Distribution</h2>
+                      <div className="flex-1 flex flex-col items-center justify-center min-h-[250px]">
+                        {platformPieData.length > 0 ? (
+                          <div className="relative w-full h-56 flex justify-center items-center">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={platformPieData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={65}
+                                  outerRadius={90}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                                  stroke="none"
+                                >
+                                  {platformPieData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip 
+                                  cursor={false}
+                                  contentStyle={{ 
+                                    backgroundColor: 'rgba(11, 15, 25, 0.9)', 
+                                    border: '1px solid rgba(255,255,255,0.1)', 
+                                    borderRadius: '12px', 
+                                    fontSize: '12px',
+                                    backdropFilter: 'blur(10px)'
+                                  }} 
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute flex flex-col items-center justify-center font-sans">
+                              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Win Rate</span>
+                              <span className="text-2xl font-black text-up-green">{platformStats.win_rate.toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-zinc-500 font-medium">No closed trades</span>
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants} className="lg:col-span-2">
+                    <Card className="p-6 h-full flex flex-col">
+                      <h2 className="text-sm font-bold text-white mb-6 uppercase tracking-wider">Cumulative PnL Growth (%)</h2>
+                      <div className="flex-1 min-h-[250px]">
+                        {platformLineData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={platformLineData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                              <XAxis dataKey="date" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                              <YAxis stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} orientation="right" dx={10} />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'rgba(11, 15, 25, 0.9)', 
+                                  border: '1px solid rgba(255,255,255,0.1)', 
+                                  borderRadius: '12px', 
+                                  fontSize: '12px',
+                                  backdropFilter: 'blur(10px)',
+                                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                                }} 
+                                labelStyle={{ color: '#9CA3AF', marginBottom: '4px' }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="pnl" 
+                                stroke="#3B82F6" 
+                                strokeWidth={3} 
+                                dot={{ fill: '#0B0F19', stroke: '#3B82F6', strokeWidth: 2, r: 4 }} 
+                                activeDot={{ r: 6, fill: '#3B82F6', stroke: '#0B0F19' }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-sm text-zinc-500 font-medium">Not enough growth data</div>
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-20 text-text-secondary">لا توجد إحصائيات متوفرة للمحفظة حالياً.</div>
-          )}
-        </>
-      )}
+              </>
+            ) : (
+              <div className="text-center py-20 text-zinc-500 font-medium">No platform statistics available.</div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="personal"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+          >
+            {personalStats ? (
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Win Rate</span>
+                        <Award className="w-4 h-4 text-up-green" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-up-green font-mono">
+                          {personalStats.win_rate.toFixed(1)}%
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1 font-medium">
+                          {personalStats.closed_trades} closed trades
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Net PnL</span>
+                        <TrendingUp className="w-4 h-4 text-accent-gold" />
+                      </div>
+                      <div>
+                        <div className={`text-2xl font-black font-mono ${personalStats.total_pnl_amount >= 0 ? 'text-accent-gold' : 'text-down-red'}`}>
+                          {personalStats.total_pnl_amount > 0 ? '+' : ''}{personalStats.total_pnl_amount.toLocaleString()} EGP
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1 font-medium">
+                          Realized EGP profit
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Best Trade</span>
+                        <UserCheck className="w-4 h-4 text-up-green" />
+                      </div>
+                      <div>
+                        <div className="text-xl font-black text-white font-mono">
+                          {personalStats.best_trade_symbol || '-'}
+                        </div>
+                        <p className="text-[11px] text-up-green mt-1 font-bold">
+                          {formatPercent(personalStats.best_trade_pct)}
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Worst Trade</span>
+                        <XCircle className="w-4 h-4 text-down-red" />
+                      </div>
+                      <div>
+                        <div className="text-xl font-black text-white font-mono">
+                          {personalStats.worst_trade_symbol || '-'}
+                        </div>
+                        <p className="text-[11px] text-down-red mt-1 font-bold">
+                          {formatPercent(personalStats.worst_trade_pct)}
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants}>
+                    <Card className="p-5 h-full flex flex-col justify-between">
+                      <div className="flex items-center justify-between text-zinc-400 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Active</span>
+                        <Activity className="w-4 h-4 text-accent-blue" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-white font-mono">
+                          {personalStats.active_trades}
+                        </div>
+                        <p className="text-[10px] text-zinc-500 mt-1 font-medium">
+                          Open positions
+                        </p>
+                      </div>
+                    </Card>
+                  </motion.div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                  <motion.div variants={itemVariants} className="lg:col-span-1">
+                    <Card className="p-6 h-full flex flex-col">
+                      <h2 className="text-sm font-bold text-white mb-6 uppercase tracking-wider">Portfolio Results</h2>
+                      <div className="flex-1 flex flex-col items-center justify-center min-h-[250px]">
+                        {personalPieData.length > 0 ? (
+                          <div className="relative w-full h-56 flex justify-center items-center">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={personalPieData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={65}
+                                  outerRadius={90}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                                  stroke="none"
+                                >
+                                  {personalPieData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip 
+                                  cursor={false}
+                                  contentStyle={{ 
+                                    backgroundColor: 'rgba(11, 15, 25, 0.9)', 
+                                    border: '1px solid rgba(255,255,255,0.1)', 
+                                    borderRadius: '12px', 
+                                    fontSize: '12px',
+                                    backdropFilter: 'blur(10px)'
+                                  }} 
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute flex flex-col items-center justify-center font-sans">
+                              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Win Rate</span>
+                              <span className="text-2xl font-black text-up-green">{personalStats.win_rate.toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-zinc-500 font-medium">No closed trades yet</span>
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants} className="lg:col-span-2">
+                    <Card className="p-6 h-full flex flex-col">
+                      <h2 className="text-sm font-bold text-white mb-6 uppercase tracking-wider">Realized PnL Growth (EGP)</h2>
+                      <div className="flex-1 min-h-[250px]">
+                        {personalLineData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={personalLineData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                              <XAxis dataKey="date" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                              <YAxis stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} orientation="right" dx={10} />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'rgba(11, 15, 25, 0.9)', 
+                                  border: '1px solid rgba(255,255,255,0.1)', 
+                                  borderRadius: '12px', 
+                                  fontSize: '12px',
+                                  backdropFilter: 'blur(10px)',
+                                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                                }} 
+                                labelStyle={{ color: '#9CA3AF', marginBottom: '4px' }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="pnl" 
+                                stroke="#FCD34D" 
+                                strokeWidth={3} 
+                                dot={{ fill: '#0B0F19', stroke: '#FCD34D', strokeWidth: 2, r: 4 }} 
+                                activeDot={{ r: 6, fill: '#FCD34D', stroke: '#0B0F19' }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-sm text-zinc-500 font-medium">Not enough PnL data</div>
+                        )}
+                      </div>
+                    </Card>
+                  </motion.div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-20 text-zinc-500 font-medium">No personal portfolio statistics available.</div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

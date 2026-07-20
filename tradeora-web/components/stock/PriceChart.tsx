@@ -29,6 +29,7 @@ import {
   detectCandlePattern,
   detectRSIDivergence,
   calcTFSignal,
+  scoreRSI,
   calcPositionSize,
   detectSRLevels,
   calcMarketRegime,
@@ -74,31 +75,108 @@ function formatVolume(v: number | null | undefined): string {
   return v.toFixed(0);
 }
 
+const exceptional_map: Record<string, string> = {
+  "ORAS": "EGS95001C011.CA",
+  "DCRC": "EGS21451C017-EGP.CA",
+  "NCGC": "EGS32131C012-EGP.CA",
+  "GTHE": "EGS74081C018-EGP.CA",
+  "ACRO": "EGS3E071C013-EGP.CA",
+  "AMES": "EGS72081C010.CA",
+  "CAED": "EGS72201C014.CA",
+  "ELNA": "EGS300L1C011.CA",
+  "NIPH": "EGS38331C012.CA",
+  "RREI": "EGS65011C016.CA",
+  "AJWA": "EGS30211C014.CA",
+  "BONY": "EGS656M1C010.CA",
+  "DOMT": "EGS30031C016.CA",
+  "FERC": "EGS385S1C012.CA",
+  "GTEX": "EGS59U92C011.CA",
+  "RAKT": "EGS36021C011.CA",
+  "TANM": "EGS21EB1C011.CA",
+  "TAQA": "EGS490S1C014.CA",
+  "UTOP": "EGS655Y1C017.CA"
+};
+
 function getYahooTicker(symbol: string): string {
-  const mapping: Record<string, string> = {
-    "ORAS": "EGS95001C011.CA",
-    "DCRC": "EGS21451C017-EGP.CA",
-    "NCGC": "EGS32131C012-EGP.CA",
-    "GTHE": "EGS74081C018-EGP.CA",
-    "ACRO": "EGS3E071C013-EGP.CA",
-    "AMES": "EGS72081C010.CA",
-    "CAED": "EGS72201C014.CA",
-    "ELNA": "EGS300L1C011.CA",
-    "NIPH": "EGS38331C012.CA",
-    "RREI": "EGS65011C016.CA",
-    "AJWA": "EGS30211C014.CA",
-    "BONY": "EGS656M1C010.CA",
-    "DOMT": "EGS30031C016.CA",
-    "FERC": "EGS385S1C012.CA",
-    "GTEX": "EGS59U92C011.CA",
-    "RAKT": "EGS36021C011.CA",
-    "TANM": "EGS21EB1C011.CA",
-    "TAQA": "EGS490S1C014.CA",
-    "UTOP": "EGS655Y1C017.CA"
-  };
   const sym = symbol.toUpperCase();
-  return mapping[sym] || `${sym}.CA`;
+  return exceptional_map[sym] || `${sym}.CA`;
 }
+
+async function fetchYahooCandles(symbol: string, interval: string): Promise<any[]> {
+  const parseYahooData = (json: any) => {
+    const result = json?.chart?.result?.[0];
+    if (!result) return [];
+    const timestamps = result.timestamp || [];
+    const quotes = result.indicators?.quote?.[0] || {};
+    const opens = quotes.open || [];
+    const highs = quotes.high || [];
+    const lows = quotes.low || [];
+    const closes = quotes.close || [];
+    const volumes = quotes.volume || [];
+
+    const rawPoints: any[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      if (opens[i] === null || highs[i] === null || lows[i] === null || closes[i] === null) continue;
+      rawPoints.push({
+        time: timestamps[i],
+        open: opens[i],
+        high: highs[i],
+        low: lows[i],
+        close: closes[i],
+        volume: volumes[i] ?? 0
+      });
+    }
+
+    if (interval === '4h') {
+      const aggregated: any[] = [];
+      for (let i = 0; i < rawPoints.length; i += 4) {
+        const chunk = rawPoints.slice(i, i + 4);
+        if (chunk.length === 0) continue;
+        const first = chunk[0];
+        const last = chunk[chunk.length - 1];
+        let maxHigh = chunk[0].high;
+        let minLow = chunk[0].low;
+        let sumVol = 0;
+        chunk.forEach(c => {
+          if (c.high > maxHigh) maxHigh = c.high;
+          if (c.low < minLow) minLow = c.low;
+          sumVol += c.volume;
+        });
+        aggregated.push({ time: last.time, open: first.open, high: maxHigh, low: minLow, close: last.close, volume: sumVol });
+      }
+      return aggregated;
+    }
+
+    return rawPoints;
+  };
+
+  const primaryTicker = getYahooTicker(symbol);
+  try {
+    const res = await fetch(`/api/yahoo-chart?ticker=${encodeURIComponent(primaryTicker)}&interval=${interval}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (!json.error && json?.chart?.result?.[0]?.timestamp) {
+        return parseYahooData(json);
+      }
+    }
+
+    if (primaryTicker.endsWith('.CA')) {
+      const caiTicker = `${symbol.toUpperCase()}.CAI`;
+      const resCai = await fetch(`/api/yahoo-chart?ticker=${encodeURIComponent(caiTicker)}&interval=${interval}`);
+      if (resCai.ok) {
+        const jsonCai = await resCai.json();
+        if (!jsonCai.error && jsonCai?.chart?.result?.[0]?.timestamp) {
+          return parseYahooData(jsonCai);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Yahoo candles fetch error:', err);
+  }
+
+  return [];
+}
+
 
 interface SREntry extends SRLevel {
   id: string;
@@ -198,120 +276,7 @@ function buildAggregatedCandle(chunk: PriceRecord[], dateStr: string): PriceReco
   };
 }
 
-function generateIntradayForDay(day: PriceRecord, interval: string): any[] {
-  const O = day.open_price ?? day.close_price;
-  const H = day.high_price ?? day.close_price;
-  const L = day.low_price ?? day.close_price;
-  const C = day.close_price;
-  const V = day.volume ?? 0;
 
-  let times: string[] = [];
-  if (interval === '4h') {
-    times = ['10:00', '13:00'];
-  } else if (interval === '1h') {
-    times = ['10:00', '11:00', '12:00', '13:00', '14:00'];
-  } else if (interval === '30m') {
-    times = ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00'];
-  } else { // 15m
-    times = [
-      '10:00', '10:15', '10:30', '10:45',
-      '11:00', '11:15', '11:30', '11:45',
-      '12:00', '12:15', '12:30', '12:45',
-      '13:00', '13:15', '13:30', '13:45',
-      '14:00', '14:15'
-    ];
-  }
-
-  const K = times.length;
-  const result: any[] = [];
-
-  const dateParts = day.price_date.split(' ')[0].split('-');
-  if (dateParts.length !== 3) return [];
-  const year = parseInt(dateParts[0]);
-  const month = parseInt(dateParts[1]);
-  const dayNum = parseInt(dateParts[2]);
-
-  const isGreen = C >= O;
-  const p0 = O;
-  const p1 = isGreen ? L : H;
-  const p2 = isGreen ? H : L;
-  const p3 = C;
-
-  let prevClose = O;
-
-  for (let i = 0; i < K; i++) {
-    const [hourStr, minStr] = times[i].split(':');
-    const hr = parseInt(hourStr);
-    const mn = parseInt(minStr);
-
-    const dateObj = new Date(Date.UTC(year, month - 1, dayNum, hr, mn));
-    const timeSec = Math.floor(dateObj.getTime() / 1000);
-
-    const progress = i / (K - 1 || 1);
-    let targetClose = C;
-    if (progress < 0.25) {
-      const t = progress / 0.25;
-      targetClose = p0 + (p1 - p0) * t;
-    } else if (progress < 0.7) {
-      const t = (progress - 0.25) / 0.45;
-      targetClose = p1 + (p2 - p1) * t;
-    } else {
-      const t = (progress - 0.7) / 0.3;
-      targetClose = p2 + (p3 - p2) * t;
-    }
-
-    const noise = (Math.sin(i * 1.5) * 0.0012) * targetClose;
-    targetClose = targetClose + noise;
-
-    if (targetClose > H) targetClose = H;
-    if (targetClose < L) targetClose = L;
-
-    const candleOpen = i === 0 ? O : prevClose;
-    let candleClose = i === K - 1 ? C : parseFloat(targetClose.toFixed(3));
-
-    let candleHigh = Math.max(candleOpen, candleClose);
-    let candleLow = Math.min(candleOpen, candleClose);
-
-    if (K > 1) {
-      if (progress >= 0.1 && progress <= 0.4) {
-        if (isGreen) {
-          candleLow = Math.min(candleLow, L);
-        } else {
-          candleHigh = Math.max(candleHigh, H);
-        }
-      }
-      if (progress >= 0.5 && progress <= 0.8) {
-        if (isGreen) {
-          candleHigh = Math.max(candleHigh, H);
-        } else {
-          candleLow = Math.min(candleLow, L);
-        }
-      }
-    } else {
-      candleHigh = H;
-      candleLow = L;
-    }
-
-    if (candleHigh > H) candleHigh = H;
-    if (candleLow < L) candleLow = L;
-
-    const candleVolume = Math.round(V / K);
-
-    result.push({
-      time: timeSec,
-      price_date: `${day.price_date.split(' ')[0]} ${times[i]}`,
-      open_price: candleOpen,
-      high_price: candleHigh,
-      low_price: candleLow,
-      close_price: candleClose,
-      volume: candleVolume
-    });
-
-    prevClose = candleClose;
-  }
-
-  return result;
-}
 
 export function PriceChart({ symbol, companyId, historicalPrices, locale, fundamentals }: PriceChartProps) {
   const tTA = useTranslations('technicalAnalysis');
@@ -335,11 +300,15 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const [dbPrices, setDbPrices] = useState<PriceRecord[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  // Intraday prices fetched from proxy API
-  const [intradayYahooPrices, setIntradayYahooPrices] = useState<any[]>([]);
+  // Intraday prices states
+  const [dbIntradayCandles, setDbIntradayCandles] = useState<any[]>([]);
+  const [yahooCandles, setYahooCandles] = useState<any[]>([]);
   const [isIntradayLoading, setIsIntradayLoading] = useState(false);
-  const [intradayHasNoData, setIntradayHasNoData] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const intradayHasNoData = dbIntradayCandles.length < 10 && yahooCandles.length < 10;
+
+
 
   // Bug Fix: Track visible S/R lines using separate state
   const [visibleSRLines, setVisibleSRLines] = useState<Set<number>>(new Set());
@@ -491,53 +460,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     if (historicalPrices?.length > 0) setDbPrices(historicalPrices);
   }, [historicalPrices]);
 
-  // Auto-switch to 1D if intraday is selected but has no real data
-  useEffect(() => {
-    const isIntraday = ['15m', '30m', '1h', '4h'].includes(interval);
-    if (isIntraday && intradayHasNoData && !isIntradayLoading) {
-      setIntervalVal('1d');
-      setToastMessage(
-        locale === 'ar'
-          ? '⚠️ البيانات اللحظية الحقيقية غير متاحة حالياً. تم التحويل إلى الفريم اليومي تلقائياً.'
-          : '⚠️ Live intraday data is currently unavailable. Switched to Daily (1D) interval.'
-      );
-      
-      const tid = setTimeout(() => setToastMessage(null), 5000);
-      return () => clearTimeout(tid);
-    }
-  }, [interval, intradayHasNoData, isIntradayLoading, locale]);
-
-  // Daily polling to Supabase every 60s
-  useEffect(() => {
-    if (!companyId) return;
-    const fetch = async () => {
-      try {
-        const latest = await fetchHistoricalPrices(companyId, 1);
-        if (latest.length > 0) {
-          const p = latest[0];
-          setDbPrices(prev => {
-            const idx = prev.findIndex(x => x.price_date === p.price_date);
-            if (idx !== -1) {
-              const updated = [...prev];
-              updated[idx] = p;
-              return updated;
-            }
-            return [...prev, p];
-          });
-          setLastUpdated(new Date());
-        }
-      } catch (e) { /* silent */ }
-    };
-    fetch();
-    const id = setInterval(fetch, 60000);
-    return () => clearInterval(id);
-  }, [companyId]);
-
   // Intraday fetching: DB first, fallback to Yahoo
   useEffect(() => {
-    const isIntraday = interval === '15m' || interval === '30m' || interval === '1h' || interval === '4h';
+    const isIntraday = ['15m', '30m', '1h', '4h'].includes(interval);
     if (!isIntraday) {
-      setIntradayYahooPrices([]);
+      setDbIntradayCandles([]);
+      setYahooCandles([]);
       return;
     }
 
@@ -576,91 +504,24 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         else if (interval === '1h') minuteInterval = 60;
         else if (interval === '4h') minuteInterval = 240;
 
-        // 1. Fetch from DB
+        // 1. Fetch real DB intraday candles
         const dbRes = await fetch(`/api/intraday?symbol=${symbol}&interval=${minuteInterval}&days=90`);
-        const { candles: dbCandles } = await dbRes.json();
-        
-        let finalRawPoints = dbCandles || [];
-        setDbCandlesCount(finalRawPoints.length);
-        
-        // 2. If insufficient data, fallback to Yahoo
-        if (finalRawPoints.length < 50) {
-          try {
-            const yfTicker = getYahooTicker(symbol);
-            const url = `/api/yahoo-chart?ticker=${encodeURIComponent(yfTicker)}&interval=${interval}`;
-            const res = await fetch(url);
-            if (res.ok) {
-              const json = await res.json();
-              const result = json?.chart?.result?.[0];
-              if (result) {
-                // Guard: reject if Yahoo returned daily data instead of intraday
-                const meta = result.meta ?? {};
-                const actualGranularity: string = meta.dataGranularity ?? '';
-                const expectedGranularity = (interval === '4h') ? '60m' : interval;
-                if (actualGranularity && actualGranularity !== expectedGranularity) {
-                  console.warn(`Yahoo returned ${actualGranularity} instead of ${expectedGranularity} — skipping fallback`);
-                  // Do not use this data — keep DB-only data
-                } else {
-                  const timestamps = result.timestamp || [];
-                  const quotes = result.indicators?.quote?.[0] || {};
-                  const opens = quotes.open || [];
-                  const highs = quotes.high || [];
-                  const lows = quotes.low || [];
-                  const closes = quotes.close || [];
-                  const volumes = quotes.volume || [];
+        const { candles: fetchedDbCandles } = await dbRes.json();
+        const formattedDb = (fetchedDbCandles || []).map(formatCandle);
+        setDbIntradayCandles(formattedDb);
+        setDbCandlesCount(formattedDb.length);
 
-                  const rawPoints: any[] = [];
-                  for (let i = 0; i < timestamps.length; i++) {
-                    const op = opens[i];
-                    const hi = highs[i];
-                    const lo = lows[i];
-                    const cl = closes[i];
-                    const vol = volumes[i] ?? 0;
-                    if (op === null || hi === null || lo === null || cl === null) continue;
-                    rawPoints.push({ time: timestamps[i], open: op, high: hi, low: lo, close: cl, volume: vol });
-                  }
-
-                  let yfFinalPoints = rawPoints;
-                  if (interval === '4h') {
-                    const aggregated: any[] = [];
-                    for (let i = 0; i < rawPoints.length; i += 4) {
-                      const chunk = rawPoints.slice(i, i + 4);
-                      if (chunk.length === 0) continue;
-                      const first = chunk[0];
-                      const last = chunk[chunk.length - 1];
-                      let maxHigh = chunk[0].high;
-                      let minLow = chunk[0].low;
-                      let sumVol = 0;
-                      chunk.forEach(c => {
-                        if (c.high > maxHigh) maxHigh = c.high;
-                        if (c.low < minLow) minLow = c.low;
-                        sumVol += c.volume;
-                      });
-                      aggregated.push({ time: last.time, open: first.open, high: maxHigh, low: minLow, close: last.close, volume: sumVol });
-                    }
-                    yfFinalPoints = aggregated;
-                  }
-
-                  // Merge DB + Yahoo (prevent duplicate times)
-                  const dbTimes = new Set(finalRawPoints.map((c: any) => c.time));
-                  const extra = yfFinalPoints.filter(c => !dbTimes.has(c.time));
-                  finalRawPoints = [...finalRawPoints, ...extra].sort((a: any, b: any) => a.time - b.time);
-                }
-              }
-            }
-          } catch (e) {
-            console.error('Yahoo fallback failed:', e);
-          }
+        // 2. Fetch Yahoo Finance candles if DB candles are insufficient
+        if (formattedDb.length < 10) {
+          const yfPoints = await fetchYahooCandles(symbol, interval);
+          const formattedYahoo = yfPoints.map(formatCandle);
+          setYahooCandles(formattedYahoo);
+        } else {
+          setYahooCandles([]);
         }
-
-        const formatted = finalRawPoints.map(formatCandle);
-        // If still very few candles (< 3 real intraday bars), mark as no data
-        setIntradayHasNoData(finalRawPoints.length < 3);
-        setIntradayYahooPrices(formatted);
         setLastUpdated(new Date());
       } catch (err) {
-        console.error('Error loading intraday data:', err);
-        setIntradayHasNoData(true);
+        console.error('Error fetching intraday data:', err);
       } finally {
         setIsIntradayLoading(false);
       }
@@ -669,7 +530,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     fetchIntraday();
   }, [interval, symbol]);
 
-  // Selected active prices
+  // Selected active prices (Smart Fallback)
   const activePrices = useMemo(() => {
     if (interval === '1w') {
       const data = aggregateWeekly(dbPrices);
@@ -682,21 +543,34 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     if (interval === '1d') {
       return dbPrices.map(d => ({ ...d, time: d.price_date }));
     }
-    
-    // Intraday estimation if no data found
-    if (intradayHasNoData) {
-      // Use last 45 daily prices to generate estimated intraday candles so the chart loads nicely
-      const dailySlice = dbPrices.slice(-45);
-      const generated: any[] = [];
-      dailySlice.forEach(day => {
-        const dayCandles = generateIntradayForDay(day, interval);
-        generated.push(...dayCandles);
-      });
-      return generated;
+
+    // Intraday Fallback logic:
+    if (dbIntradayCandles.length >= 10) {
+      return dbIntradayCandles;
+    } else if (yahooCandles.length >= 10) {
+      return yahooCandles;
+    } else {
+      // Fallback to daily candles if both intraday sources have insufficient data
+      return dbPrices.map(d => ({ ...d, time: d.price_date }));
     }
-    
-    return intradayYahooPrices;
-  }, [interval, dbPrices, intradayYahooPrices, intradayHasNoData]);
+  }, [interval, dbPrices, dbIntradayCandles, yahooCandles]);
+
+  // Toast notification for intraday fallback
+  useEffect(() => {
+    const isIntraday = ['15m', '30m', '1h', '4h'].includes(interval);
+    if (isIntraday && !isIntradayLoading) {
+      if (dbIntradayCandles.length < 10 && yahooCandles.length < 10) {
+        setToastMessage(
+          locale === 'ar'
+            ? 'بيانات الفريم الزمني المطلوب غير متاحة، عرض البيانات اليومية'
+            : 'Requested timeframe data is unavailable, displaying daily chart'
+        );
+      } else {
+        setToastMessage(null);
+      }
+    }
+  }, [interval, isIntradayLoading, dbIntradayCandles.length, yahooCandles.length, locale]);
+
 
   // Find full historical All-Time High
   const allTimeHigh = useMemo(() => {
@@ -1124,25 +998,24 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       return { val: '-', desc: locale === 'ar' ? 'غير متاح' : 'N/A', bar: '[░░░░░░░░░░]', score: 0, signal: '🟡' };
     }
     let desc = '';
-    let scoreVal = 0;
+    const scoreVal = scoreRSI(r);
     let signal = '🟡';
     
-    if (r > 70) {
-      desc = locale === 'ar' ? 'منطقة تشبع شراء (سلبي)' : 'Overbought region (bearish)';
-      scoreVal = -2;
-      signal = '🔴';
-    } else if (r < 30) {
-      desc = locale === 'ar' ? 'منطقة تشبع بيع (إيجابي)' : 'Oversold region (bullish)';
-      scoreVal = 2;
+    if (r > 65) {
+      desc = locale === 'ar' ? 'تشبع شراء / منطقة حذر (RSI > 65)' : 'Overbought caution (RSI > 65)';
       signal = '🟢';
-    } else if (r >= 50) {
-      desc = locale === 'ar' ? 'منطقة محايدة مائلة للشراء (50-70)' : 'Neutral-bullish region (50-70)';
-      scoreVal = 1;
+    } else if (r > 55) {
+      desc = locale === 'ar' ? 'منطقة إيجابية صاعدة (RSI > 55)' : 'Bullish region (RSI > 55)';
+      signal = '🟢';
+    } else if (r >= 45) {
+      desc = locale === 'ar' ? 'منطقة محايدة (45 - 55)' : 'Neutral region (45 - 55)';
       signal = '🟡';
+    } else if (r >= 30) {
+      desc = locale === 'ar' ? 'منطقة سلبي / ضغط بيعي (30 - 45)' : 'Bearish region (30 - 45)';
+      signal = '🔴';
     } else {
-      desc = locale === 'ar' ? 'منطقة محايدة مائلة للبيع (30-50)' : 'Neutral-bearish region (30-50)';
-      scoreVal = 1;
-      signal = '🟡';
+      desc = locale === 'ar' ? 'تشبع بيعي / احتمال ارتداد (RSI < 30)' : 'Oversold / reversal potential (RSI < 30)';
+      signal = '🔴';
     }
 
     const filled = Math.round(r / 10);
@@ -1924,12 +1797,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     fetch('/api/ml-predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features, interval })
+      body: JSON.stringify({ symbol, interval, features })
     })
       .then(r => r.json())
       .then(d => setMlProb(d.probability))
       .catch(() => setMlProb(null));
-  }, [analysisData, interval, dealSetup?.atr, currentPrice, analysisCandles, newsSentimentData, lastSectorRelativeVol]);
+  }, [symbol, analysisData, interval, dealSetup?.atr, currentPrice, analysisCandles, newsSentimentData, lastSectorRelativeVol]);
 
   useEffect(() => {
     setIsSaved(false);
@@ -2203,7 +2076,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
               />
               {intradayHasNoData && ['15m', '30m', '1h', '4h'].includes(interval) && (
                 <div className="absolute top-2 left-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-[9px] font-bold px-2 py-0.5 rounded backdrop-blur-sm pointer-events-none select-none font-sans">
-                  ⚠️ {locale === 'ar' ? 'شارت تقديري' : 'Estimated Chart'}
+                  ⚠️ {locale === 'ar' ? 'عرض البيانات اليومية' : 'Daily Chart Fallback'}
                 </div>
               )}
             </div>
@@ -2214,14 +2087,15 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
                 {intradayHasNoData ? (
                   <span className="text-yellow-500 bg-yellow-500/5 border border-yellow-500/10 py-1 px-3 rounded-lg w-full">
                     ⚠️ {locale === 'ar'
-                      ? 'بيانات تقديرية — غير متاحة من المصادر الفنية اللحظية (توليد ذكي من الشموع اليومية)'
-                      : 'Estimated data — unavailable from live sources (smartly generated from daily candles)'}
+                      ? 'بيانات الفريم الزمني المطلوب غير متاحة، عرض البيانات اليومية'
+                      : 'Requested timeframe data is unavailable, displaying daily chart'}
                   </span>
                 ) : (
-                  <span>⏱ {locale === 'ar' ? `البيانات اللحظية من DB: ${dbCandlesCount} شمعة` : `Intraday data from DB: ${dbCandlesCount} candles`}</span>
+                  <span>⏱ {locale === 'ar' ? `البيانات اللحظية المتاحة: ${dbIntradayCandles.length || yahooCandles.length} شمعة` : `Intraday candles available: ${dbIntradayCandles.length || yahooCandles.length}`}</span>
                 )}
               </div>
             )}
+
 
             {/* RSI sub-chart */}
             {showRSI && (

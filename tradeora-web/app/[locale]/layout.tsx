@@ -38,7 +38,7 @@ export const metadata = {
     icon: '/favicon.ico',
     apple: '/logo-icon.png',
   },
-  themeColor: '#C9A84C',
+  themeColor: '#09090b',
 };
 
 export default async function LocaleLayout({
@@ -56,7 +56,7 @@ export default async function LocaleLayout({
     <html lang={locale} dir={dir} className={`${cairo.variable} ${inter.variable} h-full`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#C9A84C" />
+        <meta name="theme-color" content="#09090b" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

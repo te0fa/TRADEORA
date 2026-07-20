@@ -7,7 +7,7 @@ import asyncio
 from playwright.async_api import async_playwright
 import os
 
-OUTPUT_DIR = r"E:\TRADEORA\data"
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 async def test_headed():
     print("=" * 60)

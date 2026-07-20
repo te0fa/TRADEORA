@@ -128,7 +128,6 @@ export function calcSupportResistance(
     }
   }
 
-  console.debug(`calcSupportResistance: scanned last ${actualLookback} candles. Found ${supportCandidates.length} swing lows and ${resistanceCandidates.length} swing highs.`);
 
   // Helper function to cluster levels
   function cluster(prices: number[]): { price: number; strength: number }[] {
@@ -354,6 +353,14 @@ export function detectRSIDivergence(
 // ══ Multi-Timeframe Score ═════════════
 export type TFSignal = 'bullish' | 'bearish' | 'neutral';
 
+export function scoreRSI(rsi: number): number {
+  if (rsi > 65)  return 2;   // overbought caution
+  if (rsi > 55)  return 1;   // bullish
+  if (rsi >= 45) return 0;   // neutral
+  if (rsi >= 30) return -1;  // bearish
+  return -2;                  // oversold (reversal potential)
+}
+
 export function calcTFSignal(
   candles: {
     close: number; open: number;
@@ -371,8 +378,9 @@ export function calcTFSignal(
     .slice(-50)
     .reduce((s, c) => s + c.close, 0) / 50;
 
+  const rsiScore = scoreRSI(lastRSI);
   const bullScore =
-    (lastRSI > 50 ? 1 : 0) +
+    (rsiScore > 0 ? 1 : 0) +
     (lastClose > sma20 ? 1 : 0) +
     (sma20 > sma50 ? 1 : 0);
 

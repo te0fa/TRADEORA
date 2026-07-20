@@ -7,10 +7,14 @@ export async function GET() {
       .from('companies')
       .select('id, symbol, sector');
 
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+
     const { data: prices } = await supabase
       .from('market_prices')
       .select('company_id, close_price, open_price, high_price, low_price, volume, price_date, change_percent, change_value')
-      .order('price_date', { ascending: false });
+      .gte('price_date', sevenDaysAgo)
+      .order('price_date', { ascending: false })
+      .limit(400);
 
     const { data: stats } = await supabase
       .from('signal_stats')
@@ -38,14 +42,15 @@ export async function GET() {
 
     for (const co of companies ?? []) {
       if (!co.sector) continue;
+      const normalizedSector = co.sector === 'بنوك' ? 'البنوك' : (co.sector === 'عقارات' ? 'العقارات والإنشاءات' : co.sector);
       const p = priceMap[co.id];
       const s = statsMap[co.id];
       if (!p) continue;
 
       const change = p.change_percent ?? null;
 
-      if (!sectorMap[co.sector]) {
-        sectorMap[co.sector] = {
+      if (!sectorMap[normalizedSector]) {
+        sectorMap[normalizedSector] = {
           total: 0, rising: 0, falling: 0,
           buySignals: 0, sellSignals: 0,
           avgChange: 0, changes: [],
@@ -53,7 +58,7 @@ export async function GET() {
         };
       }
 
-      const sec = sectorMap[co.sector];
+      const sec = sectorMap[normalizedSector];
       sec.total++;
       if (change !== null) {
         sec.changes.push(change);

@@ -129,7 +129,7 @@ const CandlestickChartInner = (
       width: containerRef.current.clientWidth,
       height: 380,
       layout: {
-        background: { type: ColorType.Solid, color: '#0A0F1E' },
+        background: { type: ColorType.Solid, color: '#0B0F19' },
         textColor: '#9CA3AF',
         fontSize: 10,
         fontFamily: 'sans-serif',
@@ -396,7 +396,7 @@ const CandlestickChartInner = (
   }, []);
 
   return (
-    <div className="relative w-full rounded-xl overflow-hidden border border-white/5 bg-[#0A0F1E]">
+    <div className="relative w-full rounded-xl overflow-hidden border border-white/5 bg-[#0B0F19]">
       <div
         ref={containerRef}
         className="w-full"

@@ -9,8 +9,10 @@ import { DataSourcesPanel } from '@/components/stock/DataSourcesPanel';
 import { StockFundamentals } from '@/components/stock/StockFundamentals';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
 import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toEasternArabic, formatPrice } from '@/lib/formatters';
+import { motion } from 'framer-motion';
 
 interface StockDetailPageProps {
   params: Promise<{
@@ -27,24 +29,21 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   
   const { company, intradayData, historicalPrices, loading, error, refetch } = useStockDetail(symbol);
 
-  // Sorting state for the Price History Table
   const [sortKey, setSortKey] = useState<string>('price_date');
-  const [sortAsc, setSortAsc] = useState<boolean>(false); // default latest date first
+  const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
-  // Header sort action
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortAsc(!sortAsc);
     } else {
       setSortKey(key);
-      setSortAsc(false); // default desc
+      setSortAsc(false);
     }
     setCurrentPage(1);
   };
 
-  // Sort historical history
   const sortedHistory = useMemo(() => {
     if (!historicalPrices) return [];
     return [...historicalPrices].sort((a: any, b: any) => {
@@ -65,7 +64,6 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
     });
   }, [historicalPrices, sortKey, sortAsc]);
 
-  // Paginated daily prices
   const paginatedHistory = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return sortedHistory.slice(start, start + pageSize);
@@ -73,7 +71,6 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
   const totalPages = Math.ceil(sortedHistory.length / pageSize);
 
-  // Formatting helper for numbers
   const formatNum = (num: number | null | undefined) => {
     if (num === null || num === undefined) return '-';
     return num.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US');
@@ -82,33 +79,30 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   if (loading) {
     return (
       <div className="flex flex-col gap-6 w-full">
-        {/* Header Skeleton */}
-        <Skeleton className="h-32 w-full" />
-        {/* Chart Skeleton */}
-        <Skeleton className="h-[400px] w-full" />
-        {/* Source panel Skeleton */}
-        <Skeleton className="h-44 w-full" />
+        <Skeleton className="h-32 w-full rounded-3xl" />
+        <Skeleton className="h-[450px] w-full rounded-3xl" />
+        <Skeleton className="h-44 w-full rounded-3xl" />
       </div>
     );
   }
 
   if (error || !company) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center glass-card rounded-2xl p-8 border border-white/5 max-w-lg mx-auto">
-        <span className="text-4xl mb-4">🔍</span>
-        <h2 className="text-xl font-bold text-text-primary mb-2">
+      <Card hoverEffect={false} className="flex flex-col items-center justify-center py-20 text-center p-8 max-w-lg mx-auto">
+        <span className="text-5xl mb-6">🔍</span>
+        <h2 className="text-2xl font-black text-white mb-2">
           {t('notFoundTitle')}
         </h2>
-        <p className="text-sm text-text-secondary mb-6 max-w-sm">
+        <p className="text-sm text-zinc-400 mb-8 max-w-sm">
           {t('notFoundSubtitle')} ({symbol.toUpperCase()})
         </p>
         <button
           onClick={refetch}
-          className="px-6 py-2.5 bg-accent-blue hover:bg-accent-blue/80 text-white rounded-xl text-sm font-semibold transition cursor-pointer"
+          className="px-8 py-3 btn-primary rounded-xl text-sm transition cursor-pointer"
         >
           {t('refreshButton')}
         </button>
-      </div>
+      </Card>
     );
   }
 
@@ -116,40 +110,60 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
     return (
       <th 
         onClick={() => handleSort(key)}
-        className={`px-4 sm:px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary cursor-pointer hover:text-text-primary transition-colors select-none ${locale === 'ar' ? 'text-right' : 'text-left'}`}
+        className={`px-4 sm:px-6 py-4 text-xs font-bold uppercase tracking-wider text-zinc-500 cursor-pointer hover:text-white transition-colors select-none ${locale === 'ar' ? 'text-right' : 'text-left'}`}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <span>{label}</span>
-          <ArrowUpDown className={`w-3.5 h-3.5 ${sortKey === key ? 'text-accent-blue' : 'text-text-secondary/40'}`} />
+          <ArrowUpDown className={`w-3.5 h-3.5 ${sortKey === key ? 'text-accent-blue' : 'opacity-30'}`} />
         </div>
       </th>
     );
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
+  };
+
   return (
-    <div className="w-full">
-      {/* 1. Stock Info Header Card */}
-      <StockHeader company={company} />
+    <motion.div 
+      initial="hidden"
+      animate="show"
+      variants={containerVariants}
+      className="w-full pb-20 flex flex-col gap-8"
+    >
+      <motion.div variants={itemVariants}>
+        <StockHeader company={company} />
+      </motion.div>
 
-      {/* 2. Visual Charts Container */}
-      <PriceChart 
-        symbol={symbol}
-        companyId={company.id}
-        intradayData={intradayData} 
-        historicalPrices={historicalPrices} 
-        locale={locale} 
-        fundamentals={company.fundamentals}
-      />
+      <motion.div variants={itemVariants}>
+        <PriceChart 
+          symbol={symbol}
+          companyId={company.id}
+          intradayData={intradayData} 
+          historicalPrices={historicalPrices} 
+          locale={locale} 
+          fundamentals={company.fundamentals}
+        />
+      </motion.div>
 
-      {/* 3. Financial Fundamentals analysis */}
-      <StockFundamentals
-        fundamentals={company.fundamentals}
-        currentPrice={company.priceRecord?.close_price ?? (historicalPrices && historicalPrices[0]?.close_price) ?? 0}
-        locale={locale}
-      />
+      <motion.div variants={itemVariants}>
+        <StockFundamentals
+          fundamentals={company.fundamentals}
+          currentPrice={company.priceRecord?.close_price ?? (historicalPrices && historicalPrices[0]?.close_price) ?? 0}
+          locale={locale}
+        />
+      </motion.div>
 
-      {/* 4. Real-time Comparison metrics */}
-      <div className="mb-6">
+      <motion.div variants={itemVariants}>
         <DataSourcesPanel
           company={company}
           historicalPrices={historicalPrices}
@@ -157,117 +171,117 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           intradayDate={intradayData?.date || null}
           locale={locale}
         />
-      </div>
+      </motion.div>
 
-      {/* 4. Historical Data Grid Table */}
-      <div className="glass-card p-6 rounded-2xl">
-        <h2 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
-          <span>📅</span>
-          <span>{t('priceHistory')}</span>
-        </h2>
+      <motion.div variants={itemVariants}>
+        <Card hoverEffect={false} className="p-6">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <span className="text-accent-blue">📅</span>
+            <span>{t('priceHistory')}</span>
+          </h2>
 
-        <div className="w-full overflow-x-auto rounded-xl border border-white/5 bg-white/[0.005]">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 bg-white/[0.01]">
-                {renderSortHeader(t('date'), 'price_date')}
-                {renderSortHeader(t('open'), 'open_price')}
-                {renderSortHeader(t('high'), 'high_price')}
-                {renderSortHeader(t('low'), 'low_price')}
-                {renderSortHeader(t('close'), 'close_price')}
-                {renderSortHeader(tGlobal('table.volume'), 'volume')}
-                {renderSortHeader(tGlobal('table.source'), 'source')}
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedHistory.length > 0 ? (
-                paginatedHistory.map((p, i) => {
-                  const dateStr = new Date(p.price_date).toLocaleDateString(
-                    locale === 'ar' ? 'ar-EG' : 'en-US',
-                    { year: 'numeric', month: 'short', day: 'numeric' }
-                  );
-                  return (
-                    <tr key={p.id || i} className="border-b border-white/5 hover:bg-white/[0.01] transition text-sm">
-                      <td className="px-6 py-3.5 font-medium text-text-primary font-sans">
-                        {locale === 'ar' ? toEasternArabic(dateStr) : dateStr}
-                      </td>
-                      <td className="px-6 py-3.5 font-mono text-text-primary">
-                        {formatPrice(p.open_price, locale)}
-                      </td>
-                      <td className="px-6 py-3.5 font-mono text-text-primary">
-                        {formatPrice(p.high_price, locale)}
-                      </td>
-                      <td className="px-6 py-3.5 font-mono text-text-primary">
-                        {formatPrice(p.low_price, locale)}
-                      </td>
-                      <td className="px-6 py-3.5 font-mono text-accent-blue font-bold">
-                        {formatPrice(p.close_price, locale)}
-                      </td>
-                      <td className="px-6 py-3.5 text-text-primary font-sans">
-                        {formatNum(p.volume)}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <div className="relative group/tooltip inline-block">
-                          <Badge 
-                            variant={
-                              p.source === 'egx_bulletin' 
-                                ? 'success' 
-                                : p.source === 'intraday_consensus' 
-                                ? 'primary' 
-                                : p.source === 'tradingview'
-                                ? 'warning'
-                                : 'glass'
-                            }
-                          >
-                            {tGlobal('sources.' + p.source)}
-                          </Badge>
-                          <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block w-52 p-2.5 text-[10px] leading-normal text-text-primary bg-surface-dark border border-white/10 rounded-lg shadow-xl backdrop-blur-md font-sans text-center">
-                            {tTooltip(p.source) || p.source}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-text-secondary">
-                    {t('noDataAvailable')}
-                  </td>
+          <div className="w-full overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-white/5 border-b border-white/10">
+                  {renderSortHeader(t('date'), 'price_date')}
+                  {renderSortHeader(t('open'), 'open_price')}
+                  {renderSortHeader(t('high'), 'high_price')}
+                  {renderSortHeader(t('low'), 'low_price')}
+                  {renderSortHeader(t('close'), 'close_price')}
+                  {renderSortHeader(tGlobal('table.volume'), 'volume')}
+                  {renderSortHeader(tGlobal('table.source'), 'source')}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination bar */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 px-1 font-sans">
-            <span className="text-xs text-text-secondary font-medium">
-              {tGlobal('pageIndicator', { 
-                current: locale === 'ar' ? toEasternArabic(currentPage) : currentPage, 
-                total: locale === 'ar' ? toEasternArabic(totalPages) : totalPages 
-              })}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 text-text-primary disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              >
-                {locale === 'ar' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="p-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 text-text-primary disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              >
-                {locale === 'ar' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
-            </div>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {paginatedHistory.length > 0 ? (
+                  paginatedHistory.map((p, i) => {
+                    const dateStr = new Date(p.price_date).toLocaleDateString(
+                      locale === 'ar' ? 'ar-EG' : 'en-US',
+                      { year: 'numeric', month: 'short', day: 'numeric' }
+                    );
+                    return (
+                      <tr key={p.id || i} className="hover:bg-white/5 transition-colors text-sm">
+                        <td className="px-6 py-4 font-medium text-white font-sans">
+                          {locale === 'ar' ? toEasternArabic(dateStr) : dateStr}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-zinc-300">
+                          {formatPrice(p.open_price, locale)}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-zinc-300">
+                          {formatPrice(p.high_price, locale)}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-zinc-300">
+                          {formatPrice(p.low_price, locale)}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-accent-blue font-bold text-base">
+                          {formatPrice(p.close_price, locale)}
+                        </td>
+                        <td className="px-6 py-4 text-zinc-400 font-sans">
+                          {formatNum(p.volume)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="relative group/tooltip inline-block">
+                            <Badge 
+                              variant={
+                                p.source === 'egx_bulletin' 
+                                  ? 'success' 
+                                  : p.source === 'intraday_consensus' 
+                                  ? 'primary' 
+                                  : p.source === 'tradingview'
+                                  ? 'warning'
+                                  : 'glass'
+                              }
+                            >
+                              {tGlobal('sources.' + p.source)}
+                            </Badge>
+                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block w-52 p-3 text-xs leading-relaxed text-white bg-surface-elevated border border-white/10 rounded-xl shadow-2xl backdrop-blur-md font-sans text-center">
+                              {tTooltip(p.source) || p.source}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-zinc-500">
+                      {t('noDataAvailable')}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
-    </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 px-2 font-sans">
+              <span className="text-sm text-zinc-500 font-medium">
+                {tGlobal('pageIndicator', { 
+                  current: locale === 'ar' ? toEasternArabic(currentPage) : currentPage, 
+                  total: locale === 'ar' ? toEasternArabic(totalPages) : totalPages 
+                })}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-xl glass-input hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {locale === 'ar' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-xl glass-input hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {locale === 'ar' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 }
