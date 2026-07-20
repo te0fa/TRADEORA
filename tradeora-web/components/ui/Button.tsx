@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, HTMLMotionProps } from 'framer-motion';
 
 export interface ButtonProps extends HTMLMotionProps<"button"> {
-  variant?: 'primary' | 'gold' | 'ghost' | 'glass';
+  variant?: 'primary' | 'gold' | 'ghost' | 'glass' | 'danger';
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -24,7 +24,8 @@ export function Button({
     primary: 'btn-primary rounded-xl',
     gold: 'btn-gold rounded-xl',
     ghost: 'btn-ghost rounded-xl',
-    glass: 'glass-input rounded-xl hover:bg-white/10'
+    glass: 'glass-input rounded-xl hover:bg-white/10',
+    danger: 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 rounded-xl'
   };
 
   return (
@@ -34,7 +35,7 @@ export function Button({
       className={`font-semibold tracking-wide flex items-center justify-center gap-2 ${sizeClasses[size]} ${variants[variant]} ${className}`}
       {...props}
     >
-      {children}
+      {children as React.ReactNode}
     </motion.button>
   );
 }

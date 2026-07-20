@@ -45,7 +45,7 @@ export function Badge({
           <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${dotColors[variant]}`}></span>
         </span>
       )}
-      {children}
+      {children as React.ReactNode}
     </motion.span>
   );
 }

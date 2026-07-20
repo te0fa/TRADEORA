@@ -15,7 +15,7 @@ export function Card({ children, hoverEffect = true, className = '', ...props }:
       className={`glass-card rounded-2xl overflow-hidden ${className}`}
       {...props}
     >
-      {children}
+      {children as React.ReactNode}
     </motion.div>
   );
 }
