@@ -153,6 +153,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           historicalPrices={historicalPrices} 
           locale={locale} 
           fundamentals={company.fundamentals}
+          priceRecord={company.priceRecord}
         />
       </motion.div>
 

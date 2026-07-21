@@ -457,9 +457,24 @@ export async function fetchHistoricalPrices(companyId: string, limit: number = 5
     }
   });
 
-  // Sort chronologically and slice to limit
-  const historical = Object.values(dailyMap)
+  // Sort chronologically
+  let historical = Object.values(dailyMap)
     .sort((a, b) => new Date(a.price_date).getTime() - new Date(b.price_date).getTime());
+
+  // Clean up extreme Yahoo historical split/currency mismatches
+  const cleanSourcePrices = historical.filter(p => p.source === 'egx_bulletin' || p.source === 'tradingview');
+  if (cleanSourcePrices.length > 0) {
+    const referencePrice = cleanSourcePrices[0].close_price;
+    historical = historical.filter(p => {
+      if (p.source === 'yahoo_historical') {
+        const ratio = p.close_price / referencePrice;
+        if (ratio < 0.4 || ratio > 2.5) {
+          return false; // Discard distorted point
+        }
+      }
+      return true;
+    });
+  }
     
   return historical.slice(-limit);
 }

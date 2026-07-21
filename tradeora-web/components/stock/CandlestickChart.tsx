@@ -171,6 +171,8 @@ const CandlestickChartInner = (
         borderColor: 'rgba(255,255,255,0.05)',
         timeVisible: isIntraday, // Show hours/minutes only for intraday intervals
         secondsVisible: false,
+        barSpacing: 8,          // Natural candlestick spacing
+        minBarSpacing: 1.5,
       },
     } as any);
 
@@ -331,8 +333,6 @@ const CandlestickChartInner = (
       }
       onCrosshairMove(dateStr);
     });
-
-    chart.timeScale().fitContent();
 
     // Hide only lightweight charts attribution link/logo if any
     const style = document.createElement('style');

@@ -42,17 +42,21 @@ export async function GET() {
       }
     }
 
-    // جلب signal_stats لكل سهم
-    const { data: stats, error: statsError } = await sb
-      .from('signal_stats')
-      .select('company_id, timeframe, signal_type, win_rate_tp1, total_signals')
-      .eq('timeframe', '1d');
+    // جلب التوصيات النشطة لكل سهم
+    const { data: activeTrades, error: tradesError } = await sb
+      .from('recommended_trades')
+      .select('company_id, direction, win_rate_hist')
+      .eq('status', 'active');
 
-    if (statsError) throw statsError;
+    if (tradesError) throw tradesError;
 
     const statsMap: Record<string, any> = {};
-    for (const s of stats ?? []) {
-      statsMap[s.company_id] = s;
+    for (const t of activeTrades ?? []) {
+      statsMap[t.company_id] = {
+        signal_type: t.direction,
+        win_rate_tp1: t.win_rate_hist,
+        total_signals: 1
+      };
     }
 
     // دمج البيانات

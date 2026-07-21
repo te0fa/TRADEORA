@@ -55,10 +55,10 @@ export function useStockDetail(symbol: string) {
     if (symbol) {
       loadData(false);
 
-      // Auto refresh every 5 minutes during Egyptian trading session
+      // Auto refresh every 15 seconds during Egyptian trading session
       const interval = setInterval(() => {
         loadData(true);
-      }, 5 * 60 * 1000);
+      }, 15 * 1000);
 
       return () => clearInterval(interval);
     }

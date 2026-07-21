@@ -51,6 +51,7 @@ interface PriceChartProps {
   historicalPrices: PriceRecord[];
   locale: string;
   fundamentals?: any;
+  priceRecord?: PriceRecord | null;
 }
 
 type Interval = '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m';
@@ -285,7 +286,7 @@ function buildAggregatedCandle(chunk: PriceRecord[], dateStr: string): PriceReco
 
 
 
-export function PriceChart({ symbol, companyId, historicalPrices, locale, fundamentals }: PriceChartProps) {
+export function PriceChart({ symbol, companyId, historicalPrices, locale, fundamentals, priceRecord }: PriceChartProps) {
   const tTA = useTranslations('technicalAnalysis');
   const tGlobal = useTranslations();
 
@@ -306,6 +307,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   // Database daily prices
   const [dbPrices, setDbPrices] = useState<PriceRecord[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  useEffect(() => {
+    if (priceRecord?.fetched_at) {
+      setLastUpdated(new Date(priceRecord.fetched_at));
+    }
+  }, [priceRecord?.fetched_at]);
 
   // Intraday prices states
   const [dbIntradayCandles, setDbIntradayCandles] = useState<any[]>([]);
@@ -833,16 +840,23 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     volume: activeData.volume ?? 0,
   } : null);
 
+  const latestClose = priceRecord ? priceRecord.close_price : (activePrices[activePrices.length - 1]?.close_price ?? 0);
+
   const priceChange = useMemo(() => {
+    if (priceRecord && priceRecord.change_percent !== null) {
+      return {
+        diff: priceRecord.change_value ?? 0,
+        pct: priceRecord.change_percent
+      };
+    }
     if (activePrices.length < 2) return { diff: 0, pct: 0 };
     const cur = activePrices[activePrices.length - 1].close_price;
     const prev = activePrices[activePrices.length - 2].close_price;
     return { diff: cur - prev, pct: ((cur - prev) / prev) * 100 };
-  }, [activePrices]);
+  }, [activePrices, priceRecord]);
 
   const isUp = priceChange.diff >= 0;
   const marketOpen = isMarketOpen();
-  const latestClose = activePrices[activePrices.length - 1]?.close_price ?? 0;
 
   // ─── Technical Analysis Timeframe Fallback (Day vs Swing) ─────────
   const isIntradayInterval = ['15m', '30m', '1h', '4h'].includes(interval);
