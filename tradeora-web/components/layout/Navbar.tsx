@@ -23,7 +23,8 @@ import {
   Bell,
   Search,
   Shield,
-  Star
+  Star,
+  Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -108,6 +109,7 @@ export function Navbar({ locale }: NavbarProps) {
     { href: `/${locale}/sectors`, icon: Briefcase, label: isAr ? 'القطاعات' : 'Sectors', color: 'text-blue-400' },
     { href: `/${locale}/compare`, icon: TrendingUp, label: isAr ? 'مقارنة' : 'Compare', color: 'text-purple-400' },
     { href: `/${locale}/watchlist`, icon: Star, label: isAr ? 'المراقبة' : 'Watchlist', color: 'text-accent-gold fill-accent-gold' },
+    { href: `/${locale}/daily-report`, icon: Award, label: isAr ? 'التقرير اليومي' : 'Daily Report', color: 'text-emerald-400' },
     { href: `/${locale}/my-trades`, icon: Briefcase, label: isAr ? 'صفقاتي' : 'Trades' },
     { href: `/${locale}/performance`, icon: TrendingUp, label: isAr ? 'الأداء' : 'Performance' },
   ];
