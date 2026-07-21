@@ -581,6 +581,25 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     }
   }, [interval, dbPrices, dbIntradayCandles, yahooCandles]);
 
+  // Synchronize the last candle of activePrices with today's live priceRecord close price
+  const finalActivePrices = useMemo(() => {
+    if (activePrices.length === 0) return [];
+    const copy = [...activePrices];
+    const lastIdx = copy.length - 1;
+    const lastCandle = copy[lastIdx];
+    
+    if (priceRecord && priceRecord.close_price) {
+      const livePrice = priceRecord.close_price;
+      copy[lastIdx] = {
+        ...lastCandle,
+        close_price: livePrice,
+        high_price: lastCandle.high_price !== null ? Math.max(lastCandle.high_price, livePrice) : livePrice,
+        low_price: lastCandle.low_price !== null ? Math.min(lastCandle.low_price, livePrice) : livePrice,
+      };
+    }
+    return copy;
+  }, [activePrices, priceRecord]);
+
   // Toast notification for intraday fallback
   useEffect(() => {
     const isIntraday = ['15m', '30m', '1h', '4h'].includes(interval);
@@ -601,11 +620,11 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   // Find full historical All-Time High
   const allTimeHigh = useMemo(() => {
     const dbHighs = dbPrices.map(p => p.high_price || p.close_price);
-    const activeHighs = activePrices.map(p => p.high_price || p.close_price);
+    const activeHighs = finalActivePrices.map(p => p.high_price || p.close_price);
     const allHighs = [...dbHighs, ...activeHighs];
     if (allHighs.length === 0) return 0;
     return Math.max(...allHighs);
-  }, [dbPrices, activePrices]);
+  }, [dbPrices, finalActivePrices]);
 
   const currentPrice = useMemo(() =>
     dbPrices.at(-1)?.close_price ?? 0
@@ -614,7 +633,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const isNearATH = allTimeHigh > 0 && currentPrice >= allTimeHigh * 0.99;
 
   // Indicator calculations on active prices
-  const closes = useMemo(() => activePrices.map(p => p.close_price), [activePrices]);
+  const closes = useMemo(() => finalActivePrices.map(p => p.close_price), [finalActivePrices]);
   const sma20Raw = useMemo(() => calcSMA(closes, 20), [closes]);
   const sma50Raw = useMemo(() => calcSMA(closes, 50), [closes]);
   const sma200Raw = useMemo(() => calcSMA(closes, 200), [closes]);
@@ -622,7 +641,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const rsiRaw = useMemo(() => calcRSI(closes, 14), [closes]);
   const macdRaw = useMemo(() => calcMACD(closes), [closes]);
 
-  const allChartData = useMemo(() => activePrices.map((p, i) => ({
+  const allChartData = useMemo(() => finalActivePrices.map((p, i) => ({
     ...p,
     sma20: sma20Raw[i] ?? null,
     sma50: sma50Raw[i] ?? null,
@@ -840,7 +859,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     volume: activeData.volume ?? 0,
   } : null);
 
-  const latestClose = priceRecord ? priceRecord.close_price : (activePrices[activePrices.length - 1]?.close_price ?? 0);
+  const latestClose = priceRecord ? priceRecord.close_price : (finalActivePrices[finalActivePrices.length - 1]?.close_price ?? 0);
 
   const priceChange = useMemo(() => {
     if (priceRecord && priceRecord.change_percent !== null) {
@@ -849,11 +868,11 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         pct: priceRecord.change_percent
       };
     }
-    if (activePrices.length < 2) return { diff: 0, pct: 0 };
-    const cur = activePrices[activePrices.length - 1].close_price;
-    const prev = activePrices[activePrices.length - 2].close_price;
+    if (finalActivePrices.length < 2) return { diff: 0, pct: 0 };
+    const cur = finalActivePrices[finalActivePrices.length - 1].close_price;
+    const prev = finalActivePrices[finalActivePrices.length - 2].close_price;
     return { diff: cur - prev, pct: ((cur - prev) / prev) * 100 };
-  }, [activePrices, priceRecord]);
+  }, [finalActivePrices, priceRecord]);
 
   const isUp = priceChange.diff >= 0;
   const marketOpen = isMarketOpen();
@@ -862,8 +881,8 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const isIntradayInterval = ['15m', '30m', '1h', '4h'].includes(interval);
 
   const analysisCandles = useMemo(() => {
-    if (isIntradayInterval && !intradayHasNoData && activePrices.length >= 100) {
-      return activePrices.slice(-500).map(p => ({
+    if (isIntradayInterval && !intradayHasNoData && finalActivePrices.length >= 100) {
+      return finalActivePrices.slice(-500).map(p => ({
         open: p.open_price ?? p.close_price,
         high: p.high_price ?? p.close_price,
         low: p.low_price ?? p.close_price,

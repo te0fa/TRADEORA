@@ -273,31 +273,32 @@ def generate_daily_recommendations():
         atr_eff = atr_val if atr_val > 0 else (last_close * 0.02)
         decimals = 4 if last_close < 1.0 else 2
         entry_price = round(last_close, decimals)
-        sl_price = round(entry_price - 1.5 * atr_eff, decimals)
-        tp1_price = round(entry_price + 2.0 * atr_eff, decimals)
-        tp2_price = round(entry_price + 3.5 * atr_eff, decimals)
 
-        # If Fair Value is significantly higher, align TP2 with Fair Value
-        if fair_val and float(fair_val) > tp1_price:
-            tp2_price = min(round(float(fair_val), decimals), round(entry_price * 1.5, decimals))
-
-        # Risk-Reward Validation
-        risk = entry_price - sl_price
-        if risk > 0:
-            rr = (tp1_price - entry_price) / risk
-            if rr > 5 or rr < 1.2:
-                logger.info(f"Skipping recommendation for {symbol}: R:R ratio {rr:.2f} out of bounds [1.2, 5.0]")
-                continue
-
-        # Condition 1: Probability > 0.65
+        # Condition 1: Probability > 0.65 (Buy Recommendation)
         if prob > 0.65:
+            sl_price = round(entry_price - 1.5 * atr_eff, decimals)
+            tp1_price = round(entry_price + 2.0 * atr_eff, decimals)
+            tp2_price = round(entry_price + 3.5 * atr_eff, decimals)
+
+            # If Fair Value is significantly higher, align TP2 with Fair Value
+            if fair_val and float(fair_val) > tp1_price:
+                tp2_price = min(round(float(fair_val), decimals), round(entry_price * 1.5, decimals))
+
+            # Risk-Reward Validation
+            risk = entry_price - sl_price
+            if risk > 0:
+                rr = (tp1_price - entry_price) / risk
+                if rr > 5 or rr < 1.2:
+                    logger.info(f"Skipping buy recommendation for {symbol}: R:R ratio {rr:.2f} out of bounds [1.2, 5.0]")
+                    continue
+
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
                         "ml_probability": round(prob, 4)
                     }).eq("company_id", cid).eq("status", "active").execute()
                     updated_recs_count += 1
-                    logger.info(f"🔄 Updated active trade probability for {symbol}: prob={prob:.4f}")
+                    logger.info(f"🔄 Updated active buy trade probability for {symbol}: prob={prob:.4f}")
                 except Exception as e:
                     logger.error(f"Error updating active trade for {symbol}: {e}")
             else:
@@ -317,11 +318,59 @@ def generate_daily_recommendations():
                 try:
                     sb.table("recommended_trades").insert(rec_payload).execute()
                     new_recs_count += 1
-                    logger.info(f"✅ Created new recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
+                    logger.info(f"✅ Created new buy recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
                 except Exception as e:
-                    logger.error(f"Error inserting new recommendation for {symbol}: {e}")
+                    logger.error(f"Error inserting new buy recommendation for {symbol}: {e}")
 
-        # Condition 2: Probability between 0.50 and 0.65 -> Update signal_stats
+        # Condition 2: Probability < 0.35 (Sell/Exit Recommendation)
+        elif prob < 0.35:
+            sl_price = round(entry_price + 1.5 * atr_eff, decimals)
+            tp1_price = round(entry_price - 2.0 * atr_eff, decimals)
+            tp2_price = round(entry_price - 3.5 * atr_eff, decimals)
+
+            # If Fair Value is significantly lower, align TP2 with Fair Value
+            if fair_val and float(fair_val) < tp1_price:
+                tp2_price = max(round(float(fair_val), decimals), round(entry_price * 0.5, decimals))
+
+            # Risk-Reward Validation
+            risk = sl_price - entry_price
+            if risk > 0:
+                rr = (entry_price - tp1_price) / risk
+                if rr > 5 or rr < 1.2:
+                    logger.info(f"Skipping sell recommendation for {symbol}: R:R ratio {rr:.2f} out of bounds [1.2, 5.0]")
+                    continue
+
+            if cid in active_ids:
+                try:
+                    sb.table("recommended_trades").update({
+                        "ml_probability": round(prob, 4)
+                    }).eq("company_id", cid).eq("status", "active").execute()
+                    updated_recs_count += 1
+                    logger.info(f"🔄 Updated active sell trade probability for {symbol}: prob={prob:.4f}")
+                except Exception as e:
+                    logger.error(f"Error updating active trade for {symbol}: {e}")
+            else:
+                rec_payload = {
+                    'company_id': cid,
+                    'symbol': symbol,
+                    'direction': 'sell',
+                    'entry_price': entry_price,
+                    'tp1': tp1_price,
+                    'tp2': tp2_price,
+                    'sl': sl_price,
+                    'timeframe': '1d',
+                    'status': 'active',
+                    'ml_probability': round(prob, 4),
+                    'recommended_at': datetime.now(timezone.utc).isoformat()
+                }
+                try:
+                    sb.table("recommended_trades").insert(rec_payload).execute()
+                    new_recs_count += 1
+                    logger.info(f"✅ Created new sell recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
+                except Exception as e:
+                    logger.error(f"Error inserting new sell recommendation for {symbol}: {e}")
+
+        # Condition 3: Probability between 0.50 and 0.65 -> Update signal_stats for BUY
         elif 0.50 <= prob <= 0.65:
             try:
                 existing = sb.table("signal_stats").select("id, total_signals").eq("company_id", cid).eq("timeframe", "1d").eq("signal_type", "buy").execute().data
@@ -341,13 +390,33 @@ def generate_daily_recommendations():
                         "last_updated": datetime.now(timezone.utc).isoformat()
                     }).execute()
                 stats_count += 1
-                logger.info(f"📊 Recorded signal in signal_stats for {symbol}: prob={prob:.4f}")
+                logger.info(f"📊 Recorded buy signal in signal_stats for {symbol}: prob={prob:.4f}")
             except Exception as e:
                 logger.error(f"Error updating signal_stats for {symbol}: {e}")
 
-        # Condition 3: Probability < 0.50 -> Ignore completely
-        else:
-            pass
+        # Condition 4: Probability between 0.35 and 0.50 -> Update signal_stats for SELL
+        elif 0.35 <= prob < 0.50:
+            try:
+                existing = sb.table("signal_stats").select("id, total_signals").eq("company_id", cid).eq("timeframe", "1d").eq("signal_type", "sell").execute().data
+                if existing:
+                    new_total = (existing[0].get("total_signals") or 0) + 1
+                    sb.table("signal_stats").update({
+                        "total_signals": new_total,
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }).eq("id", existing[0]["id"]).execute()
+                else:
+                    sb.table("signal_stats").insert({
+                        "company_id": cid,
+                        "symbol": symbol,
+                        "timeframe": "1d",
+                        "signal_type": "sell",
+                        "total_signals": 1,
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }).execute()
+                stats_count += 1
+                logger.info(f"📊 Recorded sell signal in signal_stats for {symbol}: prob={prob:.4f}")
+            except Exception as e:
+                logger.error(f"Error updating signal_stats for {symbol}: {e}")
 
     logger.info(f"=== Process Complete: {new_recs_count} new recommendations created, {updated_recs_count} existing active updated, {stats_count} stocks updated in signal_stats ===")
 
