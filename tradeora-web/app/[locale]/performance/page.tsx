@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ActiveTradesModal } from '@/components/performance/ActiveTradesModal';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -65,10 +66,27 @@ export default function PerformancePage() {
   // Platform states
   const [platformTrades, setPlatformTrades] = useState<RecommendedTrade[]>([]);
   const [platformStats, setPlatformStats] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Personal states
   const [personalTrades, setPersonalTrades] = useState<UserTrade[]>([]);
   const [personalStats, setPersonalStats] = useState<any>(null);
+
+  const activeTradesForModal = useMemo(() => {
+    return platformTrades
+      .filter(t => t.status === 'active')
+      .map(t => ({
+        id: t.id,
+        symbol: t.symbol,
+        trade_type: (t.direction === 'BUY' ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
+        entry_price: t.entry_price,
+        current_price: t.entry_price,
+        target_price_1: t.tp1,
+        target_price_2: t.tp2,
+        stop_loss: t.sl,
+        timeframe: '1d'
+      }));
+  }, [platformTrades]);
 
   useEffect(() => {
     setLoading(true);
@@ -263,14 +281,20 @@ export default function PerformancePage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants}>
-                    <Card className="p-5 h-full flex flex-col justify-between">
+                    <Card 
+                      onClick={() => setIsModalOpen(true)}
+                      className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-accent-blue/40 transition-all group"
+                    >
                       <div className="flex items-center justify-between text-zinc-400 mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider">Total Signals</span>
-                        <Activity className="w-5 h-5 text-purple-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider group-hover:text-accent-blue transition-colors">Total Signals (Open/Closed)</span>
+                        <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
                       </div>
                       <div>
-                        <div className="text-3xl font-black text-white font-mono">
-                          {platformStats.total_trades}
+                        <div className="text-3xl font-black text-white font-mono flex items-baseline justify-between">
+                          <span>{platformStats.total_trades}</span>
+                          <span className="text-xs font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded border border-accent-blue/20">
+                            {activeTradesForModal.length} Active ➔
+                          </span>
                         </div>
                         <p className="text-[11px] text-zinc-500 mt-1 font-medium flex gap-3">
                           <span className="text-up-green">W: {platformStats.winning_trades}</span>
@@ -577,6 +601,12 @@ export default function PerformancePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ActiveTradesModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        trades={activeTradesForModal}
+      />
     </div>
   );
 }

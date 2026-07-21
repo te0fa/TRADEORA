@@ -55,26 +55,31 @@ export function StockHeader({ company }: StockHeaderProps) {
   const getMarketStatusLabel = () => {
     if (!company.priceRecord) return null;
     
+    // Calculate freshness age in minutes
+    const fetchedTime = company.priceRecord.fetched_at ? new Date(company.priceRecord.fetched_at) : null;
+    const now = new Date();
+    const ageMins = fetchedTime ? Math.max(0, Math.floor((now.getTime() - fetchedTime.getTime()) / (1000 * 60))) : 0;
+    
+    const freshnessText = ageMins === 0 
+      ? (locale === 'ar' ? 'تحديث لحظي' : 'Live Just Now')
+      : (locale === 'ar' ? `منذ ${ageMins} دقيقة` : `${ageMins}m ago`);
+
     // Check market hours (Egypt local time)
     const cairoTime = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
     const d = new Date(cairoTime);
-    const day = d.getDay(); // 0=Sunday, 1=Monday, ..., 5=Friday, 6=Saturday
+    const day = d.getDay();
     const hour = d.getHours();
     
-    // EGX is closed Friday (5) and Saturday (6)
     const isWeekend = [5, 6].includes(day);
-    
     const totalMinutes = hour * 60 + d.getMinutes();
-    const marketOpenMinutes = 10 * 60; // 10:00
-    const marketCloseMinutes = 14 * 60 + 30; // 14:30 (870 minutes)
-    const isOpen = totalMinutes >= marketOpenMinutes && totalMinutes <= marketCloseMinutes;
+    const isOpen = totalMinutes >= (10 * 60) && totalMinutes <= (14 * 60 + 30);
     const isMarketHours = !isWeekend && isOpen;
     
     if (isMarketHours) {
       return (
         <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1 font-bold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          {tGlobal('sources.' + company.priceRecord.source)}
+          ⏱️ {freshnessText} ({tGlobal('sources.' + company.priceRecord.source)})
         </span>
       );
     } else {
@@ -89,8 +94,8 @@ export function StockHeader({ company }: StockHeaderProps) {
       }
       
       const labelText = locale === 'ar'
-        ? `إغلاق ${dayName}`
-        : `Closed (${dayName})`;
+        ? `إغلاق ${dayName} (⏱️ ${freshnessText})`
+        : `Closed (${dayName} - ⏱️ ${freshnessText})`;
         
       return (
         <span className="text-[10px] text-text-secondary bg-white/5 px-2 py-0.5 rounded border border-white/5 flex items-center gap-1 font-semibold">
@@ -125,6 +130,9 @@ export function StockHeader({ company }: StockHeaderProps) {
           {company.fundamentals?.dividend_yield && company.fundamentals.dividend_yield > 0 && (
             <Badge variant="glass" className="text-[11px] font-bold text-accent-gold bg-accent-gold/10 border-accent-gold/20">
               🎁 {locale === 'ar' ? 'عائد التوزيع: ' : 'Div Yield: '}{company.fundamentals.dividend_yield}%
+              {company.fundamentals.last_dividend_amount && (
+                <span className="mr-1 font-mono">({company.fundamentals.last_dividend_amount} EGP)</span>
+              )}
             </Badge>
           )}
           {company.is_shariah_compliant && (

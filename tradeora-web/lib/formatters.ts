@@ -16,9 +16,6 @@ export function formatPrice(price: number | null | undefined, locale: string): s
   }
   
   const formatted = price.toFixed(2);
-  if (locale === 'ar') {
-    return `${toEasternArabic(formatted)} ج.م`;
-  }
   return `${formatted} EGP`;
 }
 
@@ -48,13 +45,7 @@ function formatChangeHelper(value: number): string {
  */
 export function formatChange(change: number | null | undefined, locale: string): string {
   if (change === null || change === undefined) return '-';
-  
-  const formatted = formatChangeHelper(change);
-  
-  if (locale === 'ar') {
-    return toEasternArabic(formatted);
-  }
-  return formatted;
+  return formatChangeHelper(change);
 }
 
 /**
@@ -62,13 +53,7 @@ export function formatChange(change: number | null | undefined, locale: string):
  */
 export function formatChangePercent(percent: number | null | undefined, locale: string): string {
   if (percent === null || percent === undefined) return '-';
-  
-  const formatted = formatChangeHelper(percent) + '%';
-  
-  if (locale === 'ar') {
-    return toEasternArabic(formatted);
-  }
-  return formatted;
+  return formatChangeHelper(percent) + '%';
 }
 
 /**
