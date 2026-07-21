@@ -229,6 +229,11 @@ def run_fundamentals_import():
             upside = round(((fair_val - float(close_p)) / float(close_p)) * 100, 2)
             fair_val_count += 1
 
+        # Calculate profit margin
+        profit_margin = None
+        if rev and net_inc and float(rev) > 0:
+            profit_margin = round((float(net_inc) / float(rev)) * 100, 2)
+
         payloads.append({
             "company_id": cid,
             "pe_ratio": round(float(pe), 2) if pe else None,
@@ -237,6 +242,7 @@ def run_fundamentals_import():
             "book_value_ps": round(float(bvps), 2) if bvps else None,
             "roe": round(float(roe), 2) if roe else None,
             "roa": round(float(roa), 2) if roa else None,
+            "profit_margin": profit_margin,
             "revenue": round(float(rev), 2) if rev else None,
             "net_income": round(float(net_inc), 2) if net_inc else None,
             "market_cap": float(mcap) if mcap else None,

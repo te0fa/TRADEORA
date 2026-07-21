@@ -493,7 +493,7 @@ export function detectSRLevels(
       const distance = (price - currentPrice) / currentPrice * 100;
       const baseLevel: SRLevel = {
         price,
-        type:     data.type,
+        type:     price > currentPrice ? 'resistance' : 'support',
         strength: data.count,
         distance
       };

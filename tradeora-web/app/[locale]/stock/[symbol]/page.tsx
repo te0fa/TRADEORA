@@ -74,7 +74,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
   const formatNum = (num: number | null | undefined) => {
     if (num === null || num === undefined) return '-';
-    return num.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US');
+    return num.toLocaleString('en-US');
   };
 
   if (loading) {

@@ -74,7 +74,7 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
 
   // Format helper for numbers
   const formatNum = (num: number) => {
-    return locale === 'ar' ? toEasternArabic(num) : num.toString();
+    return num.toString();
   };
 
   // Fetch Live Index Consensus for EGX30
@@ -88,10 +88,10 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-      {/* EGX30 Live Index Consensus Card */}
-      <div className="glass-card p-4 rounded-xl flex items-center justify-between border-accent-blue/20 bg-accent-blue/[0.03]">
-        <div className="flex flex-col">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Index Consensus Card */}
+      <div className="glass-panel p-6 rounded-2xl flex items-center justify-between">
+        <div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold text-accent-blue">مؤشر EGX 30 (إجماع لايف)</span>
             <span className="text-[10px] bg-accent-blue/20 text-accent-blue px-1.5 py-0.5 rounded font-mono font-bold">
@@ -100,7 +100,7 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
           </div>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-xl font-mono font-bold text-text-primary">
-              {egx30?.value ? egx30.value.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US') : '53,758'}
+              {egx30?.value ? egx30.value.toLocaleString('en-US') : '53,758'}
             </span>
             <span className={`text-xs font-mono font-bold ${(egx30?.change ?? 0) >= 0 ? 'text-up-green' : 'text-down-red'}`} dir="ltr">
               {(egx30?.change ?? 0) >= 0 ? '+' : ''}{egx30?.change ?? 1.19}%

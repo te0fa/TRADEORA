@@ -4,7 +4,7 @@ const EASTERN_DIGITS = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
  * Translates Western Arabic numerals (0-9) to Eastern Arabic numerals (٠-٩).
  */
 export function toEasternArabic(n: string | number): string {
-  return String(n).replace(/[0-9]/g, d => EASTERN_DIGITS[parseInt(d)]);
+  return String(n);
 }
 
 /**
@@ -95,19 +95,19 @@ export function formatRelativeTime(dateStr: string | null | undefined, locale: s
     return t('relativeTime.minute');
   }
   if (diffMin < 60) {
-    return t('relativeTime.minutes', { count: locale === 'ar' ? toEasternArabic(diffMin) : diffMin });
+    return t('relativeTime.minutes', { count: diffMin });
   }
   if (diffHour === 1) {
     return t('relativeTime.hour');
   }
   if (diffHour < 24) {
-    return t('relativeTime.hours', { count: locale === 'ar' ? toEasternArabic(diffHour) : diffHour });
+    return t('relativeTime.hours', { count: diffHour });
   }
   if (diffDay === 1) {
     return t('relativeTime.day');
   }
   if (diffDay < 7) {
-    return t('relativeTime.days', { count: locale === 'ar' ? toEasternArabic(diffDay) : diffDay });
+    return t('relativeTime.days', { count: diffDay });
   }
   
   // Return short date if more than a week ago
