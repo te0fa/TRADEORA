@@ -112,6 +112,21 @@ export function StockHeader({ company }: StockHeaderProps) {
           <span className="text-sm font-mono font-bold bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg text-accent-blue">
             {symbol}
           </span>
+          {company.fundamentals?.fair_value && (
+            <Badge variant="glass" className={`text-[11px] font-bold ${company.fundamentals.upside_potential && company.fundamentals.upside_potential > 0 ? 'text-up-green bg-up-green/10 border-up-green/20' : 'text-text-secondary bg-white/5 border-white/10'}`}>
+              🎯 {locale === 'ar' ? 'السعر العادل: ' : 'Fair Value: '}{company.fundamentals.fair_value} EGP
+              {company.fundamentals.upside_potential !== null && company.fundamentals.upside_potential !== undefined && (
+                <span className="mr-1 ml-1 font-sans font-bold">
+                  ({company.fundamentals.upside_potential > 0 ? '+' : ''}{company.fundamentals.upside_potential}%)
+                </span>
+              )}
+            </Badge>
+          )}
+          {company.fundamentals?.dividend_yield && company.fundamentals.dividend_yield > 0 && (
+            <Badge variant="glass" className="text-[11px] font-bold text-accent-gold bg-accent-gold/10 border-accent-gold/20">
+              🎁 {locale === 'ar' ? 'عائد التوزيع: ' : 'Div Yield: '}{company.fundamentals.dividend_yield}%
+            </Badge>
+          )}
           {company.is_shariah_compliant && (
             <Badge variant="glass" className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border-emerald-500/20">
               {t('shariahCompliant')}

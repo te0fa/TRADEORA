@@ -458,25 +458,48 @@ def build_dataset(timeframe='1d',
 
     # First Pass: Load all candles for all companies and store them in memory
     all_candles_by_co = {}
-    for co in companies:
-        cid, sym = co['id'], co['symbol']
-        candles = []
+    if timeframe == '1d':
+        print("جلب أسعار السوق لجميع الشركات دفعة واحدة...", flush=True)
+        all_prices = []
+        page_size = 1000
+        start = 0
+        while True:
+            res = sb.table('market_prices')\
+                .select('company_id,open_price,high_price,low_price,close_price,volume,price_date')\
+                .range(start, start + page_size - 1)\
+                .order('id').execute()
+            data = res.data or []
+            if not data:
+                break
+            all_prices.extend(data)
+            if len(data) < page_size:
+                break
+            start += page_size
 
-        if timeframe == '1d':
-            rows = sb.table('market_prices')\
-                .select('open_price,high_price,'
-                        'low_price,close_price,volume,price_date')\
-                .eq('company_id', cid)\
-                .order('price_date').execute().data or []
-            candles = [{
-                'open':  r['open_price']  or r['close_price'],
-                'high':  r['high_price']  or r['close_price'],
-                'low':   r['low_price']   or r['close_price'],
-                'close': r['close_price'],
-                'volume':r['volume'] or 0,
+        prices_by_co = {}
+        for r in all_prices:
+            cid = r['company_id']
+            if not r.get('close_price'):
+                continue
+            prices_by_co.setdefault(cid, []).append({
+                'open':  float(r['open_price'] or r['close_price']),
+                'high':  float(r['high_price'] or r['close_price']),
+                'low':   float(r['low_price'] or r['close_price']),
+                'close': float(r['close_price']),
+                'volume':float(r['volume'] or 0),
                 'time':  r['price_date']
-            } for r in rows if r['close_price']]
-        else:
+            })
+
+        for co in companies:
+            cid = co['id']
+            candles = prices_by_co.get(cid, [])
+            if len(candles) >= 60:
+                candles.sort(key=lambda x: str(x['time']))
+                all_candles_by_co[cid] = candles
+    else:
+        for co in companies:
+            cid, sym = co['id'], co['symbol']
+            candles = []
             src = f'tradingview_{timeframe}'
             parquet_path = Path('data/historical_exports') / f"export_{src}.parquet"
             if parquet_path.exists():
@@ -510,8 +533,8 @@ def build_dataset(timeframe='1d',
                     'time':  r['snapshot_time']
                 } for r in rows if r['price']]
 
-        if len(candles) >= 60:
-            all_candles_by_co[cid] = candles
+            if len(candles) >= 60:
+                all_candles_by_co[cid] = candles
 
     # Fetch all news
     print("جلب أخبار الشركات والاقتصاد الكلي من قاعدة البيانات...", flush=True)
@@ -581,27 +604,13 @@ def build_dataset(timeframe='1d',
                 f['stoch_rsi'], f['vol_spike'],
                 f['dist_ath'], f['day_of_week'],
                 f['market_regime'],
-                f['news_sentiment_score'],
-                f['sector_sentiment_score'],
-                f['macro_fx_score'],
-                f['macro_rate_score'],
-                f['macro_geo_score'],
-                f['stock_sentiment_sensitivity'],
-                f['sector_relative_volume'],
             ]
-            if timeframe == '1d':
-                fund = fundamentals_lookup.get(cid, {})
-                pe = float(fund.get('pe_ratio') or 0.0)
-                eps = float(fund.get('eps') or 0.0)
-                de = float(fund.get('debt_equity') or 0.0)
-                pm = float(fund.get('profit_margin') or 0.0)
-                rev_g = float(fund.get('revenue_growth') or 0.0)
-                earn_g = float(fund.get('earnings_growth') or 0.0)
-                div_y = float(fund.get('dividend_yield') or 0.0)
-                fv = float(fund.get('fair_value') or 0.0)
-                fv_ratio = closes[i] / fv if fv > 0 else 1.0
-                
-                feat_row.extend([pe, eps, de, pm, rev_g, earn_g, div_y, fv_ratio])
+            # Extra features (16-30) commented out to use only 15 core features
+            # f['news_sentiment_score'], f['sector_sentiment_score'], f['macro_fx_score'],
+            # f['macro_rate_score'], f['macro_geo_score'], f['stock_sentiment_sensitivity'],
+            # f['sector_relative_volume']
+            # + fundamentals (pe, eps, de, pm, rev_g, earn_g, div_y, fv_ratio)
+
                 
             X_rows.append(feat_row)
             y_rows.append(label)

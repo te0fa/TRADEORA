@@ -160,6 +160,15 @@ def main():
             except Exception as e:
                 logger.warning(f"Fundamentals update failed (non-fatal): {e}")
 
+        # 6. Daily Machine Learning Predictions & Trade Generation
+        try:
+            logger.info("Running daily ML predictions for all stocks...")
+            from predict import predict_all_companies
+            predict_all_companies(timeframe='1d')
+            logger.info("Daily ML predictions and trade recommendation generation completed.")
+        except Exception as e:
+            logger.warning(f"Daily ML predictions failed (non-fatal): {e}")
+
         logger.info("Tradeora EGX Importer Pipeline Completed Successfully.")
         
     except Exception as e:

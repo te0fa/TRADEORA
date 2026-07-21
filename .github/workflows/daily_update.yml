@@ -33,6 +33,24 @@ jobs:
       run: |
         python main.py --source tradingview
 
+    - name: Sync Fundamentals & Recalculate Fair Value / Dividends
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python services/fundamentals_importer.py
+
+    - name: Generate Daily Trade Recommendations
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python generate_daily_recommendations.py
+
     - name: Validate Data Quality
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

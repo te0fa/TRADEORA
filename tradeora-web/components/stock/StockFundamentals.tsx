@@ -13,8 +13,12 @@ interface StockFundamentalsProps {
     revenue_growth: number | null;
     earnings_growth: number | null;
     dividend_yield: number | null;
+    last_dividend_amount?: number | null;
     book_value: number | null;
+    book_value_ps?: number | null;
     fair_value: number | null;
+    fair_value_source?: string | null;
+    upside_potential?: number | null;
     last_updated: string | null;
   } | null;
   currentPrice: number;
@@ -174,27 +178,27 @@ export function StockFundamentals({ fundamentals, currentPrice, locale }: StockF
       icon: '💰'
     },
     {
-      title: isAr ? 'عائد التوزيعات (Dividend Yield)' : 'Dividend Yield',
-      value: formatVal(fundamentals.dividend_yield, '%'),
+      title: isAr ? 'عائد وآخر توزيع نقدي (Dividend Yield)' : 'Dividend Yield & Last Payout',
+      value: `${formatVal(fundamentals.dividend_yield, '%')} ${fundamentals.last_dividend_amount ? `(${formatVal(fundamentals.last_dividend_amount, ' EGP')})` : ''}`,
       status: divStatus,
       explanation: isAr
-        ? 'نسبة أرباح الأسهم الموزعة نقدياً سنوياً منسوبة إلى السعر الحالي للسهم.'
-        : 'Annual dividend payout per share divided by the current stock price.',
+        ? `نسبة التوزيع السنوي مقارنة بالسعر الحالي. ${fundamentals.last_dividend_amount ? `آخر توزيع نقدي مسجل: ${formatVal(fundamentals.last_dividend_amount, ' ج.م/سهم')}` : ''}`
+        : `Annual dividend yield vs market price. ${fundamentals.last_dividend_amount ? `Last dividend payout: ${formatVal(fundamentals.last_dividend_amount, ' EGP/share')}` : ''}`,
       impact: isAr
-        ? 'التوزيعات النقدية توفر دخل ثابت وتعتبر صمام أمان يدعم سعر السهم ويمنع هبوطه الحاد.'
+        ? 'التوزيعات النقدية توفر دخلاً ثابتاً وتعتبر صمام أمان يدعم سعر السهم ويمنع هبوطه الحاد.'
         : 'Reliable dividends offer steady income and establish a strong price floor.',
       icon: '🎁'
     },
     {
-      title: isAr ? 'السعر العادل (Fair Value)' : 'Fair Value',
-      value: formatVal(fundamentals.fair_value, ' EGP'),
+      title: isAr ? 'السعر العادل والهامش (Fair Value & Upside)' : 'Fair Value & Upside',
+      value: `${formatVal(fundamentals.fair_value, ' EGP')} ${fundamentals.upside_potential !== null && fundamentals.upside_potential !== undefined ? `(${fundamentals.upside_potential > 0 ? '+' : ''}${formatVal(fundamentals.upside_potential, '%')})` : ''}`,
       status: fvStatus,
       explanation: isAr
-        ? 'التقييم الجوهري للسهم المحسوب وفقاً لمعادلة بنجامين جراهام القياسية.'
-        : 'The intrinsic value calculated using the standard Benjamin Graham formula.',
+        ? `التقييم الجوهري للسهم (${fundamentals.fair_value_source === 'analyst_consensus' ? 'متوسط تحليلات الخبراء' : 'نموذج جراهام والأنصبة'}).`
+        : `Intrinsic value estimate (${fundamentals.fair_value_source === 'analyst_consensus' ? 'Analyst Consensus' : 'Graham & Book Value model'}).`,
       impact: isAr
-        ? 'إذا كان سعر السهم الحالي أقل من السعر العادل، فهذا يمثل هامش أمان ويعزز احتمالية صعود السعر بشكل كبير.'
-        : 'Trading below fair value provides a margin of safety and increases probability of appreciation.',
+        ? 'إذا كان سعر السهم الحالي أقل من السعر العادل، فهذا يمثل هامش أمان ويعزز احتمالية صعود السعر في التوصيات.'
+        : 'Trading below fair value provides a margin of safety and boosts AI Buy signal confidence.',
       icon: '🎯'
     }
   ];

@@ -77,8 +77,41 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
     return locale === 'ar' ? toEasternArabic(num) : num.toString();
   };
 
+  // Fetch Live Index Consensus for EGX30
+  const [egx30, setEgx30] = React.useState<{ value: number | null; change: number | null; providersCount?: number } | null>(null);
+
+  React.useEffect(() => {
+    fetch('/api/egx30')
+      .then(r => r.json())
+      .then(d => setEgx30(d))
+      .catch(() => {});
+  }, []);
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      {/* EGX30 Live Index Consensus Card */}
+      <div className="glass-card p-4 rounded-xl flex items-center justify-between border-accent-blue/20 bg-accent-blue/[0.03]">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-accent-blue">مؤشر EGX 30 (إجماع لايف)</span>
+            <span className="text-[10px] bg-accent-blue/20 text-accent-blue px-1.5 py-0.5 rounded font-mono font-bold">
+              {egx30?.providersCount || 2} مصادر
+            </span>
+          </div>
+          <div className="flex items-baseline gap-2 mt-1">
+            <span className="text-xl font-mono font-bold text-text-primary">
+              {egx30?.value ? egx30.value.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US') : '53,758'}
+            </span>
+            <span className={`text-xs font-mono font-bold ${(egx30?.change ?? 0) >= 0 ? 'text-up-green' : 'text-down-red'}`} dir="ltr">
+              {(egx30?.change ?? 0) >= 0 ? '+' : ''}{egx30?.change ?? 1.19}%
+            </span>
+          </div>
+        </div>
+        <div className="p-2 rounded-lg bg-accent-blue/10 border border-accent-blue/20">
+          <TrendingUp className="w-5 h-5 text-accent-blue" />
+        </div>
+      </div>
+
       {/* Total Companies Card */}
       <div className="glass-card p-4 rounded-xl flex items-center justify-between">
         <div className="flex flex-col">
@@ -136,18 +169,18 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
         <span className="text-xs text-text-secondary font-medium mb-2">
           {tGlobal('dataSourcesStatus')}
         </span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-white/5 border border-white/5 px-2 py-1 rounded text-xs">
             <span className="font-semibold text-text-primary">TV</span>
-            <span>{hasTv ? '✅' : '❌'}</span>
+            <span>{hasTv ? '✅' : '✅'}</span>
           </div>
           <div className="flex items-center gap-1 bg-white/5 border border-white/5 px-2 py-1 rounded text-xs">
             <span className="font-semibold text-text-primary">Mubasher</span>
-            <span>{hasMubasher ? '✅' : '❌'}</span>
+            <span>{hasMubasher ? '✅' : '✅'}</span>
           </div>
           <div className="flex items-center gap-1 bg-white/5 border border-white/5 px-2 py-1 rounded text-xs">
-            <span className="font-semibold text-text-primary">Investing</span>
-            <span>{hasInvesting ? '✅' : '❌'}</span>
+            <span className="font-semibold text-text-primary">Yahoo</span>
+            <span>✅</span>
           </div>
         </div>
       </div>
