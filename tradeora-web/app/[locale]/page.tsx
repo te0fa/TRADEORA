@@ -86,14 +86,19 @@ export default function DashboardPage({ params }: Props) {
     fetch('/api/egx70').then(r => r.json()).then(setEgx70).catch(console.error);
     fetch('/api/egx33').then(r => r.json()).then(setEgx33).catch(console.error);
 
-    const intervalId = setInterval(() => {
+    // Fast real-time index price polling (every 10 seconds)
+    const indexIntervalId = setInterval(() => {
+      fetch('/api/egx30').then(r => r.json()).then(setEgx30).catch(console.error);
+      fetch('/api/egx70').then(r => r.json()).then(setEgx70).catch(console.error);
+      fetch('/api/egx33').then(r => r.json()).then(setEgx33).catch(console.error);
+    }, 10000);
+
+    // Heavy database data polling (every 5 minutes)
+    const dbIntervalId = setInterval(() => {
       fetchMarketOverview();
       fetchTopSignals();
       fetchSectors();
       fetchMarketSummary();
-      fetch('/api/egx30').then(r => r.json()).then(setEgx30).catch(console.error);
-      fetch('/api/egx70').then(r => r.json()).then(setEgx70).catch(console.error);
-      fetch('/api/egx33').then(r => r.json()).then(setEgx33).catch(console.error);
     }, 300000);
 
     // Animate stats
@@ -115,7 +120,8 @@ export default function DashboardPage({ params }: Props) {
     }, stepTime);
 
     return () => {
-      clearInterval(intervalId);
+      clearInterval(indexIntervalId);
+      clearInterval(dbIntervalId);
       clearInterval(animTimer);
     };
   }, []);

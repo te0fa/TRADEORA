@@ -1,13 +1,35 @@
 import { NextResponse } from 'next/server';
 
-export const revalidate = 30; // 30 seconds cache for live index
+export const revalidate = 5; // 5 seconds cache for real-time live indexing
 
 export async function GET() {
   const providers: Record<string, { value: number; change: number }> = {};
   const values: number[] = [];
   const changes: number[] = [];
 
-  // 1. Fetch TradingView Live Index
+  // 1. Fetch Mubasher Egypt summary page directly
+  try {
+    const mubRes = await fetch('https://www.mubasher.info/markets/EGX', {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      next: { revalidate: 5 }
+    });
+    if (mubRes.ok) {
+      const html = await mubRes.text();
+      const text = html.replace(/<[^>]*>/g, '\n').replace(/\s+/g, ' ');
+      const egx70Match = text.match(/مؤشر إيجى إكس 70 متساوي الأوزان\s*([\d,.]+)\s*([\d,.+\-]+)\s*([\d,.+\-]+)%/);
+      if (egx70Match) {
+        const val = parseFloat(egx70Match[1].replace(/,/g, ''));
+        const chg = parseFloat(egx70Match[3]);
+        providers.mubasher = { value: val, change: chg };
+        values.push(val);
+        changes.push(chg);
+      }
+    }
+  } catch (e) {
+    console.warn('Mubasher EGX70 fetch failed:', e);
+  }
+
+  // 2. Fetch TradingView Live Index
   try {
     const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
       method: 'POST',
@@ -16,7 +38,7 @@ export async function GET() {
         symbols: { tickers: ['EGX:EGX70'] },
         columns: ['name', 'close', 'change']
       }),
-      next: { revalidate: 30 }
+      next: { revalidate: 5 }
     });
     if (tvRes.ok) {
       const tvData = await tvRes.json();
@@ -25,21 +47,23 @@ export async function GET() {
         const val = Number(row[1]);
         const chg = Number(row[2] ?? 0);
         providers.tradingview = { value: parseFloat(val.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        values.push(val);
-        changes.push(chg);
+        if (values.length === 0) {
+          values.push(val);
+          changes.push(chg);
+        }
       }
     }
   } catch (e) {
     console.warn('TradingView EGX70 fetch failed:', e);
   }
 
-  // 2. Fetch Yahoo Finance Live Index
+  // 3. Fetch Yahoo Finance Live Index
   const yahooTickers = ['^EGX70EWI.CA', '^EGX70.CA'];
   for (const ticker of yahooTickers) {
-    if (providers.yahoo) break;
+    if (providers.yahoo || providers.mubasher) break; // Skip if we already have Mubasher
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 30 } });
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 5 } });
       if (!res.ok) continue;
       const data = await res.json();
       const result = data?.chart?.result?.[0];
@@ -58,8 +82,10 @@ export async function GET() {
       if (latest !== null && prev !== null && prev > 0) {
         const chg = ((latest - prev) / prev) * 100;
         providers.yahoo = { value: parseFloat(latest.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        values.push(latest);
-        changes.push(chg);
+        if (values.length === 0) {
+          values.push(latest);
+          changes.push(chg);
+        }
       }
     } catch { continue; }
   }
