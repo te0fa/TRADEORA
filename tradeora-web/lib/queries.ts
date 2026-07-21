@@ -198,6 +198,44 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     }
   }
 
+  // Check if there is a newer live intraday snapshot point
+  try {
+    const { data: latestSnap } = await supabase
+      .from('intraday_snapshots')
+      .select('*')
+      .eq('company_id', company.id)
+      .order('snapshot_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestSnap && latestSnap.price) {
+      const snapDate = new Date(latestSnap.snapshot_time);
+      const priceDate = priceRecord?.fetched_at ? new Date(priceRecord.fetched_at) : new Date(0);
+
+      if (snapDate >= priceDate) {
+        priceRecord = {
+          id: latestSnap.id,
+          company_id: latestSnap.company_id,
+          open_price: latestSnap.open_price != null ? Number(latestSnap.open_price) : priceRecord?.open_price ?? null,
+          high_price: latestSnap.high_price != null ? Number(latestSnap.high_price) : priceRecord?.high_price ?? null,
+          low_price: latestSnap.low_price != null ? Number(latestSnap.low_price) : priceRecord?.low_price ?? null,
+          close_price: Number(latestSnap.price),
+          change_value: priceRecord?.change_value ?? null,
+          change_percent: priceRecord?.change_percent ?? null,
+          volume: latestSnap.volume != null ? Number(latestSnap.volume) : priceRecord?.volume ?? null,
+          source: latestSnap.source || 'live_intraday',
+          price_date: latestSnap.snapshot_time.split('T')[0],
+          data_quality_flag: 'live_intraday',
+          fetched_at: latestSnap.snapshot_time
+        };
+        labelAr = 'مباشر لايف';
+        labelEn = 'Realtime Live';
+      }
+    }
+  } catch (err) {
+    // Keep existing priceRecord if intraday lookup fails
+  }
+
   return {
     id: company.id,
     symbol: company.symbol,
