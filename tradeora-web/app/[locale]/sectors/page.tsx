@@ -9,6 +9,7 @@ import {
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { MacroNewsPanel } from '@/components/dashboard/MacroNewsPanel';
 
 export default function SectorsPage() {
   const { locale } = useParams();
@@ -133,6 +134,10 @@ export default function SectorsPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <MacroNewsPanel />
       </motion.div>
 
       {/* Sector Cards */}

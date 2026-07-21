@@ -7,6 +7,7 @@ import { StockHeader } from '@/components/stock/StockHeader';
 import { PriceChart } from '@/components/stock/PriceChart';
 import { DataSourcesPanel } from '@/components/stock/DataSourcesPanel';
 import { StockFundamentals } from '@/components/stock/StockFundamentals';
+import { StockNewsPanel } from '@/components/stock/StockNewsPanel';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -153,6 +154,10 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           locale={locale} 
           fundamentals={company.fundamentals}
         />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <StockNewsPanel companyId={company.id} />
       </motion.div>
 
       <motion.div variants={itemVariants}>

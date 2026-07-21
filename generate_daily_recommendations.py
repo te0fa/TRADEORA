@@ -250,6 +250,19 @@ def generate_daily_recommendations():
         if div_yield is not None and div_yield >= 7.0:
             prob += 0.05
 
+        # 3. AI News & Geopolitical Impact Adjustment
+        try:
+            news_res = sb.table("company_news").select("impact_score").eq("company_id", cid).order("published_at", desc=True).limit(5).execute()
+            news_items = news_res.data or []
+            if news_items:
+                avg_impact = sum(float(n["impact_score"] or 0) for n in news_items) / len(news_items)
+                if avg_impact >= 0.25:
+                    prob += 0.07  # Positive contract/earnings news boost
+                elif avg_impact <= -0.25:
+                    prob -= 0.09  # Negative news penalty
+        except Exception:
+            pass
+
         prob = min(max(prob, 0.0), 0.99) # Clip between 0 and 0.99
 
         # ATR Validation
