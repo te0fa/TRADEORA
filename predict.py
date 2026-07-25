@@ -46,6 +46,114 @@ def calc_atr_14(candles: list) -> float:
     atr = sum(recent_trs) / len(recent_trs) if recent_trs else closes[-1] * 0.02
     return max(atr, closes[-1] * 0.005)
 
+def calc_fibonacci_levels(candles: list) -> dict:
+    """Calculates Fibonacci Retracement & Extension levels from recent swing high & low."""
+    if len(candles) < 10:
+        return {}
+    highs = [float(c['high']) for c in candles[-60:]]
+    lows = [float(c['low']) for c in candles[-60:]]
+    swing_high = max(highs)
+    swing_low = min(lows)
+    diff = swing_high - swing_low
+    if diff == 0:
+        return {}
+    return {
+        'fib_236': round(swing_high - 0.236 * diff, 2),
+        'fib_382': round(swing_high - 0.382 * diff, 2),
+        'fib_500': round(swing_high - 0.500 * diff, 2),
+        'fib_618': round(swing_high - 0.618 * diff, 2),
+        'fib_786': round(swing_high - 0.786 * diff, 2),
+        'swing_high': swing_high,
+        'swing_low': swing_low
+    }
+
+def calc_supertrend(candles: list, period=10, multiplier=3.0) -> dict:
+    """Calculates SuperTrend value and direction (bullish / bearish)."""
+    if len(candles) < period + 1:
+        return {'direction': 'neutral', 'value': 0.0}
+    atr = calc_atr_14(candles)
+    last_close = float(candles[-1]['close'])
+    last_high = float(candles[-1]['high'])
+    last_low = float(candles[-1]['low'])
+    hl2 = (last_high + last_low) / 2.0
+    upper_band = hl2 + (multiplier * atr)
+    lower_band = hl2 - (multiplier * atr)
+    is_bullish = last_close > lower_band
+    return {
+        'direction': 'bullish' if is_bullish else 'bearish',
+        'value': round(lower_band if is_bullish else upper_band, 2)
+    }
+
+def calc_ichimoku(candles: list) -> dict:
+    """Calculates Ichimoku Kinko Hyo Tenkan-sen and Kijun-sen."""
+    if len(candles) < 26:
+        return {'tenkan': 0.0, 'kijun': 0.0, 'cloud_status': 'neutral'}
+    c9 = candles[-9:]
+    tenkan = (max(float(c['high']) for c in c9) + min(float(c['low']) for c in c9)) / 2.0
+    c26 = candles[-26:]
+    kijun = (max(float(c['high']) for c in c26) + min(float(c['low']) for c in c26)) / 2.0
+    last_close = float(candles[-1]['close'])
+    cloud_status = 'above_cloud' if last_close > tenkan and tenkan > kijun else ('below_cloud' if last_close < kijun else 'in_cloud')
+    return {
+        'tenkan': round(tenkan, 2),
+        'kijun': round(kijun, 2),
+        'cloud_status': cloud_status
+    }
+
+def detect_candlestick_patterns(candles: list) -> list:
+    """Detects key reversal candlestick patterns (Bullish Engulfing, Hammer, Morning Star)."""
+    if len(candles) < 3:
+        return []
+    patterns = []
+    c1, c2, c3 = candles[-3], candles[-2], candles[-1]
+    o1, h1, l1, cl1 = float(c1['open']), float(c1['high']), float(c1['low']), float(c1['close'])
+    o2, h2, l2, cl2 = float(c2['open']), float(c2['high']), float(c2['low']), float(c2['close'])
+    o3, h3, l3, cl3 = float(c3['open']), float(c3['high']), float(c3['low']), float(c3['close'])
+    
+    body3 = abs(cl3 - o3)
+    lower_wick3 = min(o3, cl3) - l3
+    upper_wick3 = h3 - max(o3, cl3)
+    if lower_wick3 >= 2 * body3 and upper_wick3 <= body3 * 0.5 and body3 > 0:
+        patterns.append({
+            'pattern': 'Hammer',
+            'name_ar': 'شمعة المطرقة الارتدادية 🔨',
+            'sentiment': 'bullish',
+            'explanation_ar': 'شمعة انعكاسية شرائية تبين رفض الهبوط وتمركز المشترين بالقرب من القاع.'
+        })
+
+    if cl2 < o2 and cl3 > o3 and o3 <= cl2 and cl3 >= o2:
+        patterns.append({
+            'pattern': 'Bullish Engulfing',
+            'name_ar': 'نموذج الابتلاع الشرائي 🟢',
+            'sentiment': 'bullish',
+            'explanation_ar': 'نموذج شرائي قوي حيث تبتلع الشمعة الخضراء جسم الشمعة الحمراء السابقة بالكامل.'
+        })
+        
+    if cl1 < o1 and abs(cl2 - o2) < (h1 - l1) * 0.3 and cl3 > o3 and cl3 > (o1 + cl1) / 2:
+        patterns.append({
+            'pattern': 'Morning Star',
+            'name_ar': 'نموذج نجمة الصباح 🌅',
+            'sentiment': 'bullish',
+            'explanation_ar': 'نموذج ثلاثي انعكاسي صاعد يعلن بدء موجة جديدة صاعدة بعد تباطؤ الهبوط.'
+        })
+
+    return patterns
+
+def calc_volume_profile_poc(candles: list) -> float:
+    """Calculates Point of Control (POC) - the price level with highest volume accumulation."""
+    if not candles:
+        return 0.0
+    recent = candles[-60:]
+    volume_by_price = {}
+    for c in recent:
+        p = round(float(c['close']), 1)
+        v = float(c.get('volume', 0))
+        volume_by_price[p] = volume_by_price.get(p, 0) + v
+    if not volume_by_price:
+        return float(candles[-1]['close'])
+    poc_price = max(volume_by_price, key=volume_by_price.get)
+    return round(poc_price, 2)
+
 def extract_latest_features(candles: list) -> list | None:
     """
     Extracts 15 core features for the latest candle bar matching train_model.py:

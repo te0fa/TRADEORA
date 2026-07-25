@@ -110,7 +110,7 @@ export default function DashboardPage({ params }: Props) {
     const animTimer = setInterval(() => {
       step++;
       const progress = step / steps;
-      setAnalyzedStocks(Math.round(progress * 314));
+      setAnalyzedStocks(Math.round(progress * 281));
       setSignalsTested(Math.round(progress * 1959));
       setMarketInterval(Math.round(progress * 15));
 
@@ -184,8 +184,10 @@ export default function DashboardPage({ params }: Props) {
     try {
       const { data, error } = await supabase
         .from('signal_stats')
-        .select(`win_rate_tp1, signal_type, companies (id, symbol, name_ar, name_en)`)
+        .select(`win_rate_tp1, signal_type, companies!inner (id, symbol, name_ar, name_en, status)`)
         .eq('timeframe', '1d')
+        .eq('companies.status', 'active')
+        .not('win_rate_tp1', 'is', null)
         .order('win_rate_tp1', { ascending: false })
         .limit(10);
 
@@ -193,7 +195,7 @@ export default function DashboardPage({ params }: Props) {
 
       const enriched = await Promise.all(
         (data ?? []).map(async (s: any) => {
-          if (!s.companies?.id) return null;
+          if (!s.companies?.id || s.companies.status !== 'active') return null;
           
           const { data: price } = await supabase
             .from('market_prices')
@@ -208,16 +210,17 @@ export default function DashboardPage({ params }: Props) {
           const change = open > 0 ? ((close - open) / open) * 100 : 0;
 
           const rawWinRate = s.win_rate_tp1 !== null && s.win_rate_tp1 !== undefined ? Number(s.win_rate_tp1) : null;
-          const winRateVal = rawWinRate !== null ? (rawWinRate > 1 ? rawWinRate : rawWinRate * 100) : null;
+          if (rawWinRate === null) return null;
+          const winRateVal = rawWinRate > 1 ? rawWinRate : rawWinRate * 100;
 
           return {
             symbol: s.companies.symbol,
-            name: isAr ? s.companies.name_ar : s.companies.name_en,
+            name: (isAr ? s.companies.name_ar : s.companies.name_en) || s.companies.symbol,
             signal: s.signal_type || 'buy',
             price: close,
             change,
-            winRate: winRateVal !== null ? Math.round(winRateVal) : 68,
-            score: winRateVal !== null ? Math.min(8, Math.max(1, Math.round(winRateVal / 12.5))) : 5,
+            winRate: Math.round(winRateVal),
+            score: Math.min(8, Math.max(1, Math.round(winRateVal / 12.5))),
           };
         })
       );
@@ -312,7 +315,7 @@ export default function DashboardPage({ params }: Props) {
         </h1>
         
         <p className="text-sm md:text-base text-zinc-400 mb-10 max-w-2xl mx-auto z-10 leading-relaxed">
-          {t('نظام متكامل يحلل 314 سهم مصري لحظياً باستخدام خوارزميات تعلم الآلة لتقديم إشارات عالية الدقة للمتداول المحترف.', 'An integrated system analyzing 314 EGX stocks in real-time using machine learning algorithms to provide high-accuracy signals for professional traders.')}
+          {t('نظام متكامل يحلل 281 سهم مصري نشط لحظياً باستخدام خوارزميات تعلم الآلة لتقديم إشارات عالية الدقة للمتداول المحترف.', 'An integrated system analyzing 281 active EGX stocks in real-time using machine learning algorithms to provide high-accuracy signals for professional traders.')}
         </p>
 
         <div className="flex flex-wrap gap-4 z-10 justify-center">

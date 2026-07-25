@@ -1,0 +1,956 @@
+[
+  {
+    "ticker": "COMI",
+    "isin": "EGS60121C018",
+    "ar": "البنك التجاري الدولي - مصر",
+    "en": "Commercial International Bank",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ADIB",
+    "isin": "EGS60101C010",
+    "ar": "مصرف أبوظبي الإسلامي - مصر",
+    "en": "Abu Dhabi Islamic Bank Egypt",
+    "sector": "البنوك",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "QNBA",
+    "isin": "EGS60081C012",
+    "ar": "بنك قطر الوطني الأهلي",
+    "en": "QNB Alahli",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "HDBK",
+    "isin": "EGS60131C017",
+    "ar": "بنك التعمير والإسكان",
+    "en": "Housing & Development Bank",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "FAIT",
+    "isin": "EGS60041C016",
+    "ar": "بنك فيصل الإسلامي المصري (EGP)",
+    "en": "Faisal Islamic Bank of Egypt (EGP)",
+    "sector": "البنوك",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "FAITU",
+    "isin": "EGS60042C014",
+    "ar": "بنك فيصل الإسلامي المصري (USD)",
+    "en": "Faisal Islamic Bank of Egypt (USD)",
+    "sector": "البنوك",
+    "sharia": "✅ حلال",
+    "curr": "USD"
+  },
+  {
+    "ticker": "CIEB",
+    "isin": "EGS60051C015",
+    "ar": "بنك كريدي أجريكول مصر",
+    "en": "Credit Agricole Egypt",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EXPA",
+    "isin": "EGS60091C011",
+    "ar": "البنك المصري لتنمية الصادرات",
+    "en": "Export Development Bank of Egypt",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGBE",
+    "isin": "EGS60061C014",
+    "ar": "البنك المصري الخليجي",
+    "en": "Egyptian Gulf Bank",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SAIB",
+    "isin": "EGS60111C019",
+    "ar": "بنك الشركة المصرفية العربية الدولية",
+    "en": "Societe Arabe Internationale de Banque",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "USD"
+  },
+  {
+    "ticker": "CANAT",
+    "isin": "EGS60071C013",
+    "ar": "بنك قناة السويس",
+    "en": "Suez Canal Bank",
+    "sector": "البنوك",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ABUK",
+    "isin": "EGS60141C016",
+    "ar": "بنك البركة مصر",
+    "en": "Al Baraka Bank Egypt",
+    "sector": "البنوك",
+    "sharia": "✅ حلال (إسلامي)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "TMGH",
+    "isin": "EGS691S1C011",
+    "ar": "مجموعة طلعت مصطفى القابضة",
+    "en": "Talaat Moustafa Group Holding",
+    "sector": "العقارات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "HELI",
+    "isin": "EGS65011C018",
+    "ar": "مصر الجديدة للإسكان والتعمير",
+    "en": "Heliopolis Housing",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MNHD",
+    "isin": "EGS65041C015",
+    "ar": "مدينة مصر للإسكان والتعمير",
+    "en": "Madinet Masr",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PHDC",
+    "isin": "EGS655L1C012",
+    "ar": "بالم هيلز للتعمير",
+    "en": "Palm Hills Developments",
+    "sector": "العقارات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EMFD",
+    "isin": "EGS65001C019",
+    "ar": "إعمار مصر للتنمية",
+    "en": "Emaar Misr for Development",
+    "sector": "العقارات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "OCDI",
+    "isin": "EGS65591C017",
+    "ar": "سوديك - السادس من أكتوبر للتنمية",
+    "en": "SODIC",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ORHD",
+    "isin": "EGS65851C015",
+    "ar": "أوراسكوم للتنمية مصر",
+    "en": "Orascom Development Egypt",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ELKA",
+    "isin": "EGS65071C012",
+    "ar": "القاهرة للإسكان والتعمير",
+    "en": "Cairo Housing & Development",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AREH",
+    "isin": "EGS65021C017",
+    "ar": "المجموعة المصرية العقارية",
+    "en": "Egyptian Real Estate Group",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "UNIT",
+    "isin": "EGS65201C018",
+    "ar": "المتحدة للإسكان والتعمير",
+    "en": "United Housing & Development",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AMER",
+    "isin": "EGS658A1C016",
+    "ar": "مجموعة عامر جروب",
+    "en": "Amer Group Holding",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PORT",
+    "isin": "EGS659D1C018",
+    "ar": "المطورون العرب القابضة (بورتو)",
+    "en": "Arab Developers Holding",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "DCRE",
+    "isin": "EGS65031C016",
+    "ar": "الدلتا للإسكان والتعمير",
+    "en": "Delta Housing & Development",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGAS",
+    "isin": "EGS65101C016",
+    "ar": "مصر لإدارة القرارات العقارية",
+    "en": "Egypt Real Estate Management",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RREI",
+    "isin": "EGS65121C014",
+    "ar": "رواد السياحة - الرواد",
+    "en": "Rowad Tourism",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ACAM",
+    "isin": "EGS65151C011",
+    "ar": "العربية لإدارة وتطوير الأصول",
+    "en": "Arab Asset Management",
+    "sector": "العقارات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ZMID",
+    "isin": "EGS65181C018",
+    "ar": "الزهراء للإسكان والتعمير",
+    "en": "Zahraa Maadi Investment & Development",
+    "sector": "العقارات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ABUK",
+    "isin": "EGS38191C010",
+    "ar": "أبو قير للأسمدة والصناعات الكيماوية",
+    "en": "Abu Qir Fertilizers",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MFPC",
+    "isin": "EGS38201C017",
+    "ar": "مصر لإنتاج الأسمدة - موبكو",
+    "en": "MOPCO",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SKPC",
+    "isin": "EGS380S1C017",
+    "ar": "سيدي كرير للبتروكيماويات - سيدبك",
+    "en": "Sidi Kerir Petrochemicals",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGAL",
+    "isin": "EGS38081C014",
+    "ar": "مصر للألومنيوم",
+    "en": "Egypt Aluminium",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ESRS",
+    "isin": "EGS37041C018",
+    "ar": "حديد عز",
+    "en": "Ezz Steel",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ATQA",
+    "isin": "EGS37021C010",
+    "ar": "مصر الوطنية للصلب - عتاقة",
+    "en": "Ataqa Steel",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "KIMA",
+    "isin": "EGS38051C017",
+    "ar": "الصناعات الكيماوية المصرية - كيما",
+    "en": "KIMA",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PACH",
+    "isin": "EGS38041C018",
+    "ar": "البويات والصناعات الكيماوية - باكين",
+    "en": "PACHIN",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ISMFR",
+    "isin": "EGS38031C019",
+    "ar": "الحديد والصلب المصرية",
+    "en": "Egyptian Iron & Steel",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "IRAX",
+    "isin": "EGS37051C017",
+    "ar": "العز الدخيلة للصلب - الإسكندرية",
+    "en": "EZDK",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "FERC",
+    "isin": "EGS38071C015",
+    "ar": "المالية والصناعية المصرية",
+    "en": "EFIC",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "COPR",
+    "isin": "EGS37081C014",
+    "ar": "مصر لصناعة الكشك والألومنيوم",
+    "en": "Copper Mines Egypt",
+    "sector": "الموارد الأساسية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "HRHO",
+    "isin": "EGS69101C011",
+    "ar": "إي إف جي القابضة",
+    "en": "EFG Holding",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "CICH",
+    "isin": "EGS691B1C014",
+    "ar": "سي آي كابيتال القابضة",
+    "en": "CI Capital Holding",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "BTFH",
+    "isin": "EGS69071C014",
+    "ar": "بلتون المالية القابضة",
+    "en": "Beltone Financial Holding",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "BINV",
+    "isin": "EGS692D1C015",
+    "ar": "بي إنفستمنتس القابضة",
+    "en": "B Investments Holding",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "FWRY",
+    "isin": "EGS745L1C014",
+    "ar": "فوري تكنولوجيا المدفوعات",
+    "en": "Fawry",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "CCAP",
+    "isin": "EGS69082C011",
+    "ar": "القلعة للاستشارات المالية",
+    "en": "Qalaa Holdings",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AIH",
+    "isin": "EGS691V1C014",
+    "ar": "المجموعات المالية العربية القابضة",
+    "en": "Arab Investments Holding",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AMIA",
+    "isin": "EGS691C1C013",
+    "ar": "العربية للاستثمارات والتنمية",
+    "en": "Arab Investments & Development",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ROTO",
+    "isin": "EGS691D1C012",
+    "ar": "رواد للاستثمار والتنمية",
+    "en": "Rowad Investment",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "DFCI",
+    "isin": "EGS691E1C011",
+    "ar": "الدلتا للتأمين",
+    "en": "Delta Insurance",
+    "sector": "الخدمات المالية غير المصرفية",
+    "sharia": "❌ غير متوافق",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "JUFO",
+    "isin": "EGS305B1C017",
+    "ar": "جهينة للصناعات الغذائية",
+    "en": "Juhayna Food Industries",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "DOMT",
+    "isin": "EGS30541C012",
+    "ar": "الصناعات الغذائية العربية - دومتي",
+    "en": "Domty",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EFID",
+    "isin": "EGS30511C015",
+    "ar": "إدفيتا للصناعات الغذائية - ايديتا",
+    "en": "Edita Food Industries",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "CERE",
+    "isin": "EGS30021C010",
+    "ar": "القاهرة للزيوت والصابون",
+    "en": "Cairo Oils & Soap",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "POUL",
+    "isin": "EGS30101C012",
+    "ar": "القاهرة للدواجن",
+    "en": "Cairo Poultry",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MPCO",
+    "isin": "EGS30121C010",
+    "ar": "المنصورة للدواجن",
+    "en": "El Mansoura Poultry",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGFP",
+    "isin": "EGS30151C017",
+    "ar": "المصرية لأغدية والمنتجات الغذائية",
+    "en": "Egyptian Food Processing",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AJWA",
+    "isin": "EGS30201C012",
+    "ar": "أجواء للصناعات الغذائية - مصر",
+    "en": "Ajwa for Food Industries",
+    "sector": "الأغذية والمشروبات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SWDY",
+    "isin": "EGS3G0B1C014",
+    "ar": "السويدي إليكتريك",
+    "en": "Elsewedy Electric",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ORAS",
+    "isin": "EGS693V1C014",
+    "ar": "أوراسكوم كونستراكشون بي ال سي",
+    "en": "Orascom Construction",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ARCC",
+    "isin": "EGS3C011C018",
+    "ar": "العربية لأسمنت",
+    "en": "Arabian Cement",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SVCE",
+    "isin": "EGS3C021C017",
+    "ar": "جنوب الوادي لأسمنت",
+    "en": "South Valley Cement",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ECSC",
+    "isin": "EGS3C031C016",
+    "ar": "مصر لأسمنت قنا",
+    "en": "Misr Cement Qena",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SMFR",
+    "isin": "EGS3C041C015",
+    "ar": "أسمنت سيناء",
+    "en": "Sinai Cement",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "GGCC",
+    "isin": "EGS3C051C014",
+    "ar": "الجيزة العامة للمقاولات والاستثمار",
+    "en": "Giza General Contracting",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "NCCI",
+    "isin": "EGS3C061C013",
+    "ar": "النصر للمقاولات - حسن علام",
+    "en": "Nassr Contracting",
+    "sector": "المقاولات والإنشاءات",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ISPH",
+    "isin": "EGS73851C017",
+    "ar": "ابن سينا فارما",
+    "en": "Ibnsina Pharma",
+    "sector": "الخدمات والرعاية الصحية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RMDA",
+    "isin": "EGS73B41C019",
+    "ar": "العاشر من رمضان - رميدا",
+    "en": "Rameda",
+    "sector": "الخدمات والرعاية الصحية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "CLHO",
+    "isin": "EGS73501C013",
+    "ar": "مستشفى كليوباترا",
+    "en": "Cleopatra Hospital",
+    "sector": "الخدمات والرعاية الصحية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "CPAM",
+    "isin": "EGS73011C012",
+    "ar": "العربية للأدوية والصناعات الكيماوية",
+    "en": "Arab Pharmaceuticals",
+    "sector": "الخدمات والرعاية الصحية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MCRO",
+    "isin": "EGS73C11C018",
+    "ar": "ماكرو جروب للمستحضرات الطبية - ماكرو كابيتال",
+    "en": "Macro Group",
+    "sector": "الخدمات والرعاية الصحية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "BIOC",
+    "isin": "EGS73021C011",
+    "ar": "المفيس للأدوية والصناعات الكيماوية",
+    "en": "Memphis Pharmaceuticals",
+    "sector": "الخدمات والرعاية الصحية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ETEL",
+    "isin": "EGS48031C016",
+    "ar": "المصرية للاتصالات",
+    "en": "Telecom Egypt",
+    "sector": "الاتصالات والإعلام",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RAYA",
+    "isin": "EGS48011C018",
+    "ar": "راية القابضة للاستثمارات المالية",
+    "en": "Raya Holding",
+    "sector": "الاتصالات والإعلام",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EEII",
+    "isin": "EGS48021C017",
+    "ar": "المصرية لنظم التعليم الحديثة",
+    "en": "Egyptian Modern Education Systems",
+    "sector": "التكنولوجيا والتعليم",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RACC",
+    "isin": "EGS48041C015",
+    "ar": "راية لخدمات مراكز الاتصالات",
+    "en": "Raya Contact Center",
+    "sector": "الاتصالات والإعلام",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AMOC",
+    "isin": "EGS380P1C010",
+    "ar": "الإسكندرية للزيوت المعدنية - أموك",
+    "en": "AMOC",
+    "sector": "الطاقة والخدمات البترولية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EKHO",
+    "isin": "EGS69081C013",
+    "ar": "القابضة المصرية الكويتية",
+    "en": "Egypt Kuwait Holding",
+    "sector": "الطاقة والخدمات البترولية",
+    "sharia": "✅ حلال",
+    "curr": "USD"
+  },
+  {
+    "ticker": "TAQA",
+    "isin": "EGS74261C010",
+    "ar": "طاقة عربية",
+    "en": "TAQA Arabia",
+    "sector": "الطاقة والخدمات البترولية",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EAST",
+    "isin": "EGS37091C013",
+    "ar": "الشرقية للدخان - إيسترن كومباني",
+    "en": "Eastern Company",
+    "sector": "المنسوجات والسلع المعمرة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ORWE",
+    "isin": "EGS33041C010",
+    "ar": "النساجون الشرقيون السجاد",
+    "en": "Oriental Weavers",
+    "sector": "المنسوجات والسلع المعمرة",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AUTO",
+    "isin": "EGS673T1C012",
+    "ar": "جي بي كورب",
+    "en": "GB Corp",
+    "sector": "السيارات وقطع الغيار",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ACGC",
+    "isin": "EGS33011C013",
+    "ar": "العربية لحليج الأقطان",
+    "en": "Arab Cotton Ginning",
+    "sector": "المنسوجات والسلع المعمرة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "DSCW",
+    "isin": "EGS33021C012",
+    "ar": "النصر للملابس والمنسوجات - كابو",
+    "en": "KABO",
+    "sector": "المنسوجات والسلع المعمرة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MBSC",
+    "isin": "EGS33031C011",
+    "ar": "مصر لصناعة الغزل والنسيج - ميرادكس",
+    "en": "Miratex",
+    "sector": "المنسوجات والسلع المعمرة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ALCN",
+    "isin": "EGS42011C014",
+    "ar": "الإسكندرية تداول البضائع والحاويات",
+    "en": "Alexandria Container & Cargo",
+    "sector": "الخدمات والنقل",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AFMC",
+    "isin": "EGS42021C013",
+    "ar": "القناة لتداول الحاويات والبضائع",
+    "en": "Canal Shipping Agencies",
+    "sector": "الخدمات والنقل",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGSB",
+    "isin": "EGS42031C012",
+    "ar": "المصرية للخدمات والملاحة البحرية - ماريديف",
+    "en": "Maridive",
+    "sector": "الخدمات والنقل",
+    "sharia": "✅ حلال",
+    "curr": "USD"
+  },
+  {
+    "ticker": "EGTS",
+    "isin": "EGS70011C013",
+    "ar": "المصرية للانتجاعات السياحية",
+    "en": "Egyptian Resorts Company",
+    "sector": "السياحة والترفيه",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGPT",
+    "isin": "EGS70021C012",
+    "ar": "المصرية للفنادق - إيجوث",
+    "en": "Egyptian Hotels",
+    "sector": "السياحة والترفيه",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MHOT",
+    "isin": "EGS70031C011",
+    "ar": "شارم أوف دريمز للاستثمار السياحي",
+    "en": "Sharm Dreams",
+    "sector": "السياحة والترفيه",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "UNIP",
+    "isin": "EGS36011C015",
+    "ar": "यونيباك - العالمية لصناعة التغليف",
+    "en": "Unipack",
+    "sector": "ورق ومواد تعبئة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RAKT",
+    "isin": "EGS36021C014",
+    "ar": "العامة لصناعة الورق - راكتا",
+    "en": "RAKTA Paper",
+    "sector": "ورق ومواد تعبئة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MEPA",
+    "isin": "EGS36031C013",
+    "ar": "الشرق الأوسط لصناعة الورق - سيمو",
+    "en": "Simo Paper",
+    "sector": "ورق ومواد تعبئة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "CIRA",
+    "isin": "EGS729N1C018",
+    "ar": "القاهرة للاستثمار والتنمية العقارية - سيرا",
+    "en": "CIRA Education",
+    "sector": "الخدمات التعليمية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "TALE",
+    "isin": "EGS729O1C017",
+    "ar": "تعليم لخدمات الإدارة",
+    "en": "Taaleem Management Services",
+    "sector": "الخدمات التعليمية",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ODAS",
+    "isin": "EGS70401C014",
+    "ar": "أوراسكوم للاستثمار القابضة",
+    "en": "Orascom Investment Holding",
+    "sector": "التجارة والموزعون",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AIFI",
+    "isin": "EGS70411C013",
+    "ar": "الأطلس للاستثمار والصناعات الغذائية",
+    "en": "Atlas Land Investment",
+    "sector": "التجارة والموزعون",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SWGE",
+    "isin": "EGS74011C017",
+    "ar": "المصرية للخدمات والمرافق العامة",
+    "en": "Egyptian Utilities",
+    "sector": "الخدمات والمرافق العامة",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "GBCO",
+    "isin": "EGS673T1C012",
+    "ar": "جي بي غبور أوتو",
+    "en": "GB Auto",
+    "sector": "السيارات وقطع الغيار",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MERG",
+    "isin": "EGS73041C019",
+    "ar": "الميرغني للخدمات الطبية (بورصة النيل)",
+    "en": "El Merghany Medical",
+    "sector": "بورصة النيل (SME)",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "BVT",
+    "isin": "EGS73051C018",
+    "ar": "البدر للبلاستيك (بورصة النيل)",
+    "en": "Badr Plastic",
+    "sector": "بورصة النيل (SME)",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "BIGP",
+    "isin": "EGS73061C017",
+    "ar": "بي آي جي للتجارة (بورصة النيل)",
+    "en": "BIG Trade",
+    "sector": "بورصة النيل (SME)",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ICID",
+    "isin": "EGS73071C016",
+    "ar": "القصيم للاستثمار (بورصة النيل)",
+    "en": "Qassim Investment",
+    "sector": "بورصة النيل (SME)",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "UASG",
+    "isin": "EGS73081C015",
+    "ar": "الاتحاد الصيدلي للخدمات الطبية (بورصة النيل)",
+    "en": "Pharma Union",
+    "sector": "بورصة النيل (SME)",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  }
+]

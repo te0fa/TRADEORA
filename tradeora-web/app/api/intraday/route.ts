@@ -27,7 +27,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ candles: [] })
   }
 
-  // 2. Fetch candles from RPC
+  let intervalKey = '15m';
+  if (interval === 30) intervalKey = '30m';
+  else if (interval === 60) intervalKey = '1h';
+  else if (interval === 240) intervalKey = '4h';
+
+  // 1. Try fetching authentic TradingView OHLC candles directly
+  const { data: tvSnapshots } = await sb
+    .from('intraday_snapshots')
+    .select('snapshot_time, open_price, high_price, low_price, price, volume')
+    .eq('company_id', company.id)
+    .eq('source', `tradingview_${intervalKey}`)
+    .order('snapshot_time', { ascending: true })
+    .limit(2000);
+
+  if (tvSnapshots && tvSnapshots.length > 0) {
+    const formattedCandles = tvSnapshots.map((s: any) => ({
+      time: new Date(s.snapshot_time).getTime() / 1000,
+      open: parseFloat(s.open_price ?? s.price),
+      high: parseFloat(s.high_price ?? s.price),
+      low: parseFloat(s.low_price ?? s.price),
+      close: parseFloat(s.price),
+      volume: parseInt(s.volume ?? 0, 10),
+    }));
+    return NextResponse.json({ candles: formattedCandles });
+  }
+
+  // 2. Fallback to RPC
   const { data: candles, error: rpcErr } = await sb
     .rpc('get_intraday_candles', {
       p_company_id: company.id,

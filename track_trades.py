@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 # Load Environment Variables explicitly from script folder
 load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     logger.error("Missing SUPABASE_URL or SUPABASE_KEY in environment variables.")
@@ -73,14 +73,16 @@ def send_email_via_api(user_id, trade_type, symbol, price, pnl=None):
         logger.error(f"Email dispatch error: {e}")
 
 def get_current_price(symbol):
-    """Fetches real-time price from Yahoo Finance for EGX stocks (.CA)"""
+    """Fetches real-time price from Supabase market_prices table for EGX stocks"""
     try:
-        t = yf.Ticker(f"{symbol}.CA")
-        price = t.fast_info.last_price
-        if price is not None:
-            return float(price)
+        res = sb.table("companies").select("id").eq("symbol", symbol.upper()).maybe_single().execute()
+        if res and res.data:
+            cid = res.data["id"]
+            p_res = sb.table("market_prices").select("close_price").eq("company_id", cid).order("price_date", desc=True).limit(1).execute()
+            if p_res.data and p_res.data[0].get("close_price"):
+                return float(p_res.data[0]["close_price"])
     except Exception as e:
-        logger.warning(f"Error fetching price for {symbol} via yfinance: {e}")
+        logger.warning(f"Error fetching price for {symbol} from database: {e}")
     return None
 
 def track_user_trades():
@@ -279,7 +281,7 @@ def track_recommended_trades():
     # Fetch risk management settings
     trailing_stop_to_entry = True
     try:
-        res_settings = sb.table("system_settings").eq("key", "risk_management").execute()
+        res_settings = sb.table("system_settings").select("*").eq("key", "risk_management").execute()
         if res_settings.data:
             settings_val = res_settings.data[0].get("value", {})
             trailing_stop_to_entry = settings_val.get("trailing_stop_to_entry", True)
@@ -306,6 +308,7 @@ def track_recommended_trades():
         sl = float(trade["sl"])
         status = trade["status"]
         direction = trade.get("direction", "buy")
+        timeframe = trade.get("timeframe", "1d")
         rec_at = trade["recommended_at"]
         rec_date_str = rec_at[:10]
         

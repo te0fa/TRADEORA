@@ -7,7 +7,8 @@ export async function GET() {
   try {
     const { data: companies, error: compError } = await supabase
       .from('companies')
-      .select('id, symbol, sector');
+      .select('id, symbol, sector')
+      .eq('status', 'active');
 
     if (compError || !companies) {
       return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 });

@@ -3,8 +3,10 @@ import type { NextConfig } from "next";
 
 const withNextIntl = createNextIntlPlugin('./i18n.ts');
 
+import path from 'path';
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ['decimal.js'],
 };
 
 export default withNextIntl(nextConfig);

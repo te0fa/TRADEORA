@@ -14,6 +14,7 @@ export async function GET() {
     const { data: companies, error: compError } = await sb
       .from('companies')
       .select('id, symbol, name_ar, name_en, sector, is_shariah_compliant')
+      .eq('status', 'active')
       .order('symbol');
 
     if (compError) throw compError;

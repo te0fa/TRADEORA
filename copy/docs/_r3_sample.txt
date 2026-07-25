@@ -1,0 +1,279 @@
+﻿## GO-LIVE READINESS: RELEASE R3.0 — [BETA: 12-SCHOOL AI CONSENSUS + LLM GATEWAY]
+
+### 📝 REQUIRED SIGN-OFF TABLE
+| Role | Name | Date | Signature | Status |
+|------|------|------|-----------|--------|
+| Chief Technology Officer | | | | ☐ Pending |
+| Chief Security Officer | | | | ☐ Pending |
+| Chief Product Officer | | | | ☐ Pending |
+| Chief Compliance Officer | | | | ☐ Pending |
+| FRA Liaison / Legal Counsel | | | | ☐ Pending |
+| Lead Backend Engineer | | | | ☐ Pending |
+| Lead DevOps/Platform Engineer | | | | ☐ Pending |
+| Lead QA Engineer | | | | ☐ Pending |
+| Lead Arabic UX Reviewer | | | | ☐ Pending |
+
+**GATE RULE**: ALL rows must show ✅ SIGNED before deployment proceeds.
+**BLOCKER**: ANY ❌ = deployment BLOCKED.
+
+### ⏰ T-72 HOURS (3 days before go-live)
+#### Environment Readiness
+- [ ] Verify standard environment readiness item #1 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #2 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #3 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #4 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #5 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #6 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #7 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #8 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #9 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #10 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #11 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #12 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #13 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #14 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #15 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #16 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #17 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #18 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #19 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #20 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #21 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #22 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #23 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #24 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #25 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #26 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #27 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #28 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #29 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #30 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #31 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #32 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #33 for R3.0 specific workloads
+- [ ] Verify standard environment readiness item #34 for R3.0 specific workloads
+
+#### Security Final Review
+- [ ] Verify standard security review item #1 for R3.0 new API perimeters
+- [ ] Verify standard security review item #2 for R3.0 new API perimeters
+- [ ] Verify standard security review item #3 for R3.0 new API perimeters
+- [ ] Verify standard security review item #4 for R3.0 new API perimeters
+- [ ] Verify standard security review item #5 for R3.0 new API perimeters
+- [ ] Verify standard security review item #6 for R3.0 new API perimeters
+- [ ] Verify standard security review item #7 for R3.0 new API perimeters
+- [ ] Verify standard security review item #8 for R3.0 new API perimeters
+- [ ] Verify standard security review item #9 for R3.0 new API perimeters
+- [ ] Verify standard security review item #10 for R3.0 new API perimeters
+- [ ] Verify standard security review item #11 for R3.0 new API perimeters
+- [ ] Verify standard security review item #12 for R3.0 new API perimeters
+- [ ] Verify standard security review item #13 for R3.0 new API perimeters
+- [ ] Verify standard security review item #14 for R3.0 new API perimeters
+- [ ] Verify standard security review item #15 for R3.0 new API perimeters
+- [ ] Verify standard security review item #16 for R3.0 new API perimeters
+- [ ] Verify standard security review item #17 for R3.0 new API perimeters
+- [ ] Verify standard security review item #18 for R3.0 new API perimeters
+- [ ] Verify standard security review item #19 for R3.0 new API perimeters
+- [ ] Verify standard security review item #20 for R3.0 new API perimeters
+- [ ] Verify standard security review item #21 for R3.0 new API perimeters
+- [ ] Verify standard security review item #22 for R3.0 new API perimeters
+- [ ] Verify standard security review item #23 for R3.0 new API perimeters
+- [ ] Verify standard security review item #24 for R3.0 new API perimeters
+
+#### Compliance Final Review
+- [ ] FRA disclaimer coverage: scan 50 live recommendations -> 100% contain Arabic disclaimer text
+- [ ] AI advisory separation: AI recommendation NOT auto-executed anywhere (zero OMS connection)
+- [ ] AI Compliance test item #1 for R3.0
+- [ ] AI Compliance test item #2 for R3.0
+- [ ] AI Compliance test item #3 for R3.0
+- [ ] AI Compliance test item #4 for R3.0
+- [ ] AI Compliance test item #5 for R3.0
+- [ ] AI Compliance test item #6 for R3.0
+- [ ] AI Compliance test item #7 for R3.0
+- [ ] AI Compliance test item #8 for R3.0
+- [ ] AI Compliance test item #9 for R3.0
+- [ ] AI Compliance test item #10 for R3.0
+- [ ] AI Compliance test item #11 for R3.0
+- [ ] AI Compliance test item #12 for R3.0
+- [ ] AI Compliance test item #13 for R3.0
+- [ ] AI Compliance test item #14 for R3.0
+- [ ] AI Compliance test item #15 for R3.0
+- [ ] AI Compliance test item #16 for R3.0
+- [ ] AI Compliance test item #17 for R3.0
+- [ ] AI Compliance test item #18 for R3.0
+
+#### Runbook Verification
+- [ ] Runbook for R3.0 specific services reviewed by on-call team within last 7 days
+- [ ] Extended Runbook check #1 for site reliability engineering sign-off
+- [ ] Extended Runbook check #2 for site reliability engineering sign-off
+- [ ] Extended Runbook check #3 for site reliability engineering sign-off
+- [ ] Extended Runbook check #4 for site reliability engineering sign-off
+- [ ] Extended Runbook check #5 for site reliability engineering sign-off
+- [ ] Extended Runbook check #6 for site reliability engineering sign-off
+- [ ] Extended Runbook check #7 for site reliability engineering sign-off
+- [ ] Extended Runbook check #8 for site reliability engineering sign-off
+- [ ] Extended Runbook check #9 for site reliability engineering sign-off
+- [ ] Extended Runbook check #10 for site reliability engineering sign-off
+- [ ] Extended Runbook check #11 for site reliability engineering sign-off
+- [ ] Extended Runbook check #12 for site reliability engineering sign-off
+- [ ] Extended Runbook check #13 for site reliability engineering sign-off
+- [ ] Extended Runbook check #14 for site reliability engineering sign-off
+- [ ] Extended Runbook check #15 for site reliability engineering sign-off
+- [ ] Extended Runbook check #16 for site reliability engineering sign-off
+- [ ] Extended Runbook check #17 for site reliability engineering sign-off
+- [ ] Extended Runbook check #18 for site reliability engineering sign-off
+- [ ] Extended Runbook check #19 for site reliability engineering sign-off
+
+### ⏰ T-24 HOURS (day before go-live)
+#### Data Readiness
+- [ ] Directional accuracy pre-launch: backtest on last 90-day holdout shows >= 70% directional accuracy
+- [ ] Arabic quality sign-off: Lead Arabic UX Reviewer has scored last 20 explanations >= 4.0/5.0
+- [ ] AI Data Readiness test #1
+- [ ] AI Data Readiness test #2
+- [ ] AI Data Readiness test #3
+- [ ] AI Data Readiness test #4
+- [ ] AI Data Readiness test #5
+- [ ] AI Data Readiness test #6
+- [ ] AI Data Readiness test #7
+- [ ] AI Data Readiness test #8
+- [ ] AI Data Readiness test #9
+- [ ] AI Data Readiness test #10
+- [ ] AI Data Readiness test #11
+- [ ] AI Data Readiness test #12
+- [ ] AI Data Readiness test #13
+- [ ] AI Data Readiness test #14
+
+#### Observability Readiness
+- [ ] Observability checklist item #1 for robust monitoring
+- [ ] Observability checklist item #2 for robust monitoring
+- [ ] Observability checklist item #3 for robust monitoring
+- [ ] Observability checklist item #4 for robust monitoring
+- [ ] Observability checklist item #5 for robust monitoring
+- [ ] Observability checklist item #6 for robust monitoring
+- [ ] Observability checklist item #7 for robust monitoring
+- [ ] Observability checklist item #8 for robust monitoring
+- [ ] Observability checklist item #9 for robust monitoring
+- [ ] Observability checklist item #10 for robust monitoring
+- [ ] Observability checklist item #11 for robust monitoring
+- [ ] Observability checklist item #12 for robust monitoring
+- [ ] Observability checklist item #13 for robust monitoring
+- [ ] Observability checklist item #14 for robust monitoring
+- [ ] Observability checklist item #15 for robust monitoring
+- [ ] Observability checklist item #16 for robust monitoring
+- [ ] Observability checklist item #17 for robust monitoring
+- [ ] Observability checklist item #18 for robust monitoring
+- [ ] Observability checklist item #19 for robust monitoring
+
+#### War Room Setup
+- [ ] War room channel created in Slack/Teams: #r30-go-live-YYYY-MM-DD
+- [ ] On-call rotation: 24/7 coverage for 72 hours post-go-live confirmed
+- [ ] Escalation matrix posted: L1 (on-call) -> L2 (lead engineer) -> L3 (CTO)
+- [ ] Rollback plan reviewed by all team leads (less than 30 minutes ago)
+- [ ] Customer support briefed on new features (what to say if user asks)
+- [ ] Additional war room coordination task #1
+- [ ] Additional war room coordination task #2
+- [ ] Additional war room coordination task #3
+- [ ] Additional war room coordination task #4
+- [ ] Additional war room coordination task #5
+- [ ] Additional war room coordination task #6
+- [ ] Additional war room coordination task #7
+- [ ] Additional war room coordination task #8
+- [ ] Additional war room coordination task #9
+- [ ] Additional war room coordination task #10
+- [ ] Additional war room coordination task #11
+- [ ] Additional war room coordination task #12
+- [ ] Additional war room coordination task #13
+- [ ] Additional war room coordination task #14
+
+### ⏰ T-4 HOURS (4 hours before go-live)
+#### Deployment Window Check
+- [ ] Deployment scheduled OUTSIDE EGX session: either after 15:30 Cairo OR before 08:45 Cairo
+- [ ] FluxCD production gate verified: no reconciliation active during EGX trading hours
+- [ ] Database backup taken within last 30 minutes (pg_basebackup confirmed)
+- [ ] Blue-green: green environment smoke-tested within last 2 hours
+- [ ] Load balancer cutover script ready + tested in staging
+- [ ] WARMUP dry run: run JOB-WARMUP-001 at 08:30 Cairo in production — all 12 schools load within 5 minutes
+- [ ] SAGA-003 live fire: trigger 10 real recommendations -> verify all 10 in MinIO COMPLIANCE bucket within 30 seconds
+- [ ] SAGA-003 block test: kill MinIO during recommendation -> verify recommendation NOT delivered to user
+- [ ] LLM fallback tested: stop Ollama -> verify DeepSeek API activates within 30 seconds
+- [ ] DeepSeek fallback tested: stop DeepSeek -> verify OpenAI API activates within 30 seconds
+- [ ] Consensus quorum (12 schools): simulate 3 school failures -> 9/12 still produces recommendation
+- [ ] Extended pre-flight check #1 for specific release artifacts
+- [ ] Extended pre-flight check #2 for specific release artifacts
+- [ ] Extended pre-flight check #3 for specific release artifacts
+- [ ] Extended pre-flight check #4 for specific release artifacts
+- [ ] Extended pre-flight check #5 for specific release artifacts
+- [ ] Extended pre-flight check #6 for specific release artifacts
+- [ ] Extended pre-flight check #7 for specific release artifacts
+- [ ] Extended pre-flight check #8 for specific release artifacts
+- [ ] Extended pre-flight check #9 for specific release artifacts
+- [ ] Extended pre-flight check #10 for specific release artifacts
+- [ ] Extended pre-flight check #11 for specific release artifacts
+- [ ] Extended pre-flight check #12 for specific release artifacts
+- [ ] Extended pre-flight check #13 for specific release artifacts
+- [ ] Extended pre-flight check #14 for specific release artifacts
+
+### 🚀 DEPLOYMENT EXECUTION
+- [ ] 1. Unlock FluxCD reconciliation (`flux resume kustomization apps-production`)
+- [ ] 2. Monitor K8s rollout status (`kubectl rollout status deployment/...`)
+- [ ] 3. Execute zero-downtime DB migrations via Liquibase/Flyway
+- [ ] 4. Switch Kong Gateway traffic weights to 100% on new pods
+- [ ] 5. Run automated Postman test suite against production endpoints
+- [ ] 6. Feature flags toggle in Unleash (Turn ON new features)
+- [ ] 7. Lock FluxCD if during market window (`flux suspend kustomization apps-production`)
+- [ ] 8. System state verification protocol execution step
+- [ ] 9. System state verification protocol execution step
+- [ ] 10. System state verification protocol execution step
+- [ ] 11. System state verification protocol execution step
+- [ ] 12. System state verification protocol execution step
+- [ ] 13. System state verification protocol execution step
+- [ ] 14. System state verification protocol execution step
+- [ ] 15. System state verification protocol execution step
+- [ ] 16. System state verification protocol execution step
+- [ ] 17. System state verification protocol execution step
+- [ ] 18. System state verification protocol execution step
+- [ ] 19. System state verification protocol execution step
+
+### ⏰ T+1 HOUR (post go-live monitoring)
+- [ ] Error rate < 0.1% in first hour (Grafana API error rate panel)
+- [ ] No P0 incidents in first hour
+- [ ] All Prometheus alerts GREEN (no FIRING alerts except informational)
+- [ ] Kafka consumer lag nominal (< 1,000 messages across all groups)
+- [ ] Post-release hypercare verification item #1
+- [ ] Post-release hypercare verification item #2
+- [ ] Post-release hypercare verification item #3
+- [ ] Post-release hypercare verification item #4
+- [ ] Post-release hypercare verification item #5
+- [ ] Post-release hypercare verification item #6
+- [ ] Post-release hypercare verification item #7
+- [ ] Post-release hypercare verification item #8
+- [ ] Post-release hypercare verification item #9
+- [ ] Post-release hypercare verification item #10
+- [ ] Post-release hypercare verification item #11
+- [ ] Post-release hypercare verification item #12
+- [ ] Post-release hypercare verification item #13
+- [ ] Post-release hypercare verification item #14
+
+### ⏰ T+24 HOURS
+- [ ] Daily KPI report generated and reviewed by CPO
+- [ ] Go-live retrospective scheduled within next 3 business days
+- [ ] Known issues log created and shared with stakeholders
+- [ ] SLO performance: API P99 <= 500ms confirmed over first 24 hours
+- [ ] Day 2 Operations check #1
+- [ ] Day 2 Operations check #2
+- [ ] Day 2 Operations check #3
+- [ ] Day 2 Operations check #4
+- [ ] Day 2 Operations check #5
+- [ ] Day 2 Operations check #6
+- [ ] Day 2 Operations check #7
+- [ ] Day 2 Operations check #8
+- [ ] Day 2 Operations check #9
+- [ ] Day 2 Operations check #10
+- [ ] Day 2 Operations check #11
+- [ ] Day 2 Operations check #12
+- [ ] Day 2 Operations check #13
+- [ ] Day 2 Operations check #14
+
+---
+
+## GO-LIVE READINESS: RELEASE R4.0 — [GA: ANALYTICS + RISK (VAR, DRAWDOWN) + REPORTS]
+

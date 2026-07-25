@@ -1,39 +1,39 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #09090b; /* Zinc 950 */
-  --color-foreground: #fafafa; /* Zinc 50 */
+  --color-background: #0b0f19; /* Deep Obsidian Slate */
+  --color-foreground: #f8fafc; /* Slate 50 */
   
-  --color-bg-dark: #09090b;
-  --color-surface-dark: #18181b; /* Zinc 900 */
-  --color-surface-elevated: #27272a; /* Zinc 800 */
+  --color-bg-dark: #0b0f19;
+  --color-surface-dark: #111827; /* Slate 900 */
+  --color-surface-elevated: #1e293b; /* Slate 800 */
   
-  --color-accent-blue: #3b82f6;
+  --color-accent-blue: #38bdf8; /* Electric Cyan Blue */
   --color-accent-blue-glow: #60a5fa;
-  --color-accent-gold: #eab308; /* Premium Gold */
-  --color-accent-gold-glow: #fde047;
+  --color-accent-gold: #f59e0b; /* Premium Gold */
+  --color-accent-gold-glow: #fbbf24;
   
-  --color-up-green: #10b981; /* Neon green */
-  --color-up-green-bg: rgba(16, 185, 129, 0.1);
-  --color-down-red: #ef4444; /* Vibrant red */
-  --color-down-red-bg: rgba(239, 68, 68, 0.1);
+  --color-up-green: #10b981; /* Emerald green */
+  --color-up-green-bg: rgba(16, 185, 129, 0.12);
+  --color-down-red: #f43f5e; /* Rose Red */
+  --color-down-red-bg: rgba(244, 63, 94, 0.12);
   
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #a1a1aa; /* Zinc 400 */
-  --color-text-muted: #71717a; /* Zinc 500 */
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8; /* Slate 400 */
+  --color-text-muted: #64748b; /* Slate 500 */
   
   --font-cairo: "Cairo", sans-serif;
   --font-inter: "Inter", sans-serif;
 }
 
 :root {
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: #0b0f19;
+  color: #f8fafc;
 }
 
 body {
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: #0b0f19;
+  color: #f8fafc;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -57,47 +57,75 @@ body {
 
 /* Typographic & Color Utilities */
 .gold-text {
-  background: linear-gradient(135deg, #fde047 0%, #eab308 50%, #ca8a04 100%);
+  background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cyan-gradient-text {
+  background: linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #2563eb 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 /* Glassmorphism & UI Layers */
+.glass-header {
+  background: rgba(11, 15, 25, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+}
+
 .glass-panel {
-  background: rgba(24, 24, 27, 0.65); /* Zinc 900 with opacity */
+  background: rgba(17, 24, 39, 0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
 }
 
 .glass-card {
-  background: linear-gradient(180deg, rgba(39, 39, 42, 0.4) 0%, rgba(24, 24, 27, 0.8) 100%);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(56, 189, 248, 0.3);
   transform: translateY(-2px);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.1);
+}
+
+/* Modern Pill Tabs */
+.glass-pill-container {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  padding: 4px;
+}
+
+.glass-pill-item {
+  border-radius: 9999px;
+  transition: all 0.25s ease;
 }
 
 /* Premium Inputs */
 .glass-input {
-  background: rgba(24, 24, 27, 0.7);
+  background: rgba(15, 23, 42, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fafafa;
+  color: #f8fafc;
   transition: all 0.2s ease;
 }
 
 .glass-input:focus {
-  border-color: var(--color-accent-blue);
+  border-color: #38bdf8;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
 }
 
 /* Buttons */

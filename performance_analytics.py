@@ -28,7 +28,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-sb = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+url = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY') or os.getenv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+sb = create_client(url, key)
 
 def send_telegram_alert(message):
     token = os.getenv("TELEGRAM_BOT_TOKEN")

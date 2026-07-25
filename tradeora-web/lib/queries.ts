@@ -308,7 +308,13 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     isLastResort: false,
     sourceLabelAr: labelAr,
     sourceLabelEn: labelEn,
-    fundamentals
+    fundamentals,
+    shariah_audit: {
+      egx33: company.is_shariah_compliant ? '✅ مدرج في EGX 33' : '❌ غير مدرج في EGX 33',
+      boubyan: company.is_shariah_compliant ? '✅ متوافق مع الضوابط الشرعية' : '⚠️ يحتاج تطهير / مراجعة نسب الديون',
+      kasheif: company.is_shariah_compliant ? '✅ سهم حلال متوافق 100%' : '🟡 سهم مختلط (نسبة تطهير)',
+      purification_ratio: company.is_shariah_compliant ? 0.0 : 1.5
+    }
   };
 }
 

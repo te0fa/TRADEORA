@@ -189,12 +189,12 @@ def generate_daily_recommendations():
     scaler = joblib.load(scaler_path)
     expected_n_features = getattr(scaler, 'n_features_in_', 15)
 
-    # Fetch companies and fundamentals
-    companies = sb.table("companies").select("id, symbol, name_ar").execute().data or []
+    # Fetch companies (ACTIVE ONLY) and fundamentals
+    companies = sb.table("companies").select("id, symbol, name_ar").eq("status", "active").execute().data or []
     fundamentals_res = sb.table("company_fundamentals").select("*").execute().data or []
     fund_map = {f['company_id']: f for f in fundamentals_res}
 
-    logger.info(f"Loaded {len(companies)} companies for analysis.")
+    logger.info(f"Loaded {len(companies)} ACTIVE companies for trade analysis.")
 
     new_recs_count = 0
     updated_recs_count = 0
@@ -274,11 +274,12 @@ def generate_daily_recommendations():
         decimals = 4 if last_close < 1.0 else 2
         entry_price = round(last_close, decimals)
 
-        # Condition 1: Probability > 0.65 (Buy Recommendation)
-        if prob > 0.65:
+        # Condition 1: Probability > 0.65 (High-Conviction BUY Recommendation)
+        if prob >= 0.65:
             sl_price = round(entry_price - 1.5 * atr_eff, decimals)
             tp1_price = round(entry_price + 2.0 * atr_eff, decimals)
             tp2_price = round(entry_price + 3.5 * atr_eff, decimals)
+            rebound_zone = round(entry_price - 0.6 * atr_eff, decimals)
 
             # If Fair Value is significantly higher, align TP2 with Fair Value
             if fair_val and float(fair_val) > tp1_price:
@@ -288,14 +289,20 @@ def generate_daily_recommendations():
             risk = entry_price - sl_price
             if risk > 0:
                 rr = (tp1_price - entry_price) / risk
-                if rr > 5 or rr < 1.2:
+                if rr > 5.0 or rr < 1.2:
                     logger.info(f"Skipping buy recommendation for {symbol}: R:R ratio {rr:.2f} out of bounds [1.2, 5.0]")
                     continue
+
+            fra_disclaimer = "تنويه الهيئة العامة للرقابة المالية: مستويات الدعم والمقاومة وأهداف الصفقة هي لأغراض الدراسة والتعليم فقط وليست توصية بالبيع أو الشراء."
+            explanation_ar = f"توصية شراء ودخول مؤكدة بدرجة ثقة {round(prob * 100, 1)}%. منطقة الارتداد المتوقعة عند {rebound_zone} ج.م مع أهداف عند {tp1_price} ج.م و {tp2_price} ج.م ووقف خسارة {sl_price} ج.م."
 
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
-                        "ml_probability": round(prob, 4)
+                        "ml_probability": round(prob, 4),
+                        "tp1": tp1_price,
+                        "tp2": tp2_price,
+                        "sl": sl_price
                     }).eq("company_id", cid).eq("status", "active").execute()
                     updated_recs_count += 1
                     logger.info(f"🔄 Updated active buy trade probability for {symbol}: prob={prob:.4f}")
@@ -318,12 +325,12 @@ def generate_daily_recommendations():
                 try:
                     sb.table("recommended_trades").insert(rec_payload).execute()
                     new_recs_count += 1
-                    logger.info(f"✅ Created new buy recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
+                    logger.info(f"✅ Created new BUY recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
                 except Exception as e:
                     logger.error(f"Error inserting new buy recommendation for {symbol}: {e}")
 
-        # Condition 2: Probability < 0.35 (Sell/Exit Recommendation)
-        elif prob < 0.35:
+        # Condition 2: Probability < 0.35 (High-Conviction SELL / EXIT Recommendation)
+        elif prob <= 0.35:
             sl_price = round(entry_price + 1.5 * atr_eff, decimals)
             tp1_price = round(entry_price - 2.0 * atr_eff, decimals)
             tp2_price = round(entry_price - 3.5 * atr_eff, decimals)
@@ -336,14 +343,17 @@ def generate_daily_recommendations():
             risk = sl_price - entry_price
             if risk > 0:
                 rr = (entry_price - tp1_price) / risk
-                if rr > 5 or rr < 1.2:
+                if rr > 5.0 or rr < 1.2:
                     logger.info(f"Skipping sell recommendation for {symbol}: R:R ratio {rr:.2f} out of bounds [1.2, 5.0]")
                     continue
 
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
-                        "ml_probability": round(prob, 4)
+                        "ml_probability": round(prob, 4),
+                        "tp1": tp1_price,
+                        "tp2": tp2_price,
+                        "sl": sl_price
                     }).eq("company_id", cid).eq("status", "active").execute()
                     updated_recs_count += 1
                     logger.info(f"🔄 Updated active sell trade probability for {symbol}: prob={prob:.4f}")
@@ -366,7 +376,7 @@ def generate_daily_recommendations():
                 try:
                     sb.table("recommended_trades").insert(rec_payload).execute()
                     new_recs_count += 1
-                    logger.info(f"✅ Created new sell recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
+                    logger.info(f"✅ Created new SELL recommendation for {symbol}: prob={prob:.4f}, entry={entry_price}, TP1={tp1_price}, SL={sl_price}")
                 except Exception as e:
                     logger.error(f"Error inserting new sell recommendation for {symbol}: {e}")
 

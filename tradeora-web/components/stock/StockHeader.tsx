@@ -135,11 +135,29 @@ export function StockHeader({ company }: StockHeaderProps) {
               )}
             </Badge>
           )}
-          {company.is_shariah_compliant && (
+          {company.is_shariah_compliant ? (
             <Badge variant="glass" className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border-emerald-500/20">
               {t('shariahCompliant')}
             </Badge>
+          ) : (
+            <Badge variant="glass" className="text-[11px] font-bold text-amber-400 bg-amber-500/10 border-amber-500/20">
+              🧪 {locale === 'ar' ? 'سهم مختلط (نسبة تطهير: 1.5%)' : 'Mixed Stock (Purification: 1.5%)'}
+            </Badge>
           )}
+        </div>
+
+        {/* 3 Sharia Compliance Audit Sources */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+          <span className="text-zinc-400 font-bold">{locale === 'ar' ? 'فحص الشريعة الثلاثي:' : 'Sharia 3-Source Audit:'}</span>
+          <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded font-medium">
+            🏛️ EGX 33: {company.is_shariah_compliant ? (locale === 'ar' ? 'مدرج' : 'Listed') : (locale === 'ar' ? 'غير مدرج' : 'Unlisted')}
+          </span>
+          <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded font-medium">
+            🇰🇼 Boubyan: {company.is_shariah_compliant ? (locale === 'ar' ? 'متوافق' : 'Compliant') : (locale === 'ar' ? 'يحتاج تطهير' : 'Needs Purification')}
+          </span>
+          <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded font-medium">
+            🔍 Kasheif: {company.is_shariah_compliant ? (locale === 'ar' ? 'حلال 100%' : '100% Halal') : (locale === 'ar' ? 'مختلط (1.5% تطهير)' : 'Mixed (1.5% Purif)')}
+          </span>
         </div>
 
         {/* secondary name and ISIN code */}

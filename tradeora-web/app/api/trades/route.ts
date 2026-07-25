@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { calcMarketRegime } from '@/lib/ta-utils';
+import { TradeRiskLevelsEvaluator, MarketDataEvaluator, TechnicalIndicatorEvaluator } from '@/lib/domain';
 
+// Constitution Constants (Article 5.3 & Article 11.3)
+const CONSTITUTIONAL_MIN_CONFIDENCE = 0.65;
+const FRA_DISCLAIMER_AR = "تنويه الهيئة العامة للرقابة المالية: مستويات الدعم والمقاومة وأهداف الصفقة هي لأغراض الدراسة والتعليم فقط وليست توصية بالبيع أو الشراء.";
 
 // GET: Fetch recommended trades and statistics
 export async function GET(req: NextRequest) {
@@ -26,6 +30,19 @@ export async function GET(req: NextRequest) {
       throw fetchError;
     }
 
+    // Enforce gating and append explainability / FRA disclaimer metadata to active trades
+    const processedTrades = (trades || []).map((t) => {
+      const confidence = t.ml_probability ? parseFloat(t.ml_probability) : null;
+      const requiresWarning = confidence !== null && confidence < 0.75;
+      
+      return {
+        ...t,
+        confidence_warning: requiresWarning,
+        fra_disclaimer: FRA_DISCLAIMER_AR,
+        explanation_ar: t.explanation_ar || `توصية ${t.direction === 'buy' ? 'شراء' : 'بيع'} بناءً على تحليل النماذج المتعددة بأسهم ${t.symbol} ونسبة مخاطرة/مكافأة مدروسة.`
+      };
+    });
+
     // 2. Fetch all closed trades to compute statistics
     const { data: allClosed, error: statsError } = await supabase
       .from('recommended_trades')
@@ -36,8 +53,8 @@ export async function GET(req: NextRequest) {
       throw statsError;
     }
 
-    const totalTrades = (trades || []).length;
-    const activeTrades = (trades || []).filter(t => t.status === 'active').length;
+    const totalTrades = (processedTrades || []).length;
+    const activeTrades = (processedTrades || []).filter(t => t.status === 'active').length;
     
     // Statistics for all time closed trades
     const closedCount = allClosed?.length || 0;
@@ -49,7 +66,7 @@ export async function GET(req: NextRequest) {
     const avgPnl = closedCount > 0 ? totalPnl / closedCount : 0;
 
     return NextResponse.json({
-      trades,
+      trades: processedTrades,
       stats: {
         total_trades: totalTrades,
         active_trades: activeTrades,
@@ -86,7 +103,8 @@ export async function POST(req: NextRequest) {
       timeframe,
       ml_probability,
       win_rate_hist,
-      features_snapshot
+      features_snapshot,
+      explanation_ar
     } = body;
 
     if (!symbol || !entry_price || !tp1 || !tp2 || !sl || !timeframe) {
@@ -96,9 +114,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch dynamic thresholds from system settings
+    // Dynamic thresholds from system settings
     let minRR = 1.5;
-    let minML = 0.58;
+    let minML = CONSTITUTIONAL_MIN_CONFIDENCE; // Supreme Constitution rule: minimum 0.65
     try {
       const { data: settingsRes } = await supabase
         .from('system_settings')
@@ -107,7 +125,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       if (settingsRes?.value) {
         minRR = Number(settingsRes.value.min_risk_reward ?? 1.5);
-        minML = Number(settingsRes.value.min_ml_probability ?? 0.58);
+        minML = Math.max(Number(settingsRes.value.min_ml_probability ?? CONSTITUTIONAL_MIN_CONFIDENCE), CONSTITUTIONAL_MIN_CONFIDENCE);
       }
     } catch (e) {
       console.warn('Error fetching system settings thresholds, using defaults.', e);
@@ -119,10 +137,10 @@ export async function POST(req: NextRequest) {
     const parsedSL = parseFloat(sl);
     const parsedML = ml_probability ? parseFloat(ml_probability) : null;
 
-    // 1. Validate ML Probability if provided
+    // 1. Constitutional Gating Gate (Article 5.3): Reject confidence < 0.65
     if (parsedML !== null && parsedML < minML) {
       return NextResponse.json(
-        { error: `الاحتمال المتوقع للنجاح (${(parsedML * 100).toFixed(0)}%) أقل من الحد الأدنى المسموح به (${(minML * 100).toFixed(0)}%)` },
+        { error: `درجة ثقة التوصية (${(parsedML * 100).toFixed(0)}%) أقل من الحد الأدنى المسموح به دستوريين (${(minML * 100).toFixed(0)}%). تم استبعاد التوصية.` },
         { status: 400 }
       );
     }

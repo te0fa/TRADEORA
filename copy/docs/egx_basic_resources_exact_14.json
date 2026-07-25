@@ -1,0 +1,114 @@
+[
+  {
+    "ticker": "ATQA",
+    "isin": "EGS37021C010",
+    "ar": "مصر الوطنية للصلب - عتاقة",
+    "en": "Misr National Steel - Ataqa",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SKPC",
+    "isin": "EGS380S1C017",
+    "ar": "سيدي كرير للبتروكيماويات - سيدبك",
+    "en": "Sidi Kerir Petrochemicals - SIDPEC",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ABUK",
+    "isin": "EGS38191C010",
+    "ar": "أبو قير للأسمدة والصناعات الكيماوية",
+    "en": "Abou Kir Fertilizers",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MICH",
+    "isin": "EGS38061C016",
+    "ar": "مصر لصناعة الكيماويات",
+    "en": "Misr Chemical Industries",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "KZPC",
+    "isin": "EGS38101C019",
+    "ar": "كفر الزيات للمبيدات والكيماويات",
+    "en": "Kafr El Zayat Pesticides",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EFIC",
+    "isin": "EGS38071C015",
+    "ar": "المالية والصناعية المصرية",
+    "en": "Egyptian Financial & Industrial",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ISMFR",
+    "isin": "EGS38031C019",
+    "ar": "الحديد والصلب المصرية",
+    "en": "Egyptian Iron & Steel",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ALUM",
+    "isin": "EGS37011C011",
+    "ar": "العربية للألومنيوم",
+    "en": "Arab Aluminum",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MFPC",
+    "isin": "EGS38201C017",
+    "ar": "مصر لإنتاج الأسمدة - موبكو",
+    "en": "Misr Fertilizers Production Company - Mopco",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGAL",
+    "isin": "EGS38081C014",
+    "ar": "مصر للألومنيوم",
+    "en": "Egypt Aluminum",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ISMQ",
+    "isin": "EGS37061C016",
+    "ar": "الحديد والصلب للمناجم والمحاجر",
+    "en": "Iron And Steel for Mines and Quarries",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "FERC",
+    "isin": "EGS38121C017",
+    "ar": "فيركم مصر للأسمدة والكيماويات",
+    "en": "FERCHEM MISR CO. FOR FERTILIZERS & CHEMICALS",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ASCM",
+    "isin": "EGS37071C015",
+    "ar": "أسيك للتعدين - أسكوم",
+    "en": "ASEC Company For Mining - ASCOM",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "KIMA",
+    "isin": "EGS38051C017",
+    "ar": "الصناعات الكيماوية المصرية - كيما",
+    "en": "Egyptian Chemical Industries (Kima)",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  }
+]

@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 import os, time, sys
 
 load_dotenv()
-sb = create_client(os.getenv('SUPABASE_URL'),
-                   os.getenv('SUPABASE_KEY'))
+url = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY') or os.getenv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+sb = create_client(url, key)
 
 # TradingView credentials (optional)
 TV_USERNAME = os.getenv('TV_USERNAME', '')

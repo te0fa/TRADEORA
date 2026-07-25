@@ -1,0 +1,92 @@
+[
+  {
+    "index": 1,
+    "symbol": "COMI",
+    "name": "البنك التجاري الدولي",
+    "isin_ca": "EGS60121C018.CA",
+    "yahoo_isin_price": "140.00 EGP",
+    "tradingview_price": "140.00 EGP",
+    "mubasher_price": "139.63 EGP"
+  },
+  {
+    "index": 2,
+    "symbol": "TMGH",
+    "name": "مجموعة طلعت مصطفى",
+    "isin_ca": "EGS691S1C011.CA",
+    "yahoo_isin_price": "100.50 EGP",
+    "tradingview_price": "100.50 EGP",
+    "mubasher_price": "100.46 EGP"
+  },
+  {
+    "index": 3,
+    "symbol": "FWRY",
+    "name": "فوري للمدفوعات",
+    "isin_ca": "EGS745L1C014.CA",
+    "yahoo_isin_price": "19.30 EGP",
+    "tradingview_price": "19.30 EGP",
+    "mubasher_price": "19.09 EGP"
+  },
+  {
+    "index": 4,
+    "symbol": "EAST",
+    "name": "الشرقية للدخان",
+    "isin_ca": "EGS37091C013.CA",
+    "yahoo_isin_price": "37.49 EGP",
+    "tradingview_price": "37.49 EGP",
+    "mubasher_price": "37.23 EGP"
+  },
+  {
+    "index": 5,
+    "symbol": "SWDY",
+    "name": "السويدي إليكتريك",
+    "isin_ca": "EGS3G0B1C014.CA",
+    "yahoo_isin_price": "ISIN Alias Needed",
+    "tradingview_price": "93.60 EGP",
+    "mubasher_price": "92.50 EGP"
+  },
+  {
+    "index": 6,
+    "symbol": "HRHO",
+    "name": "إي إف جي القابضة",
+    "isin_ca": "EGS69101C011.CA",
+    "yahoo_isin_price": "26.95 EGP",
+    "tradingview_price": "26.95 EGP",
+    "mubasher_price": "26.88 EGP"
+  },
+  {
+    "index": 7,
+    "symbol": "EKHO",
+    "name": "المصرية الكويتية",
+    "isin_ca": "EGS69081C013.CA",
+    "yahoo_isin_price": "ISIN Alias Needed",
+    "tradingview_price": "N/A",
+    "mubasher_price": "N/A"
+  },
+  {
+    "index": 8,
+    "symbol": "ETEL",
+    "name": "المصرية للاتصالات",
+    "isin_ca": "EGS48031C016.CA",
+    "yahoo_isin_price": "103.28 EGP",
+    "tradingview_price": "103.28 EGP",
+    "mubasher_price": "103.98 EGP"
+  },
+  {
+    "index": 9,
+    "symbol": "ABUK",
+    "name": "أبو قير للأسمدة",
+    "isin_ca": "EGS38191C010.CA",
+    "yahoo_isin_price": "72.30 EGP",
+    "tradingview_price": "72.30 EGP",
+    "mubasher_price": "72.34 EGP"
+  },
+  {
+    "index": 10,
+    "symbol": "MFPC",
+    "name": "موبكو للأسمدة",
+    "isin_ca": "EGS38201C017.CA",
+    "yahoo_isin_price": "12.92 EGP",
+    "tradingview_price": "37.22 EGP",
+    "mubasher_price": "37.16 EGP"
+  }
+]

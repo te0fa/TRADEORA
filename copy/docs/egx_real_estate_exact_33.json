@@ -1,0 +1,266 @@
+[
+  {
+    "ticker": "BONY",
+    "isin": "EGS652B1C012",
+    "ar": "بنيان للتنمية والتجارة",
+    "en": "Bonyan for Development and Trade",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ZMID",
+    "isin": "EGS65181C018",
+    "ar": "الزهراء للإسكان والتعمير",
+    "en": "Zahraa Maadi Investment & Development",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "GCRE",
+    "isin": "EGS652A1C013",
+    "ar": "الخليجية الكندية للاستثمار العقاري",
+    "en": "Gulf Canadian Real Estate Investment Co.",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "NAHO",
+    "isin": "EGS652C1C011",
+    "ar": "مجموعة النعيم القابضة للاستثمار العقاري",
+    "en": "Naeem Real Estate Holding Group",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "TMGH",
+    "isin": "EGS691S1C011",
+    "ar": "مجموعة طلعت مصطفى القابضة",
+    "en": "T M G Holding",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MENA",
+    "isin": "EGS65061C013",
+    "ar": "مينا لأسكان والاستثمار العقاري والمنتجعات",
+    "en": "Mena Touristic & Real Estate Investment",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ALICO",
+    "isin": "EGS65051C014",
+    "ar": "العربية للاستثمار العقاري - أليكو",
+    "en": "Arab Real Estate Investment CO.-ALICO",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "NHPS",
+    "isin": "EGS65201C018",
+    "ar": "الوطنية للإسكان للنقابات المهنية",
+    "en": "National Housing for Professional Syndicates",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "DENC",
+    "isin": "EGS65211C017",
+    "ar": "الاستشارات الهندسية والتنمية",
+    "en": "Development & Engineering Consultants",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ELKA",
+    "isin": "EGS60711C012",
+    "ar": "القاهرة للإسكان والتعمير",
+    "en": "El Kahera Housing",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AREH",
+    "isin": "EGS65021C017",
+    "ar": "المجموعة المصرية العقارية",
+    "en": "Egyptian Real Estate Group",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "GIHD",
+    "isin": "EGS65221C016",
+    "ar": "الغربية الإسلامية للإسكان والتعمير",
+    "en": "Gharbia Islamic Housing Development",
+    "sharia": "✅ حلال (إسلامي)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "HELI",
+    "isin": "EGS65011C018",
+    "ar": "مصر الجديدة للإسكان والتعمير",
+    "en": "Heliopolis Housing",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "OBRI",
+    "isin": "EGS65231C015",
+    "ar": "العبور للاستثمار العقاري",
+    "en": "El Obour Real Estate Investment",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "OCDI",
+    "isin": "EGS65591C017",
+    "ar": "السادس من أكتوبر للتنمية والاستثمار - سوديك",
+    "en": "Six of October Development & Investment (SODIC)",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EMFD",
+    "isin": "EGS65001C019",
+    "ar": "إعمار مصر للتنمية",
+    "en": "Emaar Misr for Development",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "IDRE",
+    "isin": "EGS65241C014",
+    "ar": "الإسماعيلية للتطوير والتنمية العقارية",
+    "en": "Ismailia Development and Real Estate Co",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ATLAS",
+    "isin": "EGS70411C013",
+    "ar": "أطلس للاستثمار والصناعات الغذائية",
+    "en": "Atlas For Investment and Food Industries",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "TREI",
+    "isin": "EGS65251C013",
+    "ar": "تنمية للاستثمار العقاري",
+    "en": "Tanmiya for Real Estate Investment",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PRDC",
+    "isin": "EGS65261C012",
+    "ar": "بايرونيرز بروبرتيز للتنمية العمرانية",
+    "en": "Pioneers Properties For Urban Development - PRE Group",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MARE",
+    "isin": "EGS65271C011",
+    "ar": "المرسيليا المصرية الخليجية للاستثمار العقاري",
+    "en": "Egyptian Gulf Marseilia For Real Estate Investment",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ACAP",
+    "isin": "EGS65281C010",
+    "ar": "أي كابيتال القابضة",
+    "en": "A Capital Holding",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "UEGC",
+    "isin": "EGS65091C010",
+    "ar": "الصعيد العامة للمقاولات والاستثمار العقاري SCCD",
+    "en": "Elsaeed Contracting& Real Estate Investment Company SCCD",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AMER",
+    "isin": "EGS658A1C016",
+    "ar": "مجموعة عامر جروب القابضة",
+    "en": "Amer Group Holding",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PHDC",
+    "isin": "EGS655L1C012",
+    "ar": "بالم هيلز للتعمير",
+    "en": "Palm Hills Development Company",
+    "sharia": "✅ حلال (EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EHDR",
+    "isin": "EGS65291C019",
+    "ar": "المصريين للإسكان والتنمية والتعمير",
+    "en": "Egyptians Housing Development & Reconstruction",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ELSH",
+    "isin": "EGS65081C011",
+    "ar": "الشمس للإسكان والتعمير",
+    "en": "El Shams Housing & Urbanization",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "UNIT",
+    "isin": "EGS65201C018",
+    "ar": "المتحدة للإسكان والتعمير",
+    "en": "United Housing & Development",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ORHD",
+    "isin": "EGS65851C015",
+    "ar": "أوراسكوم للتنمية مصر",
+    "en": "Orascom Development Egypt",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MNHD",
+    "isin": "EGS65041C015",
+    "ar": "مدينة مصر للإسكان والتعمير",
+    "en": "Madinet Masr For Housing and Development",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ICID",
+    "isin": "EGS73071C016",
+    "ar": "الدولية للاستثمار والتنمية",
+    "en": "International Co For Investment & Development",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PORT",
+    "isin": "EGS659D1C018",
+    "ar": "المطورون العرب القابضة",
+    "en": "Arab Developers Holding",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ACAM",
+    "isin": "EGS65151C011",
+    "ar": "العربية لإدارة وتطوير الأصول",
+    "en": "Arab Co. for Asset Management And Development",
+    "sharia": "✅ حلال",
+    "curr": "EGP"
+  }
+]

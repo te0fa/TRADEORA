@@ -41,6 +41,8 @@ import { CandlestickChart, CandlestickChartHandle, SRLevel } from '@/components/
 import { Info } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { WatchlistButton } from '@/components/stock/WatchlistButton';
+import { StockNewsTab } from '@/components/stock/StockNewsTab';
+import { TechnicalBreakdownTable } from '@/components/stock/TechnicalBreakdownTable';
 import { PriceAlertModal } from '@/components/stock/PriceAlertModal';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 
@@ -180,6 +182,33 @@ async function fetchYahooCandles(symbol: string, interval: string): Promise<{ ca
     }
   } catch (err) {
     console.error('Yahoo candles fetch error:', err);
+  }
+
+  // Fallback to Supabase authentic TradingView intraday snapshots
+  try {
+    const { data: comp } = await supabase.from('companies').select('id').eq('symbol', symbol.toUpperCase()).maybeSingle();
+    if (comp?.id) {
+      const { data: dbSnapshots } = await supabase
+        .from('intraday_snapshots')
+        .select('snapshot_time, open_price, high_price, low_price, price, volume')
+        .eq('company_id', comp.id)
+        .order('snapshot_time', { ascending: true })
+        .limit(1000);
+
+      if (dbSnapshots && dbSnapshots.length > 0) {
+        const candles = dbSnapshots.map(s => ({
+          time: new Date(s.snapshot_time).getTime() / 1000,
+          open: Number(s.open_price || s.price),
+          high: Number(s.high_price || s.price),
+          low: Number(s.low_price || s.price),
+          close: Number(s.price),
+          volume: Number(s.volume || 0)
+        }));
+        return { candles, events: {} };
+      }
+    }
+  } catch (dbErr) {
+    console.warn('Database candles fallback error:', dbErr);
   }
 
   return { candles: [], events: {} };
@@ -3416,7 +3445,23 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
                 )}
               </div>
 
-              <p className="text-[9px] text-text-secondary/40 leading-relaxed border-t border-white/5 pt-2">
+              {/* Technical Breakdown Matrix Table (Fibonacci + SuperTrend + Ichimoku + Confluence) */}
+              <TechnicalBreakdownTable 
+                symbol={symbol}
+                currentPrice={currentPrice}
+                locale={locale}
+              />
+
+              {/* Stock Specific News & Disclosures Tab */}
+              <div className="mt-8 pt-6 border-t border-white/5">
+                <StockNewsTab 
+                  symbol={symbol}
+                  companyId={companyId}
+                  locale={locale}
+                />
+              </div>
+
+              <p className="text-[9px] text-text-secondary/40 leading-relaxed border-t border-white/5 pt-4 mt-6">
                 ⚠️ {locale === 'ar'
                   ? 'البيانات والأهداف لغرض التحليل والمعلومات فقط وليست توصية استثمارية مباشرة.'
                   : 'Data and targets are for analysis purposes only and do not constitute direct investment advice.'}

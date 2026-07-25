@@ -1,0 +1,202 @@
+[
+  {
+    "ticker": "TMGH",
+    "isin": "EGS691S1C011",
+    "ar": "مجموعة طلعت مصطفى القابضة",
+    "en": "Talaat Moustafa Group Holding",
+    "sharia": "✅ حلال (مؤشر الشريعة EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "HELI",
+    "isin": "EGS65011C018",
+    "ar": "مصر الجديدة للإسكان والتعمير",
+    "en": "Heliopolis Housing",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MNHD",
+    "isin": "EGS65041C015",
+    "ar": "مدينة مصر للإسكان والتعمير",
+    "en": "Madinet Masr",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PHDC",
+    "isin": "EGS655L1C012",
+    "ar": "بالم هيلز للتعمير",
+    "en": "Palm Hills Developments",
+    "sharia": "✅ حلال (مؤشر الشريعة EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EMFD",
+    "isin": "EGS65001C019",
+    "ar": "إعمار مصر للتنمية",
+    "en": "Emaar Misr for Development",
+    "sharia": "✅ حلال (مؤشر الشريعة EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "OCDI",
+    "isin": "EGS65591C017",
+    "ar": "سوديك - السادس من أكتوبر للتنمية والاستثمار",
+    "en": "SODIC",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ORHD",
+    "isin": "EGS65851C015",
+    "ar": "أوراسكوم للتنمية مصر",
+    "en": "Orascom Development Egypt",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ELKA",
+    "isin": "EGS65071C012",
+    "ar": "القاهرة للإسكان والتعمير",
+    "en": "Cairo Housing & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AREH",
+    "isin": "EGS65021C017",
+    "ar": "المجموعة المصرية العقارية",
+    "en": "Egyptian Real Estate Group",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "UNIT",
+    "isin": "EGS65201C018",
+    "ar": "المتحدة للإسكان والتعمير",
+    "en": "United Housing & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "AMER",
+    "isin": "EGS658A1C016",
+    "ar": "مجموعة عامر جروب",
+    "en": "Amer Group Holding",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "PORT",
+    "isin": "EGS659D1C018",
+    "ar": "المطورون العرب القابضة (بورتو)",
+    "en": "Arab Developers Holding",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "DCRE",
+    "isin": "EGS65031C016",
+    "ar": "الدلتا للإسكان والتعمير",
+    "en": "Delta Housing & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ZMID",
+    "isin": "EGS65181C018",
+    "ar": "الزهراء للإسكان والتعمير",
+    "en": "Zahraa Maadi Investment & Development",
+    "sharia": "✅ حلال (مؤشر الشريعة EGX 33)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ACAM",
+    "isin": "EGS65151C011",
+    "ar": "العربية لإدارة وتطوير الأصول",
+    "en": "Arab Asset Management & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "ISMD",
+    "isin": "EGS65081C011",
+    "ar": "شمس للإسكان والتعمير",
+    "en": "Shams Housing & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SOCC",
+    "isin": "EGS65091C010",
+    "ar": "الصعيد العامة للمقاولات والاستثمار العقاري",
+    "en": "Upper Egypt Contracting & Real Estate",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MBRC",
+    "isin": "EGS65111C015",
+    "ar": "مرسى مرسى علم للتنمية العقارية والسياحية",
+    "en": "Marsa Marsa Alam Real Estate",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RDEV",
+    "isin": "EGS65131C013",
+    "ar": "ريكاب للاستثمارات المالية والعقارية",
+    "en": "REACAP Financial & Real Estate",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MOSC",
+    "isin": "EGS65141C012",
+    "ar": "النصر للإسكان والتعمير",
+    "en": "El Nasr for Housing & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "MCDI",
+    "isin": "EGS65161C010",
+    "ar": "المعادي للتنمية والتعمير",
+    "en": "Maadi Development & Construction",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "NREH",
+    "isin": "EGS65171C019",
+    "ar": "النيل العامة لإسكان والتعمير",
+    "en": "Nile Real Estate & Development",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "SREH",
+    "isin": "EGS65191C017",
+    "ar": "الشروق للأوراق المالية والعقارات",
+    "en": "Shorouk Real Estate",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "EGAS",
+    "isin": "EGS65101C016",
+    "ar": "مصر لإدارة القرارات العقارية",
+    "en": "Egypt Real Estate Management",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  },
+  {
+    "ticker": "RREI",
+    "isin": "EGS65121C014",
+    "ar": "الرواد للاستثمار والتنمية العقارية",
+    "en": "Rowad Real Estate & Tourism",
+    "sharia": "✅ حلال (مطابق للضوابط)",
+    "curr": "EGP"
+  }
+]

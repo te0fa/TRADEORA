@@ -1,0 +1,82 @@
+[
+  {
+    "index": 1,
+    "symbol": "COMI",
+    "name": "البنك التجاري الدولي",
+    "google_finance": "Not Found",
+    "yahoo_finance": "81.20 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 2,
+    "symbol": "TMGH",
+    "name": "طلعت مصطفى",
+    "google_finance": "Not Found",
+    "yahoo_finance": "58.00 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 3,
+    "symbol": "FWRY",
+    "name": "فوري",
+    "google_finance": "Not Found",
+    "yahoo_finance": "6.82 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 4,
+    "symbol": "EAST",
+    "name": "الشرقية للدخان",
+    "google_finance": "Not Found",
+    "yahoo_finance": "21.80 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 5,
+    "symbol": "SWDY",
+    "name": "السويدي إليكتريك",
+    "google_finance": "Not Found",
+    "yahoo_finance": "47.69 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 6,
+    "symbol": "HRHO",
+    "name": "إي إف جي القابضة",
+    "google_finance": "Not Found",
+    "yahoo_finance": "21.55 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 7,
+    "symbol": "EKHO",
+    "name": "المصرية الكويتية",
+    "google_finance": "Not Found",
+    "yahoo_finance": "0.78 USD",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 8,
+    "symbol": "ETEL",
+    "name": "المصرية للاتصالات",
+    "google_finance": "Not Found",
+    "yahoo_finance": "32.77 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 9,
+    "symbol": "ABUK",
+    "name": "أبو قير للأسمدة",
+    "google_finance": "Not Found",
+    "yahoo_finance": "58.32 EGP",
+    "mubasher": "Error (HTTPError)"
+  },
+  {
+    "index": 10,
+    "symbol": "MFPC",
+    "name": "موبكو للأسمدة",
+    "google_finance": "Not Found",
+    "yahoo_finance": "43.80 EGP",
+    "mubasher": "Error (HTTPError)"
+  }
+]

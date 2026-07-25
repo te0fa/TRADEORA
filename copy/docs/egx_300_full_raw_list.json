@@ -1,0 +1,2639 @@
+[
+  {
+    "ticker": "COMI",
+    "tradingview_symbol": "EGX:COMI",
+    "name_en": "Commercial International Bank - Egypt (CIB) S.A.E.",
+    "sector_en": "Finance",
+    "close_price": 140,
+    "currency": "EGP",
+    "market_cap": 476719379883
+  },
+  {
+    "ticker": "TMGH",
+    "tradingview_symbol": "EGX:TMGH",
+    "name_en": "Talaat Moustafa Group Holding",
+    "sector_en": "Finance",
+    "close_price": 100.5,
+    "currency": "EGP",
+    "market_cap": 207095707764
+  },
+  {
+    "ticker": "SWDY",
+    "tradingview_symbol": "EGX:SWDY",
+    "name_en": "El Sewedy Electric Company",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 93.6,
+    "currency": "EGP",
+    "market_cap": 200376824663
+  },
+  {
+    "ticker": "ETEL",
+    "tradingview_symbol": "EGX:ETEL",
+    "name_en": "Telecom Egypt",
+    "sector_en": "Communications",
+    "close_price": 103.28,
+    "currency": "EGP",
+    "market_cap": 176306358473
+  },
+  {
+    "ticker": "EGAL",
+    "tradingview_symbol": "EGX:EGAL",
+    "name_en": "Egypt Aluminum",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 301.12,
+    "currency": "EGP",
+    "market_cap": 124211997986
+  },
+  {
+    "ticker": "QNBE",
+    "tradingview_symbol": "EGX:QNBE",
+    "name_en": "Qatar National Bank",
+    "sector_en": "Finance",
+    "close_price": 57,
+    "currency": "EGP",
+    "market_cap": 122200010246
+  },
+  {
+    "ticker": "EAST",
+    "tradingview_symbol": "EGX:EAST",
+    "name_en": "Eastern Company",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 37.49,
+    "currency": "EGP",
+    "market_cap": 112470005035
+  },
+  {
+    "ticker": "MFPC",
+    "tradingview_symbol": "EGX:MFPC",
+    "name_en": "Misr Fertilizers Production Company MOPCO",
+    "sector_en": "Process Industries",
+    "close_price": 37.22,
+    "currency": "EGP",
+    "market_cap": 106752179390
+  },
+  {
+    "ticker": "ABUK",
+    "tradingview_symbol": "EGX:ABUK",
+    "name_en": "Abou Kir Fertilizers & Chemical Industries Co.",
+    "sector_en": "Process Industries",
+    "close_price": 72.3,
+    "currency": "EGP",
+    "market_cap": 91233619305
+  },
+  {
+    "ticker": "ALCN",
+    "tradingview_symbol": "EGX:ALCN",
+    "name_en": "Alexandria Containers & Goods",
+    "sector_en": "Transportation",
+    "close_price": 29.76,
+    "currency": "EGP",
+    "market_cap": 88670124119
+  },
+  {
+    "ticker": "HDBK",
+    "tradingview_symbol": "EGX:HDBK",
+    "name_en": "Housing & Development Bank",
+    "sector_en": "Finance",
+    "close_price": 83,
+    "currency": "EGP",
+    "market_cap": 88195797974
+  },
+  {
+    "ticker": "ORAS",
+    "tradingview_symbol": "EGX:ORAS",
+    "name_en": "Orascom Construction Plc",
+    "sector_en": "Industrial Services",
+    "close_price": 713.5,
+    "currency": "EGP",
+    "market_cap": 84938888228.6024
+  },
+  {
+    "ticker": "EFIH",
+    "tradingview_symbol": "EGX:EFIH",
+    "name_en": "e-finance for Digital and Financial Investments S.A.E.",
+    "sector_en": "Technology Services",
+    "close_price": 23.39,
+    "currency": "EGP",
+    "market_cap": 81085333121
+  },
+  {
+    "ticker": "ADIB",
+    "tradingview_symbol": "EGX:ADIB",
+    "name_en": "Abu Dhabi Islamic Bank-Egypt",
+    "sector_en": "Finance",
+    "close_price": 49.3,
+    "currency": "EGP",
+    "market_cap": 73949998856
+  },
+  {
+    "ticker": "EMFD",
+    "tradingview_symbol": "EGX:EMFD",
+    "name_en": "Emaar Misr for Development SAE",
+    "sector_en": "Finance",
+    "close_price": 11.75,
+    "currency": "EGP",
+    "market_cap": 64001423828
+  },
+  {
+    "ticker": "FWRY",
+    "tradingview_symbol": "EGX:FWRY",
+    "name_en": "Fawry For Banking Technology And Electronic Payment",
+    "sector_en": "Technology Services",
+    "close_price": 19.3,
+    "currency": "EGP",
+    "market_cap": 63830963810
+  },
+  {
+    "ticker": "SCTS",
+    "tradingview_symbol": "EGX:SCTS",
+    "name_en": "Sues Canal Co. for Technology Settling",
+    "sector_en": "Commercial Services",
+    "close_price": 607.85,
+    "currency": "EGP",
+    "market_cap": 55253563708
+  },
+  {
+    "ticker": "ORHD",
+    "tradingview_symbol": "EGX:ORHD",
+    "name_en": "Orascom Development Egypt (S.A.E)",
+    "sector_en": "Consumer Durables",
+    "close_price": 40.4,
+    "currency": "EGP",
+    "market_cap": 45671131559
+  },
+  {
+    "ticker": "PHDC",
+    "tradingview_symbol": "EGX:PHDC",
+    "name_en": "Palm Hills Development Co.",
+    "sector_en": "Finance",
+    "close_price": 15.01,
+    "currency": "EGP",
+    "market_cap": 42927314397
+  },
+  {
+    "ticker": "GPPL",
+    "tradingview_symbol": "EGX:GPPL",
+    "name_en": "Golden Pyramids Plaza",
+    "sector_en": "Finance",
+    "close_price": 1.4,
+    "currency": "USD",
+    "market_cap": 42358716951.90508
+  },
+  {
+    "ticker": "EFID",
+    "tradingview_symbol": "EGX:EFID",
+    "name_en": "Edita Food Industries SAE",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 27.7,
+    "currency": "EGP",
+    "market_cap": 38780755109
+  },
+  {
+    "ticker": "HRHO",
+    "tradingview_symbol": "EGX:HRHO",
+    "name_en": "EFG Holding S.A.E.",
+    "sector_en": "Finance",
+    "close_price": 26.95,
+    "currency": "EGP",
+    "market_cap": 38697315945
+  },
+  {
+    "ticker": "CANA",
+    "tradingview_symbol": "EGX:CANA",
+    "name_en": "Suez Canal Bank SAE",
+    "sector_en": "Finance",
+    "close_price": 37.15,
+    "currency": "EGP",
+    "market_cap": 37150001526
+  },
+  {
+    "ticker": "OCDI",
+    "tradingview_symbol": "EGX:OCDI",
+    "name_en": "Six of October Development & Investment (SODIC)",
+    "sector_en": "Finance",
+    "close_price": 27.5,
+    "currency": "EGP",
+    "market_cap": 35455573425
+  },
+  {
+    "ticker": "JUFO",
+    "tradingview_symbol": "EGX:JUFO",
+    "name_en": "Juhayna Food Industries",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 28.9,
+    "currency": "EGP",
+    "market_cap": 34008257998
+  },
+  {
+    "ticker": "GBCO",
+    "tradingview_symbol": "EGX:GBCO",
+    "name_en": "GB Corp",
+    "sector_en": "Distribution Services",
+    "close_price": 31.31,
+    "currency": "EGP",
+    "market_cap": 33987004419.999996
+  },
+  {
+    "ticker": "RAYA",
+    "tradingview_symbol": "EGX:RAYA",
+    "name_en": "Raya Holding for Financial Investments SAE",
+    "sector_en": "Technology Services",
+    "close_price": 7.76,
+    "currency": "EGP",
+    "market_cap": 33222872308
+  },
+  {
+    "ticker": "HELI",
+    "tradingview_symbol": "EGX:HELI",
+    "name_en": "Heliopolis Housing",
+    "sector_en": "Consumer Durables",
+    "close_price": 8.27,
+    "currency": "EGP",
+    "market_cap": 33123465771.000004
+  },
+  {
+    "ticker": "BTFH",
+    "tradingview_symbol": "EGX:BTFH",
+    "name_en": "Beltone Holding",
+    "sector_en": "Finance",
+    "close_price": 3.09,
+    "currency": "EGP",
+    "market_cap": 33118951014
+  },
+  {
+    "ticker": "EGS385S1C012",
+    "tradingview_symbol": "EGX:EGS385S1C012",
+    "name_en": "Ferchem Misr Co. for Fertilizers & Chemicals",
+    "sector_en": "Process Industries",
+    "close_price": 78.26,
+    "currency": "EGP",
+    "market_cap": 31304000854
+  },
+  {
+    "ticker": "IRON",
+    "tradingview_symbol": "EGX:IRON",
+    "name_en": "Egyptian Iron & Steel",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 31.27,
+    "currency": "EGP",
+    "market_cap": 30546795812
+  },
+  {
+    "ticker": "CIEB",
+    "tradingview_symbol": "EGX:CIEB",
+    "name_en": "Credit Agricole Egypt",
+    "sector_en": "Finance",
+    "close_price": 24.3,
+    "currency": "EGP",
+    "market_cap": 30250000954
+  },
+  {
+    "ticker": "AMES",
+    "tradingview_symbol": "EGX:AMES",
+    "name_en": "Alexandria New Medical Center Co.",
+    "sector_en": "Health Services",
+    "close_price": 121,
+    "currency": "EGP",
+    "market_cap": 29594372238
+  },
+  {
+    "ticker": "FAITA",
+    "tradingview_symbol": "EGX:FAITA",
+    "name_en": "Faisal Islamic Bank of Egypt",
+    "sector_en": "Finance",
+    "close_price": 0.971,
+    "currency": "USD",
+    "market_cap": 29104000065.00592
+  },
+  {
+    "ticker": "FAIT",
+    "tradingview_symbol": "EGX:FAIT",
+    "name_en": "Faisal Islamic Bank of Egypt",
+    "sector_en": "Finance",
+    "close_price": 37.55,
+    "currency": "EGP",
+    "market_cap": 29103999971
+  },
+  {
+    "ticker": "VLMR",
+    "tradingview_symbol": "EGX:VLMR",
+    "name_en": "Valmore Holding",
+    "sector_en": "Finance",
+    "close_price": 0.656,
+    "currency": "USD",
+    "market_cap": 28594138541.80904
+  },
+  {
+    "ticker": "VLMRA",
+    "tradingview_symbol": "EGX:VLMRA",
+    "name_en": "Valmore Holding",
+    "sector_en": "Finance",
+    "close_price": 30.6,
+    "currency": "EGP",
+    "market_cap": 28594138449.449974
+  },
+  {
+    "ticker": "EXPA",
+    "tradingview_symbol": "EGX:EXPA",
+    "name_en": "Export Development Bank of Egypt",
+    "sector_en": "Finance",
+    "close_price": 19.99,
+    "currency": "EGP",
+    "market_cap": 27186399689
+  },
+  {
+    "ticker": "VALU",
+    "tradingview_symbol": "EGX:VALU",
+    "name_en": "U Consumer Finance S.A.E",
+    "sector_en": "Finance",
+    "close_price": 12.27,
+    "currency": "EGP",
+    "market_cap": 25844994548
+  },
+  {
+    "ticker": "EGCH",
+    "tradingview_symbol": "EGX:EGCH",
+    "name_en": "Egyptian Chemical Industries",
+    "sector_en": "Process Industries",
+    "close_price": 12.92,
+    "currency": "EGP",
+    "market_cap": 25666600567
+  },
+  {
+    "ticker": "IRAX",
+    "tradingview_symbol": "EGX:IRAX",
+    "name_en": "El Ezz Aldekhela Steel-Alexandria",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 1000,
+    "currency": "EGP",
+    "market_cap": 24448582708
+  },
+  {
+    "ticker": "CLHO",
+    "tradingview_symbol": "EGX:CLHO",
+    "name_en": "Cleopatra Hospital Company",
+    "sector_en": "Health Services",
+    "close_price": 16.9,
+    "currency": "EGP",
+    "market_cap": 24399976842
+  },
+  {
+    "ticker": "ARCC",
+    "tradingview_symbol": "EGX:ARCC",
+    "name_en": "Arabian Cement Company",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 56.7,
+    "currency": "EGP",
+    "market_cap": 21254983660
+  },
+  {
+    "ticker": "SCEM",
+    "tradingview_symbol": "EGX:SCEM",
+    "name_en": "Sinai Cement Co.",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 81.4,
+    "currency": "EGP",
+    "market_cap": 21230135414
+  },
+  {
+    "ticker": "TAQA",
+    "tradingview_symbol": "EGX:TAQA",
+    "name_en": "TAQA Arabia",
+    "sector_en": "Utilities",
+    "close_price": 14.54,
+    "currency": "EGP",
+    "market_cap": 19663223615
+  },
+  {
+    "ticker": "EFIC",
+    "tradingview_symbol": "EGX:EFIC",
+    "name_en": "Egyptian Financial & Industrial Co.",
+    "sector_en": "Process Industries",
+    "close_price": 185.91,
+    "currency": "EGP",
+    "market_cap": 18591000366
+  },
+  {
+    "ticker": "POUL",
+    "tradingview_symbol": "EGX:POUL",
+    "name_en": "Cairo Poultry Co.",
+    "sector_en": "Process Industries",
+    "close_price": 38.6,
+    "currency": "EGP",
+    "market_cap": 18489460524
+  },
+  {
+    "ticker": "EGTS",
+    "tradingview_symbol": "EGX:EGTS",
+    "name_en": "Egyptian for Tourism Resorts",
+    "sector_en": "Utilities",
+    "close_price": 17.6,
+    "currency": "EGP",
+    "market_cap": 18480000401
+  },
+  {
+    "ticker": "CIRA",
+    "tradingview_symbol": "EGX:CIRA",
+    "name_en": "Cairo For Investment And Real Estate Developments -CIRA Education",
+    "sector_en": "Consumer Services",
+    "close_price": 31.69,
+    "currency": "EGP",
+    "market_cap": 18468624386
+  },
+  {
+    "ticker": "SKPC",
+    "tradingview_symbol": "EGX:SKPC",
+    "name_en": "Sidi Kerir Petrochemicals",
+    "sector_en": "Process Industries",
+    "close_price": 16.1,
+    "currency": "EGP",
+    "market_cap": 18257400433
+  },
+  {
+    "ticker": "MCQE",
+    "tradingview_symbol": "EGX:MCQE",
+    "name_en": "Misr Cement Co. (Qena)",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 188.35,
+    "currency": "EGP",
+    "market_cap": 18081600586
+  },
+  {
+    "ticker": "MASR",
+    "tradingview_symbol": "EGX:MASR",
+    "name_en": "Madinet Masr for Housing & Development",
+    "sector_en": "Finance",
+    "close_price": 8.35,
+    "currency": "EGP",
+    "market_cap": 17827250814
+  },
+  {
+    "ticker": "MTIE",
+    "tradingview_symbol": "EGX:MTIE",
+    "name_en": "MM Group for Industry & International Trade",
+    "sector_en": "Distribution Services",
+    "close_price": 9.38,
+    "currency": "EGP",
+    "market_cap": 17712021090
+  },
+  {
+    "ticker": "EGSA",
+    "tradingview_symbol": "EGX:EGSA",
+    "name_en": "Egyptian Satellite Co.",
+    "sector_en": "Consumer Services",
+    "close_price": 8.98,
+    "currency": "USD",
+    "market_cap": 17557797489.92279
+  },
+  {
+    "ticker": "SAUD",
+    "tradingview_symbol": "EGX:SAUD",
+    "name_en": "Al Baraka Bank Egypt",
+    "sector_en": "Finance",
+    "close_price": 22.11,
+    "currency": "EGP",
+    "market_cap": 16077045925
+  },
+  {
+    "ticker": "PHAR",
+    "tradingview_symbol": "EGX:PHAR",
+    "name_en": "Egyptian International Pharmaceutical Industries Co.",
+    "sector_en": "Health Technology",
+    "close_price": 91.5,
+    "currency": "EGP",
+    "market_cap": 15441151360
+  },
+  {
+    "ticker": "ORWE",
+    "tradingview_symbol": "EGX:ORWE",
+    "name_en": "Oriental Weavers Carpet",
+    "sector_en": "Consumer Durables",
+    "close_price": 23.12,
+    "currency": "EGP",
+    "market_cap": 15377279919
+  },
+  {
+    "ticker": "UBEE",
+    "tradingview_symbol": "EGX:UBEE",
+    "name_en": "United Bank SAE",
+    "sector_en": "Finance",
+    "close_price": 13.72,
+    "currency": "EGP",
+    "market_cap": 15092000294
+  },
+  {
+    "ticker": "MOIL",
+    "tradingview_symbol": "EGX:MOIL",
+    "name_en": "Maridive & Oil Services SAE",
+    "sector_en": "Industrial Services",
+    "close_price": 0.59,
+    "currency": "USD",
+    "market_cap": 14533833100.899231
+  },
+  {
+    "ticker": "MBSC",
+    "tradingview_symbol": "EGX:MBSC",
+    "name_en": "Misr Beni Suef Cement Co. SAE",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 245,
+    "currency": "EGP",
+    "market_cap": 13480470219
+  },
+  {
+    "ticker": "EGBE",
+    "tradingview_symbol": "EGX:EGBE",
+    "name_en": "Egyptian Gulf Bank",
+    "sector_en": "Finance",
+    "close_price": 0.485,
+    "currency": "USD",
+    "market_cap": 13236438806.50435
+  },
+  {
+    "ticker": "MHOT",
+    "tradingview_symbol": "EGX:MHOT",
+    "name_en": "Misr Hotels Co.",
+    "sector_en": "Consumer Services",
+    "close_price": 16.6,
+    "currency": "EGP",
+    "market_cap": 13147200302
+  },
+  {
+    "ticker": "ISPH",
+    "tradingview_symbol": "EGX:ISPH",
+    "name_en": "Ibnsina Pharma",
+    "sector_en": "Distribution Services",
+    "close_price": 11.73,
+    "currency": "EGP",
+    "market_cap": 13137599487
+  },
+  {
+    "ticker": "CICH",
+    "tradingview_symbol": "EGX:CICH",
+    "name_en": "CI Capital Holding for Financial Investments",
+    "sector_en": "Finance",
+    "close_price": 12.42,
+    "currency": "EGP",
+    "market_cap": 12390000343
+  },
+  {
+    "ticker": "NIPH",
+    "tradingview_symbol": "EGX:NIPH",
+    "name_en": "El-Nile Co. for Pharmaceuticals & Chemical Industries",
+    "sector_en": "Health Technology",
+    "close_price": 236.01,
+    "currency": "EGP",
+    "market_cap": 11800499725
+  },
+  {
+    "ticker": "ATQA",
+    "tradingview_symbol": "EGX:ATQA",
+    "name_en": "Misr National Steel",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 9.81,
+    "currency": "EGP",
+    "market_cap": 11772000504
+  },
+  {
+    "ticker": "TALM",
+    "tradingview_symbol": "EGX:TALM",
+    "name_en": "Taaleem Management Services S.A.E",
+    "sector_en": "Consumer Services",
+    "close_price": 15.75,
+    "currency": "EGP",
+    "market_cap": 11561085434
+  },
+  {
+    "ticker": "AMOC",
+    "tradingview_symbol": "EGX:AMOC",
+    "name_en": "Alexandria Mineral Oils Co.",
+    "sector_en": "Energy Minerals",
+    "close_price": 8.37,
+    "currency": "EGP",
+    "market_cap": 10809854852
+  },
+  {
+    "ticker": "BINV",
+    "tradingview_symbol": "EGX:BINV",
+    "name_en": "B Investments Holding SAE",
+    "sector_en": "Finance",
+    "close_price": 47.66,
+    "currency": "EGP",
+    "market_cap": 10411537308
+  },
+  {
+    "ticker": "BIOC",
+    "tradingview_symbol": "EGX:BIOC",
+    "name_en": "GlaxoSmithKline S.A.E.",
+    "sector_en": "Distribution Services",
+    "close_price": 121.7,
+    "currency": "EGP",
+    "market_cap": 10163678607
+  },
+  {
+    "ticker": "RMDA",
+    "tradingview_symbol": "EGX:RMDA",
+    "name_en": "Tenth of Ramadan Pharmaceutical Industries & Diagnostic-Rameda",
+    "sector_en": "Health Technology",
+    "close_price": 4.98,
+    "currency": "EGP",
+    "market_cap": 10123430605
+  },
+  {
+    "ticker": "CSAG",
+    "tradingview_symbol": "EGX:CSAG",
+    "name_en": "Canal Shipping Agencies Co.",
+    "sector_en": "Transportation",
+    "close_price": 33.57,
+    "currency": "EGP",
+    "market_cap": 10070999908
+  },
+  {
+    "ticker": "PRDC",
+    "tradingview_symbol": "EGX:PRDC",
+    "name_en": "Pioneers Properties for Urban Development",
+    "sector_en": "Finance",
+    "close_price": 9.8,
+    "currency": "EGP",
+    "market_cap": 9926600474
+  },
+  {
+    "ticker": "IFAP",
+    "tradingview_symbol": "EGX:IFAP",
+    "name_en": "International Agricultural Products",
+    "sector_en": "Process Industries",
+    "close_price": 19.29,
+    "currency": "EGP",
+    "market_cap": 9592692931
+  },
+  {
+    "ticker": "OLFI",
+    "tradingview_symbol": "EGX:OLFI",
+    "name_en": "Obour Land for Food Industries",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 23.43,
+    "currency": "EGP",
+    "market_cap": 9372000122
+  },
+  {
+    "ticker": "ISMQ",
+    "tradingview_symbol": "EGX:ISMQ",
+    "name_en": "Iron & Steel for Mines & Quarries",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 9.27,
+    "currency": "EGP",
+    "market_cap": 9055606236
+  },
+  {
+    "ticker": "SVCE",
+    "tradingview_symbol": "EGX:SVCE",
+    "name_en": "South Valley Cement Co.",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 9.35,
+    "currency": "EGP",
+    "market_cap": 9018203200
+  },
+  {
+    "ticker": "GTHE",
+    "tradingview_symbol": "EGX:GTHE",
+    "name_en": "Global Telecom Holding S.A.E.",
+    "sector_en": "Communications",
+    "close_price": 3.82,
+    "currency": "EGP",
+    "market_cap": 8828498294
+  },
+  {
+    "ticker": "MIPH",
+    "tradingview_symbol": "EGX:MIPH",
+    "name_en": "Minapharm Pharmaceuticals",
+    "sector_en": "Health Technology",
+    "close_price": 746.02,
+    "currency": "EGP",
+    "market_cap": 8414257264
+  },
+  {
+    "ticker": "SPHT",
+    "tradingview_symbol": "EGX:SPHT",
+    "name_en": "El Shams Pyramids Co. for Hotels & Touristic Projects SAE",
+    "sector_en": "Consumer Services",
+    "close_price": 1.91,
+    "currency": "USD",
+    "market_cap": 8374134547.739916
+  },
+  {
+    "ticker": "BONY",
+    "tradingview_symbol": "EGX:BONY",
+    "name_en": "Bonyan for Development and Trade",
+    "sector_en": "Finance",
+    "close_price": 5.03,
+    "currency": "EGP",
+    "market_cap": 8319620347
+  },
+  {
+    "ticker": "MPRC",
+    "tradingview_symbol": "EGX:MPRC",
+    "name_en": "Egyptian Media Production City",
+    "sector_en": "Consumer Services",
+    "close_price": 43.8,
+    "currency": "EGP",
+    "market_cap": 8305794069
+  },
+  {
+    "ticker": "PHTV",
+    "tradingview_symbol": "EGX:PHTV",
+    "name_en": "Pyramisa Hotels",
+    "sector_en": "Consumer Services",
+    "close_price": 313,
+    "currency": "EGP",
+    "market_cap": 7884356840
+  },
+  {
+    "ticker": "CCAP",
+    "tradingview_symbol": "EGX:CCAP",
+    "name_en": "QALA For Financial Investments",
+    "sector_en": "Finance",
+    "close_price": 5.51,
+    "currency": "EGP",
+    "market_cap": 7814620377
+  },
+  {
+    "ticker": "OIH",
+    "tradingview_symbol": "EGX:OIH",
+    "name_en": "Orascom Investment Holding SAE",
+    "sector_en": "Communications",
+    "close_price": 1.47,
+    "currency": "EGP",
+    "market_cap": 7711165082
+  },
+  {
+    "ticker": "DOMT",
+    "tradingview_symbol": "EGX:DOMT",
+    "name_en": "Arabian Food Industries Co.",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 26.86,
+    "currency": "EGP",
+    "market_cap": 7590869952
+  },
+  {
+    "ticker": "EGAS",
+    "tradingview_symbol": "EGX:EGAS",
+    "name_en": "Egypt Gas Co.",
+    "sector_en": "Utilities",
+    "close_price": 52.23,
+    "currency": "EGP",
+    "market_cap": 7532733331
+  },
+  {
+    "ticker": "ZMID",
+    "tradingview_symbol": "EGX:ZMID",
+    "name_en": "Zahraa Maadi Investment & Development",
+    "sector_en": "Finance",
+    "close_price": 7.41,
+    "currency": "EGP",
+    "market_cap": 7409999847
+  },
+  {
+    "ticker": "ELEC",
+    "tradingview_symbol": "EGX:ELEC",
+    "name_en": "Electro Cable Egypt",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 2.23,
+    "currency": "EGP",
+    "market_cap": 7389194895
+  },
+  {
+    "ticker": "CPCI",
+    "tradingview_symbol": "EGX:CPCI",
+    "name_en": "Kahira Pharmaceuticals & Chemical Industries Co.",
+    "sector_en": "Health Technology",
+    "close_price": 466.66,
+    "currency": "EGP",
+    "market_cap": 6969275403
+  },
+  {
+    "ticker": "SUGR",
+    "tradingview_symbol": "EGX:SUGR",
+    "name_en": "Delta Sugar",
+    "sector_en": "Process Industries",
+    "close_price": 47.21,
+    "currency": "EGP",
+    "market_cap": 6713170959
+  },
+  {
+    "ticker": "NINH",
+    "tradingview_symbol": "EGX:NINH",
+    "name_en": "Nozha International Hospital",
+    "sector_en": "Health Services",
+    "close_price": 21.81,
+    "currency": "EGP",
+    "market_cap": 6542999840
+  },
+  {
+    "ticker": "ACAP",
+    "tradingview_symbol": "EGX:ACAP",
+    "name_en": "A Capital Holding",
+    "sector_en": "Finance",
+    "close_price": 8.9,
+    "currency": "EGP",
+    "market_cap": 6508211635
+  },
+  {
+    "ticker": "CPME",
+    "tradingview_symbol": "EGX:CPME",
+    "name_en": "Catalyst Partners Middle East",
+    "sector_en": "Finance",
+    "close_price": 21.48,
+    "currency": "EGP",
+    "market_cap": 6484853886
+  },
+  {
+    "ticker": "SUCE",
+    "tradingview_symbol": "EGX:SUCE",
+    "name_en": "Suez Cement Co.",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 19,
+    "currency": "EGP",
+    "market_cap": 6364978256
+  },
+  {
+    "ticker": "MPCI",
+    "tradingview_symbol": "EGX:MPCI",
+    "name_en": "Memphis Pharmaceutical & Chemical Industries",
+    "sector_en": "Health Technology",
+    "close_price": 278.01,
+    "currency": "EGP",
+    "market_cap": 6324727722
+  },
+  {
+    "ticker": "MOIN",
+    "tradingview_symbol": "EGX:MOIN",
+    "name_en": "Mohandes Insurance Co.",
+    "sector_en": "Finance",
+    "close_price": 23.95,
+    "currency": "EGP",
+    "market_cap": 6193199921
+  },
+  {
+    "ticker": "AXPH",
+    "tradingview_symbol": "EGX:AXPH",
+    "name_en": "Alexandria Company for Pharmaceuticals and Chemical Industries",
+    "sector_en": "Health Technology",
+    "close_price": 1221.07,
+    "currency": "EGP",
+    "market_cap": 6119450073
+  },
+  {
+    "ticker": "ENGC",
+    "tradingview_symbol": "EGX:ENGC",
+    "name_en": "Industrial Engineering Co. for Construction & Development",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 41.7,
+    "currency": "EGP",
+    "market_cap": 6067350111
+  },
+  {
+    "ticker": "NBKE",
+    "tradingview_symbol": "EGX:NBKE",
+    "name_en": "National Bank of Kuwait - Egypt",
+    "sector_en": "Finance",
+    "close_price": 32,
+    "currency": "EGP",
+    "market_cap": 6009999495
+  },
+  {
+    "ticker": "CNFN",
+    "tradingview_symbol": "EGX:CNFN",
+    "name_en": "Contact Financial Holding SAE",
+    "sector_en": "Finance",
+    "close_price": 4.86,
+    "currency": "EGP",
+    "market_cap": 5817293795
+  },
+  {
+    "ticker": "GOUR",
+    "tradingview_symbol": "EGX:GOUR",
+    "name_en": "Gourmet Egypt.Com Foods",
+    "sector_en": "Retail Trade",
+    "close_price": 14.15,
+    "currency": "EGP",
+    "market_cap": 5660000000
+  },
+  {
+    "ticker": "ARAB",
+    "tradingview_symbol": "EGX:ARAB",
+    "name_en": "Arab Developers Holding",
+    "sector_en": "Finance",
+    "close_price": 0.233,
+    "currency": "EGP",
+    "market_cap": 5569390697
+  },
+  {
+    "ticker": "OCPH",
+    "tradingview_symbol": "EGX:OCPH",
+    "name_en": "October Pharma Co.",
+    "sector_en": "Health Technology",
+    "close_price": 463.16,
+    "currency": "EGP",
+    "market_cap": 5557920044
+  },
+  {
+    "ticker": "AMIA",
+    "tradingview_symbol": "EGX:AMIA",
+    "name_en": "Arab Moltaqa Investments Company",
+    "sector_en": "Finance",
+    "close_price": 10.8,
+    "currency": "EGP",
+    "market_cap": 5514162109
+  },
+  {
+    "ticker": "EGS3E071C013-EGP",
+    "tradingview_symbol": "EGX:EGS3E071C013-EGP",
+    "name_en": "Acrow Misr",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 100,
+    "currency": "EGP",
+    "market_cap": 5505468750
+  },
+  {
+    "ticker": "SPIN",
+    "tradingview_symbol": "EGX:SPIN",
+    "name_en": "Alexandria Spinning & Weaving",
+    "sector_en": "Process Industries",
+    "close_price": 14.93,
+    "currency": "EGP",
+    "market_cap": 5385563397
+  },
+  {
+    "ticker": "DSCW",
+    "tradingview_symbol": "EGX:DSCW",
+    "name_en": "Dice Sports & Casual Wear Manufacturers SAE",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 1.96,
+    "currency": "EGP",
+    "market_cap": 5252735981
+  },
+  {
+    "ticker": "ALEX",
+    "tradingview_symbol": "EGX:ALEX",
+    "name_en": "Alexandria Cement Co.",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 18.2,
+    "currency": "EGP",
+    "market_cap": 5038324280
+  },
+  {
+    "ticker": "MCRO",
+    "tradingview_symbol": "EGX:MCRO",
+    "name_en": "Macro Group Pharmaceutical S.A.E.",
+    "sector_en": "Health Technology",
+    "close_price": 1.46,
+    "currency": "EGP",
+    "market_cap": 4983182591
+  },
+  {
+    "ticker": "KABO",
+    "tradingview_symbol": "EGX:KABO",
+    "name_en": "El Nasr Clothing & Textiles Co.",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 8.8,
+    "currency": "EGP",
+    "market_cap": 4969305430
+  },
+  {
+    "ticker": "GSSC",
+    "tradingview_symbol": "EGX:GSSC",
+    "name_en": "General Silos & Storage Co.",
+    "sector_en": "Retail Trade",
+    "close_price": 270.81,
+    "currency": "EGP",
+    "market_cap": 4739174957
+  },
+  {
+    "ticker": "UNIT",
+    "tradingview_symbol": "EGX:UNIT",
+    "name_en": "United Housing Construction SA",
+    "sector_en": "Finance",
+    "close_price": 18.11,
+    "currency": "EGP",
+    "market_cap": 4736974409
+  },
+  {
+    "ticker": "GDWA",
+    "tradingview_symbol": "EGX:GDWA",
+    "name_en": "Gadwa For Industrial Development",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 0.872,
+    "currency": "EGP",
+    "market_cap": 4667605978
+  },
+  {
+    "ticker": "MICH",
+    "tradingview_symbol": "EGX:MICH",
+    "name_en": "Misr Chemical Industries Ltd.",
+    "sector_en": "Process Industries",
+    "close_price": 40.29,
+    "currency": "EGP",
+    "market_cap": 4419309475
+  },
+  {
+    "ticker": "MFSC",
+    "tradingview_symbol": "EGX:MFSC",
+    "name_en": "Misr Duty Free Shops Co.",
+    "sector_en": "Retail Trade",
+    "close_price": 46.15,
+    "currency": "EGP",
+    "market_cap": 4326562643
+  },
+  {
+    "ticker": "WCDF",
+    "tradingview_symbol": "EGX:WCDF",
+    "name_en": "Middle & West Delta Flour Mills Co.",
+    "sector_en": "Process Industries",
+    "close_price": 567.58,
+    "currency": "EGP",
+    "market_cap": 4256850128
+  },
+  {
+    "ticker": "AMER",
+    "tradingview_symbol": "EGX:AMER",
+    "name_en": "Amer Group Holding",
+    "sector_en": "Finance",
+    "close_price": 4.25,
+    "currency": "EGP",
+    "market_cap": 3836856628
+  },
+  {
+    "ticker": "ELKA",
+    "tradingview_symbol": "EGX:ELKA",
+    "name_en": "El Kahera Housing",
+    "sector_en": "Finance",
+    "close_price": 2.06,
+    "currency": "EGP",
+    "market_cap": 3824934818
+  },
+  {
+    "ticker": "UEFM",
+    "tradingview_symbol": "EGX:UEFM",
+    "name_en": "Upper Egypt Flour Mills Co.",
+    "sector_en": "Process Industries",
+    "close_price": 539,
+    "currency": "EGP",
+    "market_cap": 3775240051
+  },
+  {
+    "ticker": "SAIB",
+    "tradingview_symbol": "EGX:SAIB",
+    "name_en": "Societe Arabe Internationale de Banque",
+    "sector_en": "Finance",
+    "close_price": 2.11,
+    "currency": "USD",
+    "market_cap": 3658788539.843031
+  },
+  {
+    "ticker": "AFMC",
+    "tradingview_symbol": "EGX:AFMC",
+    "name_en": "Alexandria Flour Mills Co.",
+    "sector_en": "Retail Trade",
+    "close_price": 107.49,
+    "currency": "EGP",
+    "market_cap": 3535537044
+  },
+  {
+    "ticker": "ELSH",
+    "tradingview_symbol": "EGX:ELSH",
+    "name_en": "El-Shams Housing & Development SA",
+    "sector_en": "Finance",
+    "close_price": 15.1,
+    "currency": "EGP",
+    "market_cap": 3425812587
+  },
+  {
+    "ticker": "AJWA",
+    "tradingview_symbol": "EGX:AJWA",
+    "name_en": "Ajwa for Food Industries Co. Egypt",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 171.79,
+    "currency": "EGP",
+    "market_cap": 3416803949
+  },
+  {
+    "ticker": "ASCM",
+    "tradingview_symbol": "EGX:ASCM",
+    "name_en": "ASEC Co. for Mining",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 61.27,
+    "currency": "EGP",
+    "market_cap": 3369850025
+  },
+  {
+    "ticker": "ACAMD",
+    "tradingview_symbol": "EGX:ACAMD",
+    "name_en": "Arab Co. for Asset Management & Development",
+    "sector_en": "Finance",
+    "close_price": 2.46,
+    "currency": "EGP",
+    "market_cap": 3257235241
+  },
+  {
+    "ticker": "OFH",
+    "tradingview_symbol": "EGX:OFH",
+    "name_en": "O B Financial Holding",
+    "sector_en": "Finance",
+    "close_price": 0.719,
+    "currency": "EGP",
+    "market_cap": 3202042546
+  },
+  {
+    "ticker": "ACTF",
+    "tradingview_symbol": "EGX:ACTF",
+    "name_en": "Act Financial",
+    "sector_en": "Finance",
+    "close_price": 2.77,
+    "currency": "EGP",
+    "market_cap": 3164922449
+  },
+  {
+    "ticker": "ADCI",
+    "tradingview_symbol": "EGX:ADCI",
+    "name_en": "Arab Pharmaceuticals",
+    "sector_en": "Health Technology",
+    "close_price": 258,
+    "currency": "EGP",
+    "market_cap": 3096000000
+  },
+  {
+    "ticker": "TORA",
+    "tradingview_symbol": "EGX:TORA",
+    "name_en": "Tourah Cement Co",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 68,
+    "currency": "EGP",
+    "market_cap": 2903882429
+  },
+  {
+    "ticker": "ACGC",
+    "tradingview_symbol": "EGX:ACGC",
+    "name_en": "Arab Cotton Ginning Co.",
+    "sector_en": "Process Industries",
+    "close_price": 10.83,
+    "currency": "EGP",
+    "market_cap": 2867956041
+  },
+  {
+    "ticker": "LCSW",
+    "tradingview_symbol": "EGX:LCSW",
+    "name_en": "Lecico Egypt SAE",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 33.83,
+    "currency": "EGP",
+    "market_cap": 2819166905
+  },
+  {
+    "ticker": "CFGH",
+    "tradingview_symbol": "EGX:CFGH",
+    "name_en": "Concrete Fashion Group for Commercial and Industrial Investments S.A.E",
+    "sector_en": "Retail Trade",
+    "close_price": 0.108,
+    "currency": "USD",
+    "market_cap": 2685031386.3573027
+  },
+  {
+    "ticker": "SDTI",
+    "tradingview_symbol": "EGX:SDTI",
+    "name_en": "Sharm Dreams Co. for Tourism Investment",
+    "sector_en": "Consumer Services",
+    "close_price": 50.39,
+    "currency": "EGP",
+    "market_cap": 2669937407
+  },
+  {
+    "ticker": "NCGC",
+    "tradingview_symbol": "EGX:NCGC",
+    "name_en": "Nile Cotton Ginning",
+    "sector_en": "Process Industries",
+    "close_price": 51,
+    "currency": "EGP",
+    "market_cap": 2649625015
+  },
+  {
+    "ticker": "AIFI",
+    "tradingview_symbol": "EGX:AIFI",
+    "name_en": "Atlas for Investment & Food Industries SAE",
+    "sector_en": "Process Industries",
+    "close_price": 2.23,
+    "currency": "EGP",
+    "market_cap": 2567366465
+  },
+  {
+    "ticker": "ISMA",
+    "tradingview_symbol": "EGX:ISMA",
+    "name_en": "Ismailia Misr Poultry",
+    "sector_en": "Process Industries",
+    "close_price": 28.29,
+    "currency": "EGP",
+    "market_cap": 2542040215
+  },
+  {
+    "ticker": "KZPC",
+    "tradingview_symbol": "EGX:KZPC",
+    "name_en": "Kafr El Zayat Pesticides & Chemical Co.",
+    "sector_en": "Process Industries",
+    "close_price": 8.59,
+    "currency": "EGP",
+    "market_cap": 2474841487
+  },
+  {
+    "ticker": "ETRS",
+    "tradingview_symbol": "EGX:ETRS",
+    "name_en": "Egyptian Transport And Commercial Services Co. (Egytrans Nosco)",
+    "sector_en": "Transportation",
+    "close_price": 10.85,
+    "currency": "EGP",
+    "market_cap": 2440705566
+  },
+  {
+    "ticker": "EDFM",
+    "tradingview_symbol": "EGX:EDFM",
+    "name_en": "East Delta Flour Mills Co.",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 392,
+    "currency": "EGP",
+    "market_cap": 2357460022
+  },
+  {
+    "ticker": "ZEOT",
+    "tradingview_symbol": "EGX:ZEOT",
+    "name_en": "Extracted Oils & Derivatives Co.",
+    "sector_en": "Process Industries",
+    "close_price": 11.66,
+    "currency": "EGP",
+    "market_cap": 2331999969
+  },
+  {
+    "ticker": "SMFR",
+    "tradingview_symbol": "EGX:SMFR",
+    "name_en": "Samad Misr-EGYFERT",
+    "sector_en": "Distribution Services",
+    "close_price": 235.18,
+    "currency": "EGP",
+    "market_cap": 2257728019
+  },
+  {
+    "ticker": "NARE",
+    "tradingview_symbol": "EGX:NARE",
+    "name_en": "Naeem Real Estate Holding Group",
+    "sector_en": "Finance",
+    "close_price": 17.55,
+    "currency": "EGP",
+    "market_cap": 2241925504
+  },
+  {
+    "ticker": "DAPH",
+    "tradingview_symbol": "EGX:DAPH",
+    "name_en": "Development & Engineering Consultants",
+    "sector_en": "Finance",
+    "close_price": 92.7,
+    "currency": "EGP",
+    "market_cap": 2180526399
+  },
+  {
+    "ticker": "INFI",
+    "tradingview_symbol": "EGX:INFI",
+    "name_en": "Ismailia National Food Industries",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 105.11,
+    "currency": "EGP",
+    "market_cap": 2140722917
+  },
+  {
+    "ticker": "ATLC",
+    "tradingview_symbol": "EGX:ATLC",
+    "name_en": "Al Tawfeek Leasing Company-A.T.LEASE",
+    "sector_en": "Finance",
+    "close_price": 5.19,
+    "currency": "EGP",
+    "market_cap": 2076000023
+  },
+  {
+    "ticker": "ADPC",
+    "tradingview_symbol": "EGX:ADPC",
+    "name_en": "Arab Dairy Products Co. Arab Dairy - Panda",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 4.08,
+    "currency": "EGP",
+    "market_cap": 2039999962
+  },
+  {
+    "ticker": "RACC",
+    "tradingview_symbol": "EGX:RACC",
+    "name_en": "Raya Contact Center",
+    "sector_en": "Commercial Services",
+    "close_price": 10.05,
+    "currency": "EGP",
+    "market_cap": 2002022421
+  },
+  {
+    "ticker": "CRST",
+    "tradingview_symbol": "EGX:CRST",
+    "name_en": "Creast Mark For Contracting And Real Estate Development",
+    "sector_en": "Industrial Services",
+    "close_price": 1.72,
+    "currency": "EGP",
+    "market_cap": 1930719768
+  },
+  {
+    "ticker": "GGCC",
+    "tradingview_symbol": "EGX:GGCC",
+    "name_en": "Giza General Contracting & Real Estate Investment",
+    "sector_en": "Industrial Services",
+    "close_price": 0.89,
+    "currency": "EGP",
+    "market_cap": 1926022330
+  },
+  {
+    "ticker": "EHDR",
+    "tradingview_symbol": "EGX:EHDR",
+    "name_en": "Egyptians Housing Development & Reconstruction",
+    "sector_en": "Finance",
+    "close_price": 2.86,
+    "currency": "EGP",
+    "market_cap": 1921920090
+  },
+  {
+    "ticker": "SNFC",
+    "tradingview_symbol": "EGX:SNFC",
+    "name_en": "Sharkia National Food",
+    "sector_en": "Process Industries",
+    "close_price": 11.45,
+    "currency": "EGP",
+    "market_cap": 1876965539
+  },
+  {
+    "ticker": "EALR",
+    "tradingview_symbol": "EGX:EALR",
+    "name_en": "El Arabia for Land Reclamation",
+    "sector_en": "Finance",
+    "close_price": 360.18,
+    "currency": "EGP",
+    "market_cap": 1872935893
+  },
+  {
+    "ticker": "NAHO",
+    "tradingview_symbol": "EGX:NAHO",
+    "name_en": "Naeem Holding Co.",
+    "sector_en": "Finance",
+    "close_price": 0.102,
+    "currency": "USD",
+    "market_cap": 1865091257.9886239
+  },
+  {
+    "ticker": "MAAL",
+    "tradingview_symbol": "EGX:MAAL",
+    "name_en": "Marseilla Al Masreia Al Khalegeya for Holding Investment",
+    "sector_en": "Finance",
+    "close_price": 8.71,
+    "currency": "EGP",
+    "market_cap": 1862872523
+  },
+  {
+    "ticker": "CEFM",
+    "tradingview_symbol": "EGX:CEFM",
+    "name_en": "Middle Egypt Flour Mills",
+    "sector_en": "Process Industries",
+    "close_price": 126.15,
+    "currency": "EGP",
+    "market_cap": 1857298238
+  },
+  {
+    "ticker": "MILS",
+    "tradingview_symbol": "EGX:MILS",
+    "name_en": "North Cairo Mills Co.",
+    "sector_en": "Process Industries",
+    "close_price": 172,
+    "currency": "EGP",
+    "market_cap": 1840399967
+  },
+  {
+    "ticker": "MPCO",
+    "tradingview_symbol": "EGX:MPCO",
+    "name_en": "Mansourah Poultry Co.",
+    "sector_en": "Process Industries",
+    "close_price": 1.84,
+    "currency": "EGP",
+    "market_cap": 1839999914
+  },
+  {
+    "ticker": "PRCL",
+    "tradingview_symbol": "EGX:PRCL",
+    "name_en": "General Co. for Ceramic & Porcelain Products",
+    "sector_en": "Retail Trade",
+    "close_price": 36.5,
+    "currency": "EGP",
+    "market_cap": 1838355282
+  },
+  {
+    "ticker": "GPIM",
+    "tradingview_symbol": "EGX:GPIM",
+    "name_en": "GPI For Urban Growth",
+    "sector_en": "Finance",
+    "close_price": 1.12,
+    "currency": "EGP",
+    "market_cap": 1832727293
+  },
+  {
+    "ticker": "ICFC",
+    "tradingview_symbol": "EGX:ICFC",
+    "name_en": "International Co. for Fertilizers & Chemicals",
+    "sector_en": "Process Industries",
+    "close_price": 15.46,
+    "currency": "EGP",
+    "market_cap": 1805341528
+  },
+  {
+    "ticker": "ECAP",
+    "tradingview_symbol": "EGX:ECAP",
+    "name_en": "El Ezz Ceramics & Porcelain Co. (Gemma)",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 33.43,
+    "currency": "EGP",
+    "market_cap": 1783240261
+  },
+  {
+    "ticker": "UEGC",
+    "tradingview_symbol": "EGX:UEGC",
+    "name_en": "El-Saeed Contracting & Real Estate Investment Co. SCCD",
+    "sector_en": "Industrial Services",
+    "close_price": 2.43,
+    "currency": "EGP",
+    "market_cap": 1774059784
+  },
+  {
+    "ticker": "IDRE",
+    "tradingview_symbol": "EGX:IDRE",
+    "name_en": "Ismailia Development & Real Estate Co.",
+    "sector_en": "Consumer Durables",
+    "close_price": 47.77,
+    "currency": "EGP",
+    "market_cap": 1759762999
+  },
+  {
+    "ticker": "WKOL",
+    "tradingview_symbol": "EGX:WKOL",
+    "name_en": "Wadi Kom Ombo Land Reclamation",
+    "sector_en": "Industrial Services",
+    "close_price": 310,
+    "currency": "EGP",
+    "market_cap": 1736056025
+  },
+  {
+    "ticker": "MOSC",
+    "tradingview_symbol": "EGX:MOSC",
+    "name_en": "Misr Oils & Soap Co.",
+    "sector_en": "Process Industries",
+    "close_price": 286.09,
+    "currency": "EGP",
+    "market_cap": 1716539978
+  },
+  {
+    "ticker": "MENA",
+    "tradingview_symbol": "EGX:MENA",
+    "name_en": "Mena Touristic & Real Estate Investment",
+    "sector_en": "Finance",
+    "close_price": 7.01,
+    "currency": "EGP",
+    "market_cap": 1695870795
+  },
+  {
+    "ticker": "SCFM",
+    "tradingview_symbol": "EGX:SCFM",
+    "name_en": "South Cairo & Giza Mills & Bakeries",
+    "sector_en": "Process Industries",
+    "close_price": 274.79,
+    "currency": "EGP",
+    "market_cap": 1648740051
+  },
+  {
+    "ticker": "ODIN",
+    "tradingview_symbol": "EGX:ODIN",
+    "name_en": "ODIN Investments",
+    "sector_en": "Finance",
+    "close_price": 2.65,
+    "currency": "EGP",
+    "market_cap": 1590000057
+  },
+  {
+    "ticker": "AALR",
+    "tradingview_symbol": "EGX:AALR",
+    "name_en": "General Co. for Land Reclamation Development & Reconstruction",
+    "sector_en": "Finance",
+    "close_price": 235.63,
+    "currency": "EGP",
+    "market_cap": 1536555346
+  },
+  {
+    "ticker": "KRDI",
+    "tradingview_symbol": "EGX:KRDI",
+    "name_en": "Al Khair River for Development Agriculture Investment and Environmental Services",
+    "sector_en": "Finance",
+    "close_price": 0.389,
+    "currency": "EGP",
+    "market_cap": 1517099994
+  },
+  {
+    "ticker": "NDRL",
+    "tradingview_symbol": "EGX:NDRL",
+    "name_en": "National Drilling Co.",
+    "sector_en": "Industrial Services",
+    "close_price": 4.69,
+    "currency": "USD",
+    "market_cap": 1471974808.3165529
+  },
+  {
+    "ticker": "GTWL",
+    "tradingview_symbol": "EGX:GTWL",
+    "name_en": "Golden Textiles & Clothes Wool",
+    "sector_en": "Process Industries",
+    "close_price": 102.77,
+    "currency": "EGP",
+    "market_cap": 1467901203
+  },
+  {
+    "ticker": "CAED",
+    "tradingview_symbol": "EGX:CAED",
+    "name_en": "Cairo Educational Services",
+    "sector_en": "Consumer Services",
+    "close_price": 121.87,
+    "currency": "EGP",
+    "market_cap": 1462440033
+  },
+  {
+    "ticker": "NHPS",
+    "tradingview_symbol": "EGX:NHPS",
+    "name_en": "National Housing for Professional Syndicates",
+    "sector_en": "Finance",
+    "close_price": 91.3,
+    "currency": "EGP",
+    "market_cap": 1460800049
+  },
+  {
+    "ticker": "CERA",
+    "tradingview_symbol": "EGX:CERA",
+    "name_en": "Arab Ceramic Co. - Ceramica Remas",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 1.33,
+    "currency": "EGP",
+    "market_cap": 1433906296
+  },
+  {
+    "ticker": "ASPI",
+    "tradingview_symbol": "EGX:ASPI",
+    "name_en": "Aspire Capital Holding for Financial Investments",
+    "sector_en": "Finance",
+    "close_price": 0.365,
+    "currency": "EGP",
+    "market_cap": 1423500037
+  },
+  {
+    "ticker": "DEIN",
+    "tradingview_symbol": "EGX:DEIN",
+    "name_en": "Delta Insurance",
+    "sector_en": "Finance",
+    "close_price": 10.35,
+    "currency": "EGP",
+    "market_cap": 1422499992
+  },
+  {
+    "ticker": "OBRI",
+    "tradingview_symbol": "EGX:OBRI",
+    "name_en": "El Obour Real Estate Investment",
+    "sector_en": "Finance",
+    "close_price": 35.27,
+    "currency": "EGP",
+    "market_cap": 1410800018
+  },
+  {
+    "ticker": "NCCW",
+    "tradingview_symbol": "EGX:NCCW",
+    "name_en": "Nasr Co. for Civil Works",
+    "sector_en": "Industrial Services",
+    "close_price": 6.63,
+    "currency": "EGP",
+    "market_cap": 1392300024
+  },
+  {
+    "ticker": "MEPA",
+    "tradingview_symbol": "EGX:MEPA",
+    "name_en": "Medical Packaging Company",
+    "sector_en": "Process Industries",
+    "close_price": 1.93,
+    "currency": "EGP",
+    "market_cap": 1264150044
+  },
+  {
+    "ticker": "DTPP",
+    "tradingview_symbol": "EGX:DTPP",
+    "name_en": "Delta for Printing & Packaging",
+    "sector_en": "Process Industries",
+    "close_price": 224.33,
+    "currency": "EGP",
+    "market_cap": 1256247989
+  },
+  {
+    "ticker": "SMPP",
+    "tradingview_symbol": "EGX:SMPP",
+    "name_en": "Modern Shorouk Printing & Packaging",
+    "sector_en": "Consumer Services",
+    "close_price": 137.5,
+    "currency": "EGP",
+    "market_cap": 1206602065
+  },
+  {
+    "ticker": "TYCN",
+    "tradingview_symbol": "EGX:TYCN",
+    "name_en": "Tycoon Holding Company For Financial Investments",
+    "sector_en": "Finance",
+    "close_price": 21.31,
+    "currency": "EGP",
+    "market_cap": 1113447472
+  },
+  {
+    "ticker": "COSG",
+    "tradingview_symbol": "EGX:COSG",
+    "name_en": "Cairo Oils & Soap",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 1.73,
+    "currency": "EGP",
+    "market_cap": 1079520012
+  },
+  {
+    "ticker": "KWIN",
+    "tradingview_symbol": "EGX:KWIN",
+    "name_en": "El Kahera El Watania Investment",
+    "sector_en": "Finance",
+    "close_price": 99.49,
+    "currency": "EGP",
+    "market_cap": 1044644978
+  },
+  {
+    "ticker": "IEEC",
+    "tradingview_symbol": "EGX:IEEC",
+    "name_en": "Industrial & Engineering Enterprises Co.",
+    "sector_en": "Industrial Services",
+    "close_price": 0.7,
+    "currency": "EGP",
+    "market_cap": 1020600000
+  },
+  {
+    "ticker": "RTVC",
+    "tradingview_symbol": "EGX:RTVC",
+    "name_en": "Remco for Touristic Villages Construction",
+    "sector_en": "Industrial Services",
+    "close_price": 4.05,
+    "currency": "EGP",
+    "market_cap": 999531161
+  },
+  {
+    "ticker": "ALUM",
+    "tradingview_symbol": "EGX:ALUM",
+    "name_en": "Arab Aluminum Co. SAE",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 23.4,
+    "currency": "EGP",
+    "market_cap": 991933021
+  },
+  {
+    "ticker": "EBSC",
+    "tradingview_symbol": "EGX:EBSC",
+    "name_en": "Osool ESB Securities Brokerage",
+    "sector_en": "Finance",
+    "close_price": 1.87,
+    "currency": "EGP",
+    "market_cap": 977380886
+  },
+  {
+    "ticker": "PACH",
+    "tradingview_symbol": "EGX:PACH",
+    "name_en": "Paints & Chemical Industries Co.",
+    "sector_en": "Process Industries",
+    "close_price": 81,
+    "currency": "EGP",
+    "market_cap": 955199982
+  },
+  {
+    "ticker": "SIPC",
+    "tradingview_symbol": "EGX:SIPC",
+    "name_en": "Sabaa International Company for Pharmaceutial and Chemical Industry",
+    "sector_en": "Health Technology",
+    "close_price": 3.82,
+    "currency": "EGP",
+    "market_cap": 954999983
+  },
+  {
+    "ticker": "PRMH",
+    "tradingview_symbol": "EGX:PRMH",
+    "name_en": "Prime Holding",
+    "sector_en": "Finance",
+    "close_price": 2.72,
+    "currency": "EGP",
+    "market_cap": 952000010
+  },
+  {
+    "ticker": "FCMD",
+    "tradingview_symbol": "EGX:FCMD",
+    "name_en": "Future Care For Medical Industries",
+    "sector_en": "Distribution Services",
+    "close_price": 6.53,
+    "currency": "EGP",
+    "market_cap": 946334294
+  },
+  {
+    "ticker": "MEGM",
+    "tradingview_symbol": "EGX:MEGM",
+    "name_en": "Middle East Glass Manufacturing SAE",
+    "sector_en": "Process Industries",
+    "close_price": 12.54,
+    "currency": "EGP",
+    "market_cap": 941924978
+  },
+  {
+    "ticker": "UNIP",
+    "tradingview_symbol": "EGX:UNIP",
+    "name_en": "Universal Co. for Paper & Packaging Materials-Unipack",
+    "sector_en": "Process Industries",
+    "close_price": 0.408,
+    "currency": "EGP",
+    "market_cap": 934908475
+  },
+  {
+    "ticker": "RREI",
+    "tradingview_symbol": "EGX:RREI",
+    "name_en": "Arab Real Estate Investment Co.",
+    "sector_en": "Consumer Durables",
+    "close_price": 3.74,
+    "currency": "EGP",
+    "market_cap": 921535980
+  },
+  {
+    "ticker": "AFDI",
+    "tradingview_symbol": "EGX:AFDI",
+    "name_en": "Alahly For Development & Investment",
+    "sector_en": "Finance",
+    "close_price": 49.29,
+    "currency": "EGP",
+    "market_cap": 887220016
+  },
+  {
+    "ticker": "ARVA",
+    "tradingview_symbol": "EGX:ARVA",
+    "name_en": "Arab Valves Co.",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 11.65,
+    "currency": "EGP",
+    "market_cap": 873083353
+  },
+  {
+    "ticker": "TANM",
+    "tradingview_symbol": "EGX:TANM",
+    "name_en": "Tanmiya for Real Estate Investment",
+    "sector_en": "Finance",
+    "close_price": 6,
+    "currency": "EGP",
+    "market_cap": 873000000
+  },
+  {
+    "ticker": "MBEG",
+    "tradingview_symbol": "EGX:MBEG",
+    "name_en": "MB for Engineering & Contracting",
+    "sector_en": "Distribution Services",
+    "close_price": 4.27,
+    "currency": "EGP",
+    "market_cap": 864863815
+  },
+  {
+    "ticker": "APSW",
+    "tradingview_symbol": "EGX:APSW",
+    "name_en": "Arab Polvara Spinning & Weaving Co.",
+    "sector_en": "Process Industries",
+    "close_price": 8.9,
+    "currency": "EGP",
+    "market_cap": 834747249
+  },
+  {
+    "ticker": "RUBX",
+    "tradingview_symbol": "EGX:RUBX",
+    "name_en": "Rubex International for Plastic & Acrylic Manufacturing",
+    "sector_en": "Consumer Durables",
+    "close_price": 13.2,
+    "currency": "EGP",
+    "market_cap": 812063289
+  },
+  {
+    "ticker": "ICLE",
+    "tradingview_symbol": "EGX:ICLE",
+    "name_en": "International Co. for Leasing SAE",
+    "sector_en": "Finance",
+    "close_price": 15.76,
+    "currency": "EGP",
+    "market_cap": 800261290
+  },
+  {
+    "ticker": "ICID",
+    "tradingview_symbol": "EGX:ICID",
+    "name_en": "International Company for Investment & Development",
+    "sector_en": "Finance",
+    "close_price": 8,
+    "currency": "EGP",
+    "market_cap": 800000000
+  },
+  {
+    "ticker": "EASB",
+    "tradingview_symbol": "EGX:EASB",
+    "name_en": "Egyptian Arabian Company for Securities Brokerage EAC",
+    "sector_en": "Finance",
+    "close_price": 7.92,
+    "currency": "EGP",
+    "market_cap": 792000008
+  },
+  {
+    "ticker": "AIH",
+    "tradingview_symbol": "EGX:AIH",
+    "name_en": "Arabia Investments Holding SAE",
+    "sector_en": "Finance",
+    "close_price": 0.494,
+    "currency": "EGP",
+    "market_cap": 769715600
+  },
+  {
+    "ticker": "ROTO",
+    "tradingview_symbol": "EGX:ROTO",
+    "name_en": "Rowad Tourism (Al Rowad) Co",
+    "sector_en": "Finance",
+    "close_price": 43,
+    "currency": "EGP",
+    "market_cap": 744407400
+  },
+  {
+    "ticker": "SPMD",
+    "tradingview_symbol": "EGX:SPMD",
+    "name_en": "Speed Medical SAE",
+    "sector_en": "Health Services",
+    "close_price": 0.447,
+    "currency": "EGP",
+    "market_cap": 743681403
+  },
+  {
+    "ticker": "MOED",
+    "tradingview_symbol": "EGX:MOED",
+    "name_en": "Egyptian Modern Education Systems",
+    "sector_en": "Commercial Services",
+    "close_price": 0.719,
+    "currency": "EGP",
+    "market_cap": 722617451
+  },
+  {
+    "ticker": "RAKT",
+    "tradingview_symbol": "EGX:RAKT",
+    "name_en": "Rakta Paper Manufacturing",
+    "sector_en": "Process Industries",
+    "close_price": 22.64,
+    "currency": "EGP",
+    "market_cap": 679199982
+  },
+  {
+    "ticker": "COPR",
+    "tradingview_symbol": "EGX:COPR",
+    "name_en": "Cooper for Commercial Investment & Real Estate Development",
+    "sector_en": "Finance",
+    "close_price": 0.4,
+    "currency": "EGP",
+    "market_cap": 630656943
+  },
+  {
+    "ticker": "SEIGA",
+    "tradingview_symbol": "EGX:SEIGA",
+    "name_en": "Saudi Egyptian Investment & Finance Co. SAE",
+    "sector_en": "Finance",
+    "close_price": 0.95,
+    "currency": "USD",
+    "market_cap": 608100015.9641631
+  },
+  {
+    "ticker": "SEIG",
+    "tradingview_symbol": "EGX:SEIG",
+    "name_en": "Saudi Egyptian Investment & Finance Co. SAE",
+    "sector_en": "Finance",
+    "close_price": 243.24,
+    "currency": "EGP",
+    "market_cap": 608100014
+  },
+  {
+    "ticker": "EEII",
+    "tradingview_symbol": "EGX:EEII",
+    "name_en": "El Arabia Engineering Industries",
+    "sector_en": "Electronic Technology",
+    "close_price": 2.73,
+    "currency": "EGP",
+    "market_cap": 606373053
+  },
+  {
+    "ticker": "AREH",
+    "tradingview_symbol": "EGX:AREH",
+    "name_en": "Egyptian Real Estate Group",
+    "sector_en": "Industrial Services",
+    "close_price": 1.5,
+    "currency": "EGP",
+    "market_cap": 600000000
+  },
+  {
+    "ticker": "CCRS",
+    "tradingview_symbol": "EGX:CCRS",
+    "name_en": "Gulf Canadian Real Estate Investment Co.",
+    "sector_en": "Finance",
+    "close_price": 2.67,
+    "currency": "EGP",
+    "market_cap": 560700016
+  },
+  {
+    "ticker": "LKGP",
+    "tradingview_symbol": "EGX:LKGP",
+    "name_en": "The Holding Company for Financial Investment - The Lakah Group",
+    "sector_en": "Health Services",
+    "close_price": 3.56,
+    "currency": "EGP",
+    "market_cap": 533957295.00000006
+  },
+  {
+    "ticker": "GRCA",
+    "tradingview_symbol": "EGX:GRCA",
+    "name_en": "Grand Investment Capital",
+    "sector_en": "Finance",
+    "close_price": 62.4,
+    "currency": "EGP",
+    "market_cap": 486720024
+  },
+  {
+    "ticker": "EPCO",
+    "tradingview_symbol": "EGX:EPCO",
+    "name_en": "Egypt for Poultry Co.",
+    "sector_en": "Process Industries",
+    "close_price": 11.1,
+    "currency": "EGP",
+    "market_cap": 472527013
+  },
+  {
+    "ticker": "DCRC",
+    "tradingview_symbol": "EGX:DCRC",
+    "name_en": "Delta Construction & Rebuilding Co.",
+    "sector_en": "Finance",
+    "close_price": 52,
+    "currency": "EGP",
+    "market_cap": 425382175
+  },
+  {
+    "ticker": "ELWA",
+    "tradingview_symbol": "EGX:ELWA",
+    "name_en": "Elwadi for International Investment & Development",
+    "sector_en": "Consumer Services",
+    "close_price": 1.95,
+    "currency": "EGP",
+    "market_cap": 349440014
+  },
+  {
+    "ticker": "IBCT",
+    "tradingview_symbol": "EGX:IBCT",
+    "name_en": "International Business Corp. for Trading & Agencies",
+    "sector_en": "Distribution Services",
+    "close_price": 13.96,
+    "currency": "EGP",
+    "market_cap": 337595799
+  },
+  {
+    "ticker": "GIHD",
+    "tradingview_symbol": "EGX:GIHD",
+    "name_en": "Gharbia Islamic Housing Development",
+    "sector_en": "Consumer Durables",
+    "close_price": 56.51,
+    "currency": "EGP",
+    "market_cap": 317868741
+  },
+  {
+    "ticker": "ELNA",
+    "tradingview_symbol": "EGX:ELNA",
+    "name_en": "El Nasr for Manufacturing Agricultural Crops",
+    "sector_en": "Process Industries",
+    "close_price": 38.79,
+    "currency": "EGP",
+    "market_cap": 305099977
+  },
+  {
+    "ticker": "EGREF",
+    "tradingview_symbol": "EGX:EGREF",
+    "name_en": "Egyptians Real Estate Fund",
+    "sector_en": "Miscellaneous",
+    "close_price": 13.5,
+    "currency": "EGP",
+    "market_cap": 248091274
+  },
+  {
+    "ticker": "UTOP",
+    "tradingview_symbol": "EGX:UTOP",
+    "name_en": "Utopia Real Estate Investment & Tourism SAE",
+    "sector_en": "Finance",
+    "close_price": 80.25,
+    "currency": "EGP",
+    "market_cap": 241259995
+  },
+  {
+    "ticker": "FNAR",
+    "tradingview_symbol": "EGX:FNAR",
+    "name_en": "Al Fanar Contracting Construction Trade Import & Export Co.",
+    "sector_en": "Industrial Services",
+    "close_price": 13.05,
+    "currency": "EGP",
+    "market_cap": 208479996
+  },
+  {
+    "ticker": "VERT",
+    "tradingview_symbol": "EGX:VERT",
+    "name_en": "Vertika for Industry & Trade",
+    "sector_en": "Technology Services",
+    "close_price": 7.97,
+    "currency": "EGP",
+    "market_cap": 204787227
+  },
+  {
+    "ticker": "NEDA",
+    "tradingview_symbol": "EGX:NEDA",
+    "name_en": "Northern Upper Egypt Development & Agricultural Production",
+    "sector_en": "Process Industries",
+    "close_price": 2.83,
+    "currency": "EGP",
+    "market_cap": 179695236
+  },
+  {
+    "ticker": "TRTO",
+    "tradingview_symbol": "EGX:TRTO",
+    "name_en": "TransOceans Tours",
+    "sector_en": "Commercial Services",
+    "close_price": 0.034,
+    "currency": "USD",
+    "market_cap": 178103719.79999998
+  },
+  {
+    "ticker": "MMAT",
+    "tradingview_symbol": "EGX:MMAT",
+    "name_en": "Marsa Marsa Alam for Tourism Development",
+    "sector_en": "Consumer Services",
+    "close_price": 3.53,
+    "currency": "EGP",
+    "market_cap": 176499999
+  },
+  {
+    "ticker": "EPPK",
+    "tradingview_symbol": "EGX:EPPK",
+    "name_en": "El Ahram Co. for Printing & Packing",
+    "sector_en": "Process Industries",
+    "close_price": 14.9,
+    "currency": "EGP",
+    "market_cap": 125465595
+  },
+  {
+    "ticker": "EGS30AJ1C016-EGP",
+    "tradingview_symbol": "EGX:EGS30AJ1C016-EGP",
+    "name_en": "International Dry Ice Co.",
+    "sector_en": "Process Industries",
+    "close_price": 15.5,
+    "currency": "EGP",
+    "market_cap": 108500000
+  },
+  {
+    "ticker": "BIGP",
+    "tradingview_symbol": "EGX:BIGP",
+    "name_en": "ElBarbary Investment Group",
+    "sector_en": "Distribution Services",
+    "close_price": 0.284,
+    "currency": "EGP",
+    "market_cap": 93169415
+  },
+  {
+    "ticker": "RKAZ",
+    "tradingview_symbol": "EGX:RKAZ",
+    "name_en": "REKAZ Financial Holding",
+    "sector_en": "Process Industries",
+    "close_price": 4.49,
+    "currency": "EGP",
+    "market_cap": 89799995
+  },
+  {
+    "ticker": "AMPI",
+    "tradingview_symbol": "EGX:AMPI",
+    "name_en": "AL Moasher Pay for Electronic Payment and Collection (S.A.E)",
+    "sector_en": "Technology Services",
+    "close_price": 2.92,
+    "currency": "EGP",
+    "market_cap": 86480440
+  },
+  {
+    "ticker": "GMCI",
+    "tradingview_symbol": "EGX:GMCI",
+    "name_en": "GMC Group for Industrial Commercial & Financial Investments",
+    "sector_en": "Distribution Services",
+    "close_price": 2.02,
+    "currency": "EGP",
+    "market_cap": 84481155
+  },
+  {
+    "ticker": "FIRE",
+    "tradingview_symbol": "EGX:FIRE",
+    "name_en": "First Investment & Real Estate Development",
+    "sector_en": "Finance",
+    "close_price": 4.9,
+    "currency": "EGP",
+    "market_cap": 67100002
+  },
+  {
+    "ticker": "MKIT",
+    "tradingview_symbol": "EGX:MKIT",
+    "name_en": "Misr Kuwait Investment & Trading Co.",
+    "sector_en": "Distribution Services",
+    "close_price": 2.75,
+    "currency": "EGP",
+    "market_cap": 55599999
+  },
+  {
+    "ticker": "MISR",
+    "tradingview_symbol": "EGX:MISR",
+    "name_en": "MISR Intercontinental for Granite & Marble",
+    "sector_en": "Non-Energy Minerals",
+    "close_price": 5.51,
+    "currency": "EGP",
+    "market_cap": 49997000
+  },
+  {
+    "ticker": "BIDI",
+    "tradingview_symbol": "EGX:BIDI",
+    "name_en": "El Badr Investment and Development - BID",
+    "sector_en": "Process Industries",
+    "close_price": 2.12,
+    "currency": "EGP",
+    "market_cap": 48653999
+  },
+  {
+    "ticker": "EOSB",
+    "tradingview_symbol": "EGX:EOSB",
+    "name_en": "El Orouba Securities Brokerage",
+    "sector_en": "Finance",
+    "close_price": 1.55,
+    "currency": "EGP",
+    "market_cap": 36260000
+  },
+  {
+    "ticker": "APPC",
+    "tradingview_symbol": "EGX:APPC",
+    "name_en": "Advanced Pharmaceutical Packaging Co.",
+    "sector_en": "Process Industries",
+    "close_price": 1.4,
+    "currency": "EGP",
+    "market_cap": 19043202
+  },
+  {
+    "ticker": "SINA",
+    "tradingview_symbol": "EGX:SINA",
+    "name_en": "Sinai Manganese Company",
+    "sector_en": null,
+    "close_price": 15,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "KORA",
+    "tradingview_symbol": "EGX:KORA",
+    "name_en": "KORRA",
+    "sector_en": "Utilities",
+    "close_price": 3.36,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EFAC",
+    "tradingview_symbol": "EGX:EFAC",
+    "name_en": "Egyptian Ferro All Egp10",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "DCCC",
+    "tradingview_symbol": "EGX:DCCC",
+    "name_en": "Damietta Container and Cargo Handling",
+    "sector_en": "Transportation",
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS65621C012",
+    "tradingview_symbol": "EGX:EGS65621C012",
+    "name_en": "El Nasr Housing & Egp5",
+    "sector_en": null,
+    "close_price": 5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "RMTV",
+    "tradingview_symbol": "EGX:RMTV",
+    "name_en": "Rowad Misr Tourism Investment",
+    "sector_en": "Consumer Services",
+    "close_price": 100,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "ADRI",
+    "tradingview_symbol": "EGX:ADRI",
+    "name_en": "Arab Development & Real Estate Investment",
+    "sector_en": "Finance",
+    "close_price": 7.95,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "YAYT",
+    "tradingview_symbol": "EGX:YAYT",
+    "name_en": "Spring & Transportation Needs Manufacturing Co.",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "MLIC",
+    "tradingview_symbol": "EGX:MLIC",
+    "name_en": "Misr Life Insurance",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "FTNS",
+    "tradingview_symbol": "EGX:FTNS",
+    "name_en": "Fitness Prime",
+    "sector_en": "Technology Services",
+    "close_price": 1.3,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "HAVC",
+    "tradingview_symbol": "EGX:HAVC",
+    "name_en": "Hassan Allam Investments & Venture Capital S.A.E",
+    "sector_en": null,
+    "close_price": 1,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EITP",
+    "tradingview_symbol": "EGX:EITP",
+    "name_en": "Egyptian International Tourism Projects",
+    "sector_en": "Consumer Services",
+    "close_price": 9.5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "SNFI",
+    "tradingview_symbol": "EGX:SNFI",
+    "name_en": "Souhag National Food Industries",
+    "sector_en": "Consumer Non-Durables",
+    "close_price": 10.42,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "AIDC",
+    "tradingview_symbol": "EGX:AIDC",
+    "name_en": "Arabia for Investment and Development",
+    "sector_en": "Finance",
+    "close_price": 0.737,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS370O1C013",
+    "tradingview_symbol": "EGX:EGS370O1C013",
+    "name_en": "National Printing",
+    "sector_en": "Commercial Services",
+    "close_price": 27.6,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "NMIN",
+    "tradingview_symbol": "EGX:NMIN",
+    "name_en": "El Nasr Mining Co Egp10",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "CID",
+    "tradingview_symbol": "EGX:CID",
+    "name_en": "Chemical Dev Ind Egp10",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "POCO",
+    "tradingview_symbol": "EGX:POCO",
+    "name_en": "Port Said Container And Cargo Handling",
+    "sector_en": "Transportation",
+    "close_price": 5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "OCAP",
+    "tradingview_symbol": "EGX:OCAP",
+    "name_en": "OG Capital For Investments SPAC",
+    "sector_en": null,
+    "close_price": 1,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGWA",
+    "tradingview_symbol": "EGX:EGWA",
+    "name_en": "General Warehouses of Egypt",
+    "sector_en": "Transportation",
+    "close_price": 5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "ENPI",
+    "tradingview_symbol": "EGX:ENPI",
+    "name_en": "Engineering for the Petroleum and Process Industries-Enppi",
+    "sector_en": null,
+    "close_price": 0.125,
+    "currency": "USD",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS72L31C011",
+    "tradingview_symbol": "EGX:EGS72L31C011",
+    "name_en": "SOLARSOL For Energy",
+    "sector_en": null,
+    "close_price": 0.1,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "MITR",
+    "tradingview_symbol": "EGX:MITR",
+    "name_en": "Misr Travel&Touris Egp6",
+    "sector_en": null,
+    "close_price": 6,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "PMSC",
+    "tradingview_symbol": "EGX:PMSC",
+    "name_en": "Petroleum Marine Services Co .P.M.S",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "USD",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS48271C018-EGP",
+    "tradingview_symbol": "EGX:EGS48271C018-EGP",
+    "name_en": "Egypt - South Africa for Communication",
+    "sector_en": null,
+    "close_price": 0.16,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "HDST",
+    "tradingview_symbol": "EGX:HDST",
+    "name_en": "HEDGESTONE INVESTMENT",
+    "sector_en": null,
+    "close_price": 0.1,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "DGTZ",
+    "tradingview_symbol": "EGX:DGTZ",
+    "name_en": "Digitize for Investment And Technology",
+    "sector_en": "Technology Services",
+    "close_price": 2.58,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "KNGC",
+    "tradingview_symbol": "EGX:KNGC",
+    "name_en": "EL- Nasr Glass And Crystal",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "HBCO",
+    "tradingview_symbol": "EGX:HBCO",
+    "name_en": "Heibco Npv",
+    "sector_en": null,
+    "close_price": 8.13,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGOTH",
+    "tradingview_symbol": "EGX:EGOTH",
+    "name_en": "El Masreyah Touris Egp100",
+    "sector_en": null,
+    "close_price": 100,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "ACFR",
+    "tradingview_symbol": "EGX:ACFR",
+    "name_en": "Alexandria Company For Refractories",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "INEG",
+    "tradingview_symbol": "EGX:INEG",
+    "name_en": "Integrated Engineering Group S.A.E",
+    "sector_en": "Producer Manufacturing",
+    "close_price": 0.533,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "UPMS",
+    "tradingview_symbol": "EGX:UPMS",
+    "name_en": "Union Pharmacist Company For Medical Services And Investment",
+    "sector_en": "Health Services",
+    "close_price": 12.64,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "GTEX",
+    "tradingview_symbol": "EGX:GTEX",
+    "name_en": "G-TEX for Commercial and Industrial Investments S.A.E",
+    "sector_en": "Finance",
+    "close_price": 0.037,
+    "currency": "USD",
+    "market_cap": null
+  },
+  {
+    "ticker": "GEOS",
+    "tradingview_symbol": "EGX:GEOS",
+    "name_en": "Geos for trading and contracting",
+    "sector_en": null,
+    "close_price": 1,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "LUTS",
+    "tradingview_symbol": "EGX:LUTS",
+    "name_en": "Lotus For Agricultural Investments And Development",
+    "sector_en": "Finance",
+    "close_price": 0.739,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "SIEG",
+    "tradingview_symbol": "EGX:SIEG",
+    "name_en": "Egyptian Company for Pipes and Cement Products -Siegwart",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "MMHC",
+    "tradingview_symbol": "EGX:MMHC",
+    "name_en": "El Mamoura Co For Egp10",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EEP",
+    "tradingview_symbol": "EGX:EEP",
+    "name_en": "Egypt Education Platform - EEP",
+    "sector_en": null,
+    "close_price": 1,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS72XL1C014",
+    "tradingview_symbol": "EGX:EGS72XL1C014",
+    "name_en": "Premium Healthcare Group",
+    "sector_en": "Health Services",
+    "close_price": 0.09,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "GGRN",
+    "tradingview_symbol": "EGX:GGRN",
+    "name_en": "Gogreen for Agricultural Investment and Development Company",
+    "sector_en": "Commercial Services",
+    "close_price": 1.42,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "ELAB",
+    "tradingview_symbol": "EGX:ELAB",
+    "name_en": "The Egyptian Linear Alkyl Benzene co.-ELAB",
+    "sector_en": null,
+    "close_price": 0.1,
+    "currency": "USD",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS65861C014",
+    "tradingview_symbol": "EGX:EGS65861C014",
+    "name_en": "Egyptian Contracting Co.-AL- ABD",
+    "sector_en": null,
+    "close_price": 5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "TWSA",
+    "tradingview_symbol": "EGX:TWSA",
+    "name_en": "TAWASOA FOR FACTORING",
+    "sector_en": null,
+    "close_price": 6.74,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "ANCC",
+    "tradingview_symbol": "EGX:ANCC",
+    "name_en": "ALNAHDA Industrial Co.",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "WATP",
+    "tradingview_symbol": "EGX:WATP",
+    "name_en": "Modern Co. for Water Proofing",
+    "sector_en": "Process Industries",
+    "close_price": 25.3,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS73M81C012",
+    "tradingview_symbol": "EGX:EGS73M81C012",
+    "name_en": "National Asset Management And Investment",
+    "sector_en": null,
+    "close_price": 5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "EGS65101C015",
+    "tradingview_symbol": "EGX:EGS65101C015",
+    "name_en": "National Investment & Reconstruction",
+    "sector_en": "Industrial Services",
+    "close_price": 5,
+    "currency": "EGP",
+    "market_cap": null
+  },
+  {
+    "ticker": "NFCI",
+    "tradingview_symbol": "EGX:NFCI",
+    "name_en": "ELNASR Co For Fertilizers And Chemical Industries",
+    "sector_en": null,
+    "close_price": 10,
+    "currency": "EGP",
+    "market_cap": null
+  }
+]

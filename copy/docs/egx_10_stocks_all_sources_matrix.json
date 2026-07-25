@@ -1,0 +1,92 @@
+[
+  {
+    "index": 1,
+    "symbol": "COMI",
+    "name": "البنك التجاري الدولي",
+    "yahoo_adjusted": "81.20 EGP",
+    "tradingview_spot": "140.00 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 2,
+    "symbol": "TMGH",
+    "name": "مجموعة طلعت مصطفى",
+    "yahoo_adjusted": "58.00 EGP",
+    "tradingview_spot": "100.50 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 3,
+    "symbol": "FWRY",
+    "name": "فوري للمدفوعات",
+    "yahoo_adjusted": "6.82 EGP",
+    "tradingview_spot": "19.30 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 4,
+    "symbol": "EAST",
+    "name": "الشرقية للدخان",
+    "yahoo_adjusted": "21.80 EGP",
+    "tradingview_spot": "37.49 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 5,
+    "symbol": "SWDY",
+    "name": "السويدي إليكتريك",
+    "yahoo_adjusted": "47.69 EGP",
+    "tradingview_spot": "93.60 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 6,
+    "symbol": "HRHO",
+    "name": "إي إف جي القابضة",
+    "yahoo_adjusted": "21.55 EGP",
+    "tradingview_spot": "26.95 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 7,
+    "symbol": "EKHO",
+    "name": "المصرية الكويتية",
+    "yahoo_adjusted": "0.78 USD",
+    "tradingview_spot": "Failed",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 8,
+    "symbol": "ETEL",
+    "name": "المصرية للاتصالات",
+    "yahoo_adjusted": "32.77 EGP",
+    "tradingview_spot": "103.28 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 9,
+    "symbol": "ABUK",
+    "name": "أبو قير للأسمدة",
+    "yahoo_adjusted": "58.32 EGP",
+    "tradingview_spot": "72.30 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  },
+  {
+    "index": 10,
+    "symbol": "MFPC",
+    "name": "موبكو للأسمدة",
+    "yahoo_adjusted": "43.80 EGP",
+    "tradingview_spot": "37.22 EGP",
+    "google_finance_spot": "JS Blocked",
+    "mubasher_spot": "Auth/Session Blocked"
+  }
+]

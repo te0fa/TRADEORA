@@ -24,7 +24,8 @@ import {
   Search,
   Shield,
   Star,
-  Award
+  Award,
+  Newspaper
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -105,9 +106,9 @@ export function Navbar({ locale }: NavbarProps) {
 
   const navLinks = [
     { href: `/${locale}`, icon: Home, label: isAr ? 'الرئيسية' : 'Home', exact: true },
+    { href: `/${locale}/news`, icon: Newspaper, label: isAr ? 'الأخبار والإفصاحات' : 'News & Disclosures', color: 'text-cyan-400' },
     { href: `/${locale}/screener`, icon: Search, label: isAr ? 'الفرز' : 'Screener' },
     { href: `/${locale}/sectors`, icon: Briefcase, label: isAr ? 'القطاعات' : 'Sectors', color: 'text-blue-400' },
-    { href: `/${locale}/compare`, icon: TrendingUp, label: isAr ? 'مقارنة' : 'Compare', color: 'text-purple-400' },
     { href: `/${locale}/watchlist`, icon: Star, label: isAr ? 'المراقبة' : 'Watchlist', color: 'text-accent-gold fill-accent-gold' },
     { href: `/${locale}/daily-report`, icon: Award, label: isAr ? 'التقرير اليومي' : 'Daily Report', color: 'text-emerald-400' },
     { href: `/${locale}/my-trades`, icon: Briefcase, label: isAr ? 'صفقاتي' : 'Trades' },
@@ -115,19 +116,19 @@ export function Navbar({ locale }: NavbarProps) {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-surface-elevated/80 backdrop-blur-xl border-b border-white/5 shadow-lg shadow-black/20">
+    <header className="sticky top-0 z-50 w-full glass-header border-b border-cyan-500/20 shadow-xl shadow-black/40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Left Side: Logo & Main Navigation Links */}
         <div className="flex items-center gap-6 lg:gap-8">
           {/* Logo */}
-          <Link href={`/${locale}`} className="flex items-center gap-2 transition-transform hover:scale-105 active:scale-95">
-            <TradeoraLogo width={140} height={40} showSubtitle={false} />
+          <Link href={`/${locale}`} className="flex items-center transition-all hover:scale-105 active:scale-95 py-1">
+            <TradeoraLogo width={150} height={38} showSubtitle={true} />
           </Link>
 
           {/* Navigation Links (Visible only if logged in) */}
           {session && (
-            <nav className="hidden lg:flex items-center gap-2 text-[13px] font-bold text-zinc-400">
+            <nav className="hidden lg:flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-[13px] font-bold text-slate-400">
               {navLinks.map((link) => {
                 const isActive = link.exact 
                   ? pathname === link.href 
@@ -137,18 +138,18 @@ export function Navbar({ locale }: NavbarProps) {
                   <Link 
                     key={link.href}
                     href={link.href}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 relative group ${
-                      isActive ? 'text-white' : 'hover:text-white'
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all duration-300 relative group ${
+                      isActive ? 'text-white font-extrabold' : 'hover:text-white'
                     }`}
                   >
                     {isActive && (
                       <motion.div 
                         layoutId="navIndicator" 
-                        className="absolute inset-0 bg-white/10 rounded-xl"
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-600/30 border border-cyan-400/40 rounded-xl shadow-sm shadow-cyan-500/20"
+                        transition={{ type: "spring", stiffness: 350, damping: 28 }}
                       />
                     )}
-                    <link.icon className={`w-4 h-4 z-10 transition-colors ${link.color || ''} ${isActive && !link.color ? 'text-accent-blue' : ''} group-hover:${link.color ? link.color.split(' ')[0] : 'text-accent-blue'}`} />
+                    <link.icon className={`w-4 h-4 z-10 transition-colors ${link.color || ''} ${isActive && !link.color ? 'text-cyan-400' : ''} group-hover:${link.color ? link.color.split(' ')[0] : 'text-cyan-400'}`} />
                     <span className="z-10">{link.label}</span>
                   </Link>
                 );
@@ -157,7 +158,7 @@ export function Navbar({ locale }: NavbarProps) {
               {userRole === 'admin' && (
                 <Link 
                   href={`/${locale}/admin`}
-                  className="px-3 py-2 rounded-xl bg-down-red/10 border border-down-red/20 text-down-red text-xs font-black hover:bg-down-red/20 transition-all flex items-center gap-1.5 ml-2"
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-black hover:bg-rose-500/30 transition-all flex items-center gap-1.5 ml-1"
                 >
                   <Shield className="w-4 h-4" />
                   <span>{isAr ? 'الإدارة' : 'Admin'}</span>
@@ -166,7 +167,7 @@ export function Navbar({ locale }: NavbarProps) {
 
               <Link 
                 href={`/${locale}/settings`}
-                className={`flex items-center gap-1.5 hover:text-white px-3 py-2 rounded-xl transition-all ml-2 ${
+                className={`flex items-center gap-1.5 hover:text-white px-2.5 py-1.5 rounded-xl transition-all ml-1 ${
                   pathname.includes('/settings') ? 'text-white bg-white/10' : ''
                 }`}
               >
