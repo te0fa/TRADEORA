@@ -41,11 +41,18 @@ export async function GET(req: NextRequest) {
     if (activeCompanyIds.length > 0) {
       const { data: latestPrices } = await supabase
         .from('market_prices')
-        .select('company_id, close_price, price_date')
+        .select('company_id, close_price, price_date, source')
         .in('company_id', activeCompanyIds)
         .order('price_date', { ascending: false });
 
       if (latestPrices) {
+        // First pass: TradingView source
+        latestPrices.forEach((p: any) => {
+          if (!priceMap[p.company_id] && p.source === 'tradingview') {
+            priceMap[p.company_id] = parseFloat(p.close_price);
+          }
+        });
+        // Second pass: Any fallback source
         latestPrices.forEach((p: any) => {
           if (!priceMap[p.company_id]) {
             priceMap[p.company_id] = parseFloat(p.close_price);

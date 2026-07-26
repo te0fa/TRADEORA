@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    if (interval === 15) {
+    if (interval === 1 || interval === 15) {
       return NextResponse.json({ candles: raw15m })
     }
 
@@ -177,6 +177,43 @@ export async function GET(req: NextRequest) {
       })
     }
     return NextResponse.json({ candles: aggregated })
+  }
+
+  // 6. Ultimate Fallback: Fetch daily candles from market_prices (tradingview preferred)
+  const { data: dailyPrices } = await sb
+    .from('market_prices')
+    .select('price_date, open_price, high_price, low_price, close_price, volume, source')
+    .eq('company_id', company.id)
+    .order('price_date', { ascending: true })
+    .limit(1000)
+
+  if (dailyPrices && dailyPrices.length > 0) {
+    const seenDates = new Set<string>()
+    const formattedDaily: any[] = []
+
+    for (const d of dailyPrices) {
+      const dateStr = d.price_date.split('T')[0]
+      if (seenDates.has(dateStr)) continue
+      seenDates.add(dateStr)
+
+      const close = parseFloat(d.close_price)
+      const open = parseFloat(d.open_price ?? d.close_price)
+      const high = parseFloat(d.high_price ?? d.close_price)
+      const low = parseFloat(d.low_price ?? d.close_price)
+
+      if (isNaN(close) || close <= 0) continue
+
+      formattedDaily.push({
+        time: dateStr,
+        open: open > 0 ? open : close,
+        high: Math.max(high, open, close),
+        low: Math.min(low > 0 ? low : close, open, close),
+        close: close,
+        volume: parseInt(d.volume ?? 0, 10)
+      })
+    }
+
+    return NextResponse.json({ candles: formattedDaily })
   }
 
   return NextResponse.json({ candles: [] })
