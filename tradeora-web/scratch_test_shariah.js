@@ -1,10 +1,4 @@
-import { NextResponse } from 'next/server';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-async function fetchMubasherShariah(): Promise<{ value: number; change: number } | null> {
-  // 1. Fetch direct Shariah Index page on Mubasher
+async function fetchMubasherShariah() {
   try {
     const res = await fetch('https://www.mubasher.info/markets/EGX/indices/SHARIAH', {
       headers: {
@@ -20,17 +14,18 @@ async function fetchMubasherShariah(): Promise<{ value: number; change: number }
       if (priceMatch && changeMatch) {
         const val = parseFloat(priceMatch[1].replace(/,/g, ''));
         const chg = parseFloat(changeMatch[1].replace('%', ''));
-        if (!isNaN(val) && !isNaN(chg)) {
-          return { value: parseFloat(val.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        }
+        console.log('Mubasher Shariah direct page:', { val, chg });
+        return { value: val, change: chg };
       }
     }
-  } catch { /* silent */ }
+  } catch (e) {
+    console.error('Mubasher Shariah direct failed:', e.message);
+  }
 
-  // 2. Fallback to main EGX summary page on Mubasher
+  // Fallback to Mubasher main markets page
   try {
     const res = await fetch('https://www.mubasher.info/markets/EGX', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
       cache: 'no-store'
     });
     if (res.ok) {
@@ -40,27 +35,15 @@ async function fetchMubasherShariah(): Promise<{ value: number; change: number }
       if (shariahMatch) {
         const val = parseFloat(shariahMatch[1].replace(/,/g, ''));
         const chg = parseFloat(shariahMatch[3]);
-        if (!isNaN(val) && !isNaN(chg)) {
-          return { value: parseFloat(val.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        }
+        console.log('Mubasher EGX summary fallback:', { val, chg });
+        return { value: val, change: chg };
       }
     }
-  } catch { /* silent */ }
+  } catch (e) {
+    console.error('Mubasher main fallback failed:', e.message);
+  }
 
   return null;
 }
 
-export async function GET() {
-  const data = await fetchMubasherShariah();
-  if (data) {
-    return NextResponse.json(
-      { value: data.value, change: data.change, source: 'mubasher' },
-      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
-    );
-  }
-
-  return NextResponse.json(
-    { value: null, change: null, source: 'unavailable' },
-    { headers: { 'Cache-Control': 'no-store, max-age=0' } }
-  );
-}
+fetchMubasherShariah();

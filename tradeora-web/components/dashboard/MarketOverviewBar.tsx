@@ -77,19 +77,49 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
     return num.toString();
   };
 
-  // Fetch Live Index data for EGX30, EGX70, EGX33 from each dedicated route
+  // Fetch Live Index data for EGX30, EGX70EWI, EGX33
   const [egx30Idx, setEgx30Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
   const [egx70Idx, setEgx70Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
   const [egx33Idx, setEgx33Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
 
   React.useEffect(() => {
-    const fetchAll = () => {
-      fetch('/api/egx30').then(r => r.json()).then(setEgx30Idx).catch(() => {});
-      fetch('/api/egx70').then(r => r.json()).then(setEgx70Idx).catch(() => {});
-      fetch('/api/egx33').then(r => r.json()).then(setEgx33Idx).catch(() => {});
+    const fetchAll = async () => {
+      // 1. Direct TradingView Scanner fetch from browser for instant 0-lag live updates
+      try {
+        const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI'] },
+            columns: ['close', 'change']
+          })
+        });
+        if (tvRes.ok) {
+          const tvData = await tvRes.json();
+          const rows = tvData?.data || [];
+          const egx30Row = rows.find((r: any) => r.s === 'EGX:EGX30')?.d;
+          const egx70Row = rows.find((r: any) => r.s === 'EGX:EGX70EWI')?.d;
+          if (egx30Row && egx30Row[0] != null) {
+            setEgx30Idx({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
+          }
+          if (egx70Row && egx70Row[0] != null) {
+            setEgx70Idx({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
+          }
+        } else {
+          fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()).then(setEgx30Idx).catch(() => {});
+          fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()).then(setEgx70Idx).catch(() => {});
+        }
+      } catch {
+        fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()).then(setEgx30Idx).catch(() => {});
+        fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()).then(setEgx70Idx).catch(() => {});
+      }
+
+      // 2. Fetch EGX33 Shariah index from API (Scraped live from Mubasher)
+      fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()).then(setEgx33Idx).catch(() => {});
     };
+
     fetchAll();
-    const id = setInterval(fetchAll, 10000);
+    const id = setInterval(fetchAll, 3000);
     return () => clearInterval(id);
   }, []);
 

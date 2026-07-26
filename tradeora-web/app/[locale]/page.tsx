@@ -82,16 +82,43 @@ export default function DashboardPage({ params }: Props) {
     fetchSectors();
     fetchMarketSummary();
 
-    fetch('/api/egx30').then(r => r.json()).then(setEgx30).catch(console.error);
-    fetch('/api/egx70').then(r => r.json()).then(setEgx70).catch(console.error);
-    fetch('/api/egx33').then(r => r.json()).then(setEgx33).catch(console.error);
+    const fetchLiveIndices = async () => {
+      // 1. Direct TradingView Scanner fetch from browser for instant 0-lag live updates
+      try {
+        const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI'] },
+            columns: ['close', 'change']
+          })
+        });
+        if (tvRes.ok) {
+          const tvData = await tvRes.json();
+          const rows = tvData?.data || [];
+          const egx30Row = rows.find((r: any) => r.s === 'EGX:EGX30')?.d;
+          const egx70Row = rows.find((r: any) => r.s === 'EGX:EGX70EWI')?.d;
+          if (egx30Row && egx30Row[0] != null) {
+            setEgx30({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
+          }
+          if (egx70Row && egx70Row[0] != null) {
+            setEgx70({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
+          }
+        } else {
+          fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()).then(setEgx30).catch(() => {});
+          fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()).then(setEgx70).catch(() => {});
+        }
+      } catch {
+        fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()).then(setEgx30).catch(() => {});
+        fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()).then(setEgx70).catch(() => {});
+      }
 
-    // Fast real-time index price polling (every 10 seconds)
-    const indexIntervalId = setInterval(() => {
-      fetch('/api/egx30').then(r => r.json()).then(setEgx30).catch(console.error);
-      fetch('/api/egx70').then(r => r.json()).then(setEgx70).catch(console.error);
-      fetch('/api/egx33').then(r => r.json()).then(setEgx33).catch(console.error);
-    }, 10000);
+      // 2. Fetch EGX33 Shariah Index from API (Scraped live from Mubasher)
+      fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()).then(setEgx33).catch(() => {});
+    };
+
+    fetchLiveIndices();
+    const indexIntervalId = setInterval(fetchLiveIndices, 3000);
 
     // Heavy database data polling (every 5 minutes)
     const dbIntervalId = setInterval(() => {
@@ -294,13 +321,15 @@ export default function DashboardPage({ params }: Props) {
             { label: 'EGX33', data: egx33 },
           ].map((idx, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-zinc-400">{idx.label}</span>
-              <span className="text-white font-mono">{idx.data.value !== null ? idx.data.value.toLocaleString('en-US') : '---'}</span>
-              {idx.data.change !== null && (
-                <span className={`font-mono flex items-center ${idx.data.change >= 0 ? 'text-up-green' : 'text-down-red'}`}>
+              <span className="text-zinc-400 font-bold">{idx.label}</span>
+              <span className="text-white font-mono font-extrabold">{idx.data.value !== null ? idx.data.value.toLocaleString('en-US') : '---'}</span>
+              {idx.data.change !== null ? (
+                <span className={`font-mono font-bold flex items-center ${idx.data.change >= 0 ? 'text-up-green' : 'text-down-red'}`} dir="ltr">
                   {idx.data.change >= 0 ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
-                  {Math.abs(idx.data.change)}%
+                  {idx.data.change >= 0 ? '+' : ''}{idx.data.change}%
                 </span>
+              ) : (
+                <span className="font-mono text-zinc-500">---</span>
               )}
             </div>
           ))}

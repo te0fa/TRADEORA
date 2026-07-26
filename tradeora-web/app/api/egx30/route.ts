@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
-export const revalidate = 10;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const TV_HEADERS = {
   'Content-Type': 'application/json',
@@ -9,16 +10,16 @@ const TV_HEADERS = {
   'Referer': 'https://www.tradingview.com/',
 };
 
-async function fetchFromTradingView(ticker: string): Promise<{ value: number; change: number } | null> {
+async function fetchFromTradingView(): Promise<{ value: number; change: number } | null> {
   try {
     const res = await fetch('https://scanner.tradingview.com/egypt/scan', {
       method: 'POST',
       headers: TV_HEADERS,
       body: JSON.stringify({
-        symbols: { tickers: [ticker] },
+        symbols: { tickers: ['EGX:EGX30'] },
         columns: ['close', 'change'],
       }),
-      next: { revalidate: 10 },
+      cache: 'no-store',
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -33,13 +34,14 @@ async function fetchFromTradingView(ticker: string): Promise<{ value: number; ch
   return null;
 }
 
-async function fetchFromYahoo(tickers: string[]): Promise<{ value: number; change: number } | null> {
-  for (const ticker of tickers) {
+async function fetchFromYahoo(): Promise<{ value: number; change: number } | null> {
+  const yahooTickers = ['^CASE30', '^EGX30.CA'];
+  for (const ticker of yahooTickers) {
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
       const res = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
-        next: { revalidate: 10 },
+        cache: 'no-store',
       });
       if (!res.ok) continue;
       const data = await res.json();
@@ -72,18 +74,24 @@ async function fetchFromYahoo(tickers: string[]): Promise<{ value: number; chang
 }
 
 export async function GET() {
-  // 1. TradingView — Primary source (most reliable for EGX indices)
-  const tv = await fetchFromTradingView('EGX:EGX30');
+  const tv = await fetchFromTradingView();
   if (tv) {
-    return NextResponse.json({ value: tv.value, change: tv.change, source: 'tradingview' });
+    return NextResponse.json(
+      { value: tv.value, change: tv.change, source: 'tradingview' },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   }
 
-  // 2. Yahoo Finance — Fallback
-  const yahoo = await fetchFromYahoo(['^CASE30', '^EGX30.CA']);
+  const yahoo = await fetchFromYahoo();
   if (yahoo) {
-    return NextResponse.json({ value: yahoo.value, change: yahoo.change, source: 'yahoo' });
+    return NextResponse.json(
+      { value: yahoo.value, change: yahoo.change, source: 'yahoo' },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   }
 
-  // 3. No data available
-  return NextResponse.json({ value: null, change: null, source: 'unavailable' });
+  return NextResponse.json(
+    { value: null, change: null, source: 'unavailable' },
+    { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+  );
 }
