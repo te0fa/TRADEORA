@@ -44,9 +44,9 @@ export function TechnicalBreakdownTable({
 }: TechnicalBreakdownTableProps) {
   const isAr = locale === 'ar';
 
-  // Calculate dynamic Fibonacci levels
-  const maxPrice = high60d || (currentPrice * 1.15);
-  const minPrice = low60d || (currentPrice * 0.85);
+  const safePrice = currentPrice || 0;
+  const maxPrice = high60d || (safePrice > 0 ? safePrice * 1.15 : 10);
+  const minPrice = low60d || (safePrice > 0 ? safePrice * 0.85 : 5);
   const diff = maxPrice - minPrice;
 
   const fibLevels: FibLevel[] = [
@@ -58,14 +58,14 @@ export function TechnicalBreakdownTable({
   ];
 
   // Technical Indicator Metrics
-  const atr = atrVal || (currentPrice * 0.03);
-  const supertrendPrice = Number((currentPrice - 1.2 * atr).toFixed(2));
-  const isSupertrendBullish = currentPrice >= supertrendPrice;
+  const atr = atrVal || (safePrice * 0.03);
+  const supertrendPrice = Number((safePrice - 1.2 * atr).toFixed(2));
+  const isSupertrendBullish = safePrice >= supertrendPrice;
 
-  const ichimokuTenkan = Number((currentPrice * 0.985).toFixed(2));
-  const isAboveIchimoku = currentPrice > ichimokuTenkan;
+  const ichimokuTenkan = Number((safePrice * 0.985).toFixed(2));
+  const isAboveIchimoku = safePrice > ichimokuTenkan;
 
-  const volumePocPrice = Number((currentPrice * 0.978).toFixed(2));
+  const volumePocPrice = Number((safePrice * 0.978).toFixed(2));
   const riskRewardRatio = "1 : 2.45";
 
   return (

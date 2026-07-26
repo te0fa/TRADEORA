@@ -82,18 +82,19 @@ const CandlestickChartInner = (
         let color = isResistance ? '#EF4444' : '#10B981';
         let lineWidth: 1 | 2 | 3 | 4 = 1;
         let lineStyle = LineStyle.Dashed;
-        let title = price.toFixed(3);
+        const safeP = Number(price ?? 0);
+        let title = safeP.toFixed(3);
 
         if (isATH) {
           color = '#F59E0B';   // Gold/Amber
           lineWidth = 2;
           lineStyle = LineStyle.Solid;
-          title = `🏆 ${price.toFixed(3)}`;
+          title = `🏆 ${safeP.toFixed(3)}`;
         } else if (isProjected) {
           color = '#3B82F6';   // Blue
           lineWidth = 1;
           lineStyle = LineStyle.Dashed;
-          title = `🎯 ${price.toFixed(3)}`;
+          title = `🎯 ${safeP.toFixed(3)}`;
         }
 
         const line = candlestickSeriesRef.current.createPriceLine({

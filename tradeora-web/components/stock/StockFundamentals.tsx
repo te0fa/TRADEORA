@@ -74,7 +74,7 @@ export function StockFundamentals({ fundamentals, currentPrice, locale }: StockF
   };
 
   const getFairValueStatus = (fv: number | null, price: number) => {
-    if (!fv || fv <= 0) return null;
+    if (!fv || fv <= 0 || !price || price <= 0 || isNaN(Number(price))) return null;
     if (price < fv) {
       const discount = ((fv - price) / fv) * 100;
       return {

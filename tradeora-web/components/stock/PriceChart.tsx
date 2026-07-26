@@ -520,19 +520,39 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         });
 
         const formatCandle = (p: any) => {
-          const date = new Date(p.time * 1000);
-          const parts = cairoFormatter.formatToParts(date);
-          const partMap: Record<string, string> = {};
-          parts.forEach(pt => partMap[pt.type] = pt.value);
-          const dateStr = `${partMap.year}-${partMap.month}-${partMap.day} ${partMap.hour}:${partMap.minute}`;
+          let date: Date;
+          if (typeof p.time === 'number') {
+            date = new Date(p.time < 1e11 ? p.time * 1000 : p.time);
+          } else if (p.time) {
+            date = new Date(p.time);
+          } else if (p.price_date) {
+            date = new Date(p.price_date);
+          } else {
+            date = new Date();
+          }
+
+          if (isNaN(date.getTime())) {
+            date = new Date();
+          }
+
+          let dateStr = '';
+          try {
+            const parts = cairoFormatter.formatToParts(date);
+            const partMap: Record<string, string> = {};
+            parts.forEach(pt => partMap[pt.type] = pt.value);
+            dateStr = `${partMap.year}-${partMap.month}-${partMap.day} ${partMap.hour}:${partMap.minute}`;
+          } catch {
+            dateStr = date.toISOString().replace('T', ' ').substring(0, 16);
+          }
+
           return {
-            time: p.time,
+            time: typeof p.time === 'number' ? p.time : Math.floor(date.getTime() / 1000),
             price_date: dateStr,
-            open_price: p.open,
-            high_price: p.high,
-            low_price: p.low,
-            close_price: p.close,
-            volume: p.volume
+            open_price: p.open ?? p.open_price ?? p.close_price ?? p.close ?? 0,
+            high_price: p.high ?? p.high_price ?? p.close_price ?? p.close ?? 0,
+            low_price: p.low ?? p.low_price ?? p.close_price ?? p.close ?? 0,
+            close_price: p.close ?? p.close_price ?? 0,
+            volume: p.volume ?? 0
           };
         };
 
@@ -876,26 +896,32 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   }, [allChartData]);
 
   const displayOHLCV = hoveredOHLCV ?? (activeData ? {
-    open: activeData.open_price ?? activeData.close_price,
-    high: activeData.high_price ?? activeData.close_price,
-    low: activeData.low_price ?? activeData.close_price,
-    close: activeData.close_price,
+    open: activeData.open_price ?? activeData.close_price ?? 0,
+    high: activeData.high_price ?? activeData.close_price ?? 0,
+    low: activeData.low_price ?? activeData.close_price ?? 0,
+    close: activeData.close_price ?? 0,
     volume: activeData.volume ?? 0,
   } : null);
 
-  const latestClose = priceRecord ? priceRecord.close_price : (finalActivePrices[finalActivePrices.length - 1]?.close_price ?? 0);
+  const latestClose = (priceRecord?.close_price != null && !isNaN(Number(priceRecord.close_price)))
+    ? Number(priceRecord.close_price)
+    : (finalActivePrices[finalActivePrices.length - 1]?.close_price != null && !isNaN(Number(finalActivePrices[finalActivePrices.length - 1]?.close_price)))
+      ? Number(finalActivePrices[finalActivePrices.length - 1].close_price)
+      : 0;
 
   const priceChange = useMemo(() => {
-    if (priceRecord && priceRecord.change_percent !== null) {
+    if (priceRecord && priceRecord.change_percent != null && !isNaN(Number(priceRecord.change_percent))) {
       return {
-        diff: priceRecord.change_value ?? 0,
-        pct: priceRecord.change_percent
+        diff: Number(priceRecord.change_value ?? 0),
+        pct: Number(priceRecord.change_percent)
       };
     }
     if (finalActivePrices.length < 2) return { diff: 0, pct: 0 };
-    const cur = finalActivePrices[finalActivePrices.length - 1].close_price;
-    const prev = finalActivePrices[finalActivePrices.length - 2].close_price;
-    return { diff: cur - prev, pct: ((cur - prev) / prev) * 100 };
+    const cur = Number(finalActivePrices[finalActivePrices.length - 1]?.close_price ?? 0);
+    const prev = Number(finalActivePrices[finalActivePrices.length - 2]?.close_price ?? 0);
+    const diff = cur - prev;
+    const pct = (prev !== 0 && !isNaN(prev)) ? ((cur - prev) / prev) * 100 : 0;
+    return { diff: isNaN(diff) ? 0 : diff, pct: isNaN(pct) ? 0 : pct };
   }, [finalActivePrices, priceRecord]);
 
   const isUp = priceChange.diff >= 0;
@@ -1226,7 +1252,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
 
   // Stochastic RSI details
   const stochRsiDetails = useMemo(() => {
-    if (!analysisData || analysisData.stochRsi === undefined) {
+    if (!analysisData || analysisData.stochRsi == null) {
       return { val: '-', desc: locale === 'ar' ? 'غير متاح' : 'N/A', score: 0, signal: '🟡' };
     }
     const stoch = analysisData.stochRsi;
@@ -1253,7 +1279,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
 
   // ATH Proximity details
   const athDetails = useMemo(() => {
-    if (!analysisData || analysisData.distAth === undefined) {
+    if (!analysisData || analysisData.distAth == null) {
       return { val: '-', desc: locale === 'ar' ? 'غير متاح' : 'N/A', score: 0, signal: '🟡' };
     }
     const dist = analysisData.distAth;
@@ -2027,13 +2053,13 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         <div className="flex flex-col gap-1">
           <div className="flex items-baseline gap-3 flex-wrap">
             <span className="text-3xl font-extrabold text-text-primary tracking-tight">
-              {latestClose.toFixed(3)}
+              {Number(latestClose ?? 0).toFixed(3)}
               <span className="text-sm font-bold text-text-secondary ml-1.5">
                 {locale === 'ar' ? 'ج.م' : 'EGP'}
               </span>
             </span>
             <span className={`text-sm font-extrabold px-2 py-0.5 rounded-lg ${isUp ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-              {isUp ? '+' : ''}{priceChange.diff.toFixed(3)} ({isUp ? '+' : ''}{priceChange.pct.toFixed(2)}%) {isUp ? '↑' : '↓'}
+              {isUp ? '+' : ''}{Number(priceChange.diff ?? 0).toFixed(3)} ({isUp ? '+' : ''}{Number(priceChange.pct ?? 0).toFixed(2)}%) {isUp ? '↑' : '↓'}
             </span>
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${
               marketRegime === 1
@@ -2054,10 +2080,10 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
           </div>
           {displayOHLCV && (
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-medium text-text-secondary mt-1">
-              <span>{locale === 'ar' ? 'أ:' : 'O:'} <span className="text-text-primary font-mono">{displayOHLCV.open.toFixed(3)}</span></span>
-              <span>{locale === 'ar' ? 'ع:' : 'H:'} <span className="text-text-primary font-mono">{displayOHLCV.high.toFixed(3)}</span></span>
-              <span>{locale === 'ar' ? 'ص:' : 'L:'} <span className="text-text-primary font-mono">{displayOHLCV.low.toFixed(3)}</span></span>
-              <span>{locale === 'ar' ? 'ق:' : 'C:'} <span className="text-text-primary font-mono">{displayOHLCV.close.toFixed(3)}</span></span>
+              <span>{locale === 'ar' ? 'أ:' : 'O:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.open ?? 0).toFixed(3)}</span></span>
+              <span>{locale === 'ar' ? 'ع:' : 'H:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.high ?? 0).toFixed(3)}</span></span>
+              <span>{locale === 'ar' ? 'ص:' : 'L:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.low ?? 0).toFixed(3)}</span></span>
+              <span>{locale === 'ar' ? 'ق:' : 'C:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.close ?? 0).toFixed(3)}</span></span>
               <span>{locale === 'ar' ? 'حجم:' : 'Vol:'} <span className="text-text-primary font-mono">{formatVolume(displayOHLCV.volume)}</span></span>
             </div>
           )}
