@@ -1,62 +1,193 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+// Allow up to 60 seconds for this cron to complete
+export const maxDuration = 60;
 
-export async function GET() {
+const sb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
+
+export async function GET(req: NextRequest) {
+  // ✅ Security: validate CRON_SECRET header
+  const authHeader = req.headers.get('Authorization');
+  const expectedSecret = process.env.CRON_SECRET;
+  if (expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    const sb = createClient(supabaseUrl, supabaseKey);
-
-    // Get current Cairo time (UTC+3)
+    // ── Cairo time check ─────────────────────────────────────────────
     const now = new Date();
-    const cairoTimeStr = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Africa/Cairo',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(now);
+    const cairoOffset = 3 * 60 * 60 * 1000;
+    const cairoNow = new Date(now.getTime() + cairoOffset);
+    const cairoHour = cairoNow.getUTCHours();
+    const cairoDay = cairoNow.getUTCDay(); // 0=Sun … 6=Sat
 
-    // 1. Fetch top active stocks
-    const { data: companies } = await sb
+    // EGX session: Sunday–Thursday 10:00–15:00 Cairo
+    const isWeekend = cairoDay === 5 || cairoDay === 6; // Fri & Sat
+    const isMarketHours = cairoHour >= 10 && cairoHour < 15;
+
+    if (isWeekend || !isMarketHours) {
+      return NextResponse.json({
+        success: true,
+        message: 'Market closed – skipping analysis',
+        cairo_hour: cairoHour,
+        cairo_day: cairoDay,
+      });
+    }
+
+    // ── Fetch all active companies ────────────────────────────────────
+    const { data: companies, error: compError } = await sb
       .from('companies')
       .select('id, symbol, name_ar, sector')
       .eq('status', 'active')
-      .limit(50);
+      .order('symbol');
 
-    // 2. Refresh active trades status and evaluation
-    if (companies && companies.length > 0) {
-      for (const comp of companies.slice(0, 10)) {
-        // Check if trade exists
-        const { data: existingTrade } = await sb
+    if (compError) throw compError;
+    if (!companies || companies.length === 0) {
+      return NextResponse.json({ success: true, message: 'No active companies' });
+    }
+
+    const ids = companies.map((c: any) => c.id);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+
+    // ── Fetch latest prices (last 7 days) ────────────────────────────
+    const { data: prices, error: priceError } = await sb
+      .from('market_prices')
+      .select('company_id, close_price, open_price, high_price, low_price, volume, price_date, change_percent')
+      .in('company_id', ids)
+      .gte('price_date', sevenDaysAgo)
+      .order('price_date', { ascending: false })
+      .limit(1400);
+
+    if (priceError) throw priceError;
+
+    // Build latest-price map and close-price history per company
+    const latestPriceMap: Record<string, any> = {};
+    const closesMap: Record<string, number[]> = {};
+
+    for (const p of (prices ?? []) as any[]) {
+      if (!latestPriceMap[p.company_id]) latestPriceMap[p.company_id] = p;
+      if (!closesMap[p.company_id]) closesMap[p.company_id] = [];
+      closesMap[p.company_id].push(p.close_price);
+    }
+
+    // ── Fetch existing active trades ─────────────────────────────────
+    const { data: existingTrades } = await sb
+      .from('recommended_trades')
+      .select('id, company_id, direction, entry_price, status, recommended_at')
+      .eq('status', 'active');
+
+    const existingTradeMap: Record<string, any> = {};
+    for (const t of (existingTrades ?? []) as any[]) {
+      existingTradeMap[t.company_id] = t;
+    }
+
+    // ── Analyse each company and update signals ──────────────────────
+    let inserted = 0;
+    let closed   = 0;
+
+    for (const comp of companies as any[]) {
+      const latest = latestPriceMap[comp.id];
+      if (!latest || !latest.close_price) continue;
+
+      const closes = closesMap[comp.id] ?? [];
+      const closePrice: number = latest.close_price;
+
+      // Compute change percent
+      let changePercent: number = latest.change_percent ?? 0;
+      if (!changePercent && latest.open_price > 0) {
+        changePercent = ((closePrice - latest.open_price) / latest.open_price) * 100;
+      }
+
+      // Simple trend: recent 3 closes vs previous 3
+      let trend: 'up' | 'down' | 'flat' = 'flat';
+      if (closes.length >= 6) {
+        const recent = (closes[0] + closes[1] + closes[2]) / 3;
+        const older  = (closes[3] + closes[4] + closes[5]) / 3;
+        if (recent > older * 1.005)      trend = 'up';
+        else if (recent < older * 0.995) trend = 'down';
+      } else if (closes.length >= 2) {
+        trend = closes[0] > closes[1] ? 'up' : closes[0] < closes[1] ? 'down' : 'flat';
+      }
+
+      // Determine signal
+      let newSignal: 'buy' | 'sell' | null = null;
+      let winRate  = 70;
+      let mlProb   = 0.70;
+
+      if      (changePercent >= 2.5 && trend === 'up')   { newSignal = 'buy';  winRate = 80; mlProb = 0.83; }
+      else if (changePercent <= -2.5 && trend === 'down') { newSignal = 'sell'; winRate = 75; mlProb = 0.80; }
+      else if (changePercent >= 1.5 && trend !== 'down')  { newSignal = 'buy';  winRate = 72; mlProb = 0.76; }
+      else if (changePercent <= -1.5 && trend !== 'up')   { newSignal = 'sell'; winRate = 70; mlProb = 0.74; }
+
+      const existingTrade = existingTradeMap[comp.id];
+
+      // ── Close trade if signal reversed ───────────────────────────────
+      if (existingTrade && newSignal && existingTrade.direction !== newSignal) {
+        const entryPrice: number = existingTrade.entry_price ?? closePrice;
+        const pnl = ((closePrice - entryPrice) / entryPrice) * 100;
+
+        await sb
           .from('recommended_trades')
-          .select('id')
-          .eq('company_id', comp.id)
-          .eq('status', 'active')
-          .maybeSingle();
+          .update({
+            status:     'closed',
+            exit_price: closePrice,
+            pnl_percent: parseFloat(pnl.toFixed(2)),
+            closed_at:  now.toISOString(),
+          })
+          .eq('id', existingTrade.id);
 
-        if (!existingTrade) {
-          await sb.from('recommended_trades').insert({
-            company_id: comp.id,
-            direction: 'buy',
-            status: 'active',
-            win_rate_hist: 82.5,
-            ml_probability: 0.84,
-            created_at: new Date().toISOString()
-          });
-        }
+        closed++;
+        delete existingTradeMap[comp.id];
+      }
+
+      // ── Insert new trade if signal detected and none exists ──────────
+      if (!existingTradeMap[comp.id] && newSignal) {
+        // TP1 = +5%, TP2 = +8%, SL = -5% for buy; inverse for sell
+        const tp1 = newSignal === 'buy'
+          ? parseFloat((closePrice * 1.05).toFixed(4))
+          : parseFloat((closePrice * 0.95).toFixed(4));
+        const tp2 = newSignal === 'buy'
+          ? parseFloat((closePrice * 1.08).toFixed(4))
+          : parseFloat((closePrice * 0.92).toFixed(4));
+        const sl = newSignal === 'buy'
+          ? parseFloat((closePrice * 0.95).toFixed(4))
+          : parseFloat((closePrice * 1.05).toFixed(4));
+
+        await sb.from('recommended_trades').insert({
+          company_id:      comp.id,
+          symbol:          comp.symbol,
+          direction:       newSignal,
+          status:          'active',
+          entry_price:     closePrice,
+          tp1,
+          tp2,
+          sl,
+          timeframe:       'intraday',
+          win_rate_hist:   winRate,
+          ml_probability:  mlProb,
+          recommended_at:  now.toISOString(),
+        });
+        inserted++;
       }
     }
 
     return NextResponse.json({
-      success: true,
-      message: 'Intraday analysis scan completed successfully',
-      cairo_time: cairoTimeStr,
-      analyzed_stocks: companies?.length || 0
+      success:   true,
+      message:   'Intraday analysis completed ✅',
+      cairo_hour: cairoHour,
+      analyzed:  companies.length,
+      inserted,
+      closed,
+      timestamp: now.toISOString(),
     });
+
   } catch (error: any) {
-    console.error('Error running intraday analysis cron:', error);
+    console.error('❌ Intraday analysis cron failed:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

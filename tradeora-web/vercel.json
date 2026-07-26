@@ -2,7 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/intraday-analysis",
-      "schedule": "30 11 * * 0,1,2,3,4"
+      "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/cron/sync-prices",
+      "schedule": "0 8 * * 1"
     }
   ]
 }
