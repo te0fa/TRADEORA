@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       const recDate = t.recommended_at ? new Date(t.recommended_at) : new Date();
       const expDateObj = new Date(recDate.getTime() + 4 * 24 * 60 * 60 * 1000);
       const expDateFormatted = expDateObj.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', year: 'numeric' });
-      const expectedTargetDate = `${expDateFormatted} (3 - 5 أيام عمل)`;
+      const expectedTargetDate = `${expDateFormatted} (4 أيام تداول)`;
 
       const companyNameStr = t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol;
       const defaultRationale = isBuy

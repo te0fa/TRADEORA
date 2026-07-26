@@ -466,7 +466,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                       <div className="text-xs text-accent-gold bg-accent-gold/10 p-2 rounded-xl border border-accent-gold/20 flex items-center justify-between font-mono font-medium">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{isAr ? 'تاريخ الهدف المتوقع (توقع الذكاء الاصطناعي):' : 'AI Expected Target Date:'}</span>
+                          <span>{isAr ? 'تاريخ الهدف المتوقع:' : 'Expected Target Date:'}</span>
                         </span>
                         <span className="font-bold text-white">{t.expected_target_date}</span>
                       </div>
