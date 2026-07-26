@@ -379,7 +379,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                   {/* 4 Metric Cards Row */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-black/40 border border-white/5 text-xs font-mono">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? 'سعر الدخول' : 'Entry Price'}</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? 'سعر الدخول' : 'سعر الخروج') : (isBuy ? 'Entry Price' : 'Exit Price')}</span>
                       <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
                     </div>
                     <div className="flex flex-col gap-0.5">
@@ -389,11 +389,11 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                       </span>
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? 'الهدف الأول (TP1)' : 'Target 1'}</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? 'الهدف الأول (TP1)' : 'هدف الهبوط الأول') : 'Target 1'}</span>
                       <span className="font-bold text-emerald-400 text-sm">{tp1.toFixed(2)} ج.م</span>
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? 'وقف الخسارة (SL)' : 'Stop Loss'}</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? 'وقف الخسارة (SL)' : 'الحد الأقصى (SL)') : 'Stop Loss'}</span>
                       <span className="font-bold text-rose-400 text-sm">{sl.toFixed(2)} ج.م</span>
                     </div>
                   </div>
@@ -444,7 +444,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                     {/* Labels below scale */}
                     <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 -mt-1 px-1">
                       <span className="text-rose-400 font-bold">🛑 SL: {sl.toFixed(2)}</span>
-                      <span className="text-white font-bold">📍 دخول: {entry.toFixed(2)}</span>
+                      <span className="text-white font-bold">📍 {isBuy ? 'دخول' : 'خروج'}: {entry.toFixed(2)}</span>
                       <span className="text-emerald-400 font-bold">🎯 TP1: {tp1.toFixed(2)}</span>
                       <span className="text-cyan-400 font-bold">🚀 TP2: {tp2.toFixed(2)}</span>
                     </div>
@@ -454,7 +454,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                   <div className="flex flex-col gap-2 font-sans mt-1">
                     {t.trigger_condition_ar && (
                       <div className="text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 leading-relaxed font-medium">
-                        ⚙️ <span className="font-bold text-amber-200">{isAr ? 'شرط تفعيل الدخول:' : 'Trigger Condition:'}</span> {t.trigger_condition_ar}
+                        ⚙️ <span className="font-bold text-amber-200">{isAr ? (isBuy ? 'شرط تفعيل الدخول:' : 'شرط تفعيل الخروج:') : 'Trigger Condition:'}</span> {t.trigger_condition_ar}
                       </div>
                     )}
                     {t.rationale_ar && (
