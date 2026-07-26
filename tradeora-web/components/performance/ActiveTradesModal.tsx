@@ -31,6 +31,8 @@ export interface ActiveTrade {
   timeframe: string;
   rationale_ar?: string;
   expected_target_date?: string;
+  order_type?: 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER' | string;
+  trigger_condition_ar?: string;
 }
 
 interface ActiveTradesModalProps {
@@ -46,6 +48,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
   const [dirFilter, setDirFilter] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
 
   // Extract unique sectors list
   const sectorsList = useMemo(() => {
@@ -64,10 +67,16 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
       if (dirFilter === 'BUY' && !isBuy) return false;
       if (dirFilter === 'SELL' && isBuy) return false;
 
-      // 2. Sector Filter
+      // 2. Order Type Filter
+      if (orderTypeFilter !== 'ALL') {
+        const type = t.order_type || 'MARKET';
+        if (type !== orderTypeFilter) return false;
+      }
+
+      // 3. Sector Filter
       if (selectedSector !== 'ALL' && t.sector !== selectedSector) return false;
 
-      // 3. Search Query
+      // 4. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const sym = (t.symbol || '').toLowerCase();
@@ -80,7 +89,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
       return true;
     });
-  }, [trades, dirFilter, selectedSector, searchQuery]);
+  }, [trades, dirFilter, orderTypeFilter, selectedSector, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -182,6 +191,50 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
             </select>
           </div>
 
+        </div>
+
+        {/* Order Type Section Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-black/30 border border-white/10 rounded-2xl text-xs font-semibold">
+          <button
+            onClick={() => setOrderTypeFilter('ALL')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer font-bold ${
+              orderTypeFilter === 'ALL'
+                ? 'bg-accent-blue text-black shadow-lg shadow-accent-blue/20 font-black'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            {isAr ? '✨ كافة التوصيات' : 'All Orders'}
+          </button>
+          <button
+            onClick={() => setOrderTypeFilter('MARKET')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              orderTypeFilter === 'MARKET'
+                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-black'
+                : 'text-emerald-400/80 hover:text-emerald-400 hover:bg-emerald-500/10'
+            }`}
+          >
+            <span>🟢 {isAr ? 'صفقات مباشرة بسعر السوق' : 'Live Market Orders'}</span>
+          </button>
+          <button
+            onClick={() => setOrderTypeFilter('LIMIT')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              orderTypeFilter === 'LIMIT'
+                ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20 font-black'
+                : 'text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10'
+            }`}
+          >
+            <span>⏳ {isAr ? 'أوامر معلقة (Limit Buy)' : 'Pending Limit Orders'}</span>
+          </button>
+          <button
+            onClick={() => setOrderTypeFilter('BREAKOUT_TRIGGER')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              orderTypeFilter === 'BREAKOUT_TRIGGER'
+                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20 font-black'
+                : 'text-purple-400/80 hover:text-purple-400 hover:bg-purple-500/10'
+            }`}
+          >
+            <span>🎯 {isAr ? 'دخول مشروط باختراق شمعة' : 'Conditional Breakout Orders'}</span>
+          </button>
         </div>
 
         {/* Risk Management & Execution Strategy Guide Banner */}
@@ -290,17 +343,30 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Order Type Badge */}
                       <span
                         className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border shadow-sm ${
-                          isBuy
+                          t.order_type === 'LIMIT'
+                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            : t.order_type === 'BREAKOUT_TRIGGER'
+                            ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                            : isBuy
                             ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                             : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                         }`}
                       >
-                        {isBuy ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                        {isBuy ? (isAr ? '🟢 إشارة شراء' : '🟢 BUY') : (isAr ? '🔴 إشارة بيع' : '🔴 SELL')}
+                        {t.order_type === 'LIMIT' ? (
+                          <span>⏳ {isAr ? 'أمر معلق (Limit)' : 'Limit Order'}</span>
+                        ) : t.order_type === 'BREAKOUT_TRIGGER' ? (
+                          <span>🎯 {isAr ? 'دخول مشروط باختراق' : 'Breakout Trigger'}</span>
+                        ) : isBuy ? (
+                          <span>🟢 {isAr ? 'شراء مباشر' : 'Market BUY'}</span>
+                        ) : (
+                          <span>🔴 {isAr ? 'بيع مباشر' : 'Market SELL'}</span>
+                        )}
                       </span>
+
                       {t.ml_probability && (
                         <span className="text-xs font-mono font-bold text-accent-gold bg-accent-gold/10 px-2.5 py-1.5 rounded-xl border border-accent-gold/20 flex items-center gap-1">
                           <Zap className="w-3.5 h-3.5" />
@@ -386,6 +452,11 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
                   {/* Rationale description & Expected Target Date */}
                   <div className="flex flex-col gap-2 font-sans mt-1">
+                    {t.trigger_condition_ar && (
+                      <div className="text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 leading-relaxed font-medium">
+                        ⚙️ <span className="font-bold text-amber-200">{isAr ? 'شرط تفعيل الدخول:' : 'Trigger Condition:'}</span> {t.trigger_condition_ar}
+                      </div>
+                    )}
                     {t.rationale_ar && (
                       <div className="text-xs text-zinc-300 bg-white/[0.02] p-2.5 rounded-xl border border-white/5 leading-relaxed">
                         💡 <span className="font-semibold text-white">{isAr ? 'سبب التوصية والتحليل:' : 'Rationale:'}</span> {t.rationale_ar}
@@ -395,7 +466,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                       <div className="text-xs text-accent-gold bg-accent-gold/10 p-2 rounded-xl border border-accent-gold/20 flex items-center justify-between font-mono font-medium">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{isAr ? 'تاريخ الهدف المتوقع:' : 'Expected Target Date:'}</span>
+                          <span>{isAr ? 'تاريخ الهدف المتوقع (توقع الذكاء الاصطناعي):' : 'AI Expected Target Date:'}</span>
                         </span>
                         <span className="font-bold text-white">{t.expected_target_date}</span>
                       </div>

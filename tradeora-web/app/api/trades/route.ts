@@ -79,6 +79,11 @@ export async function GET(req: NextRequest) {
         ? `توصية شراء لسهم ${companyNameStr} (${t.symbol}) بناءً على ثبات السعر أعلى الدعم عند ${t.sl} ج.م، مع إشارة إيجابية لمؤشر RSI وزخم السيولة التجميعي. المستهدف الأول ${t.tp1} ج.م والمستهدف الثاني ${t.tp2} ج.م.`
         : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${t.entry_price} ج.م، مع مستهدف هبوط ${t.tp1} ج.م ووقف خسارة ${t.sl} ج.م.`;
 
+      const snap = t.features_snapshot || {};
+      const orderType = snap.order_type || 'MARKET';
+      const triggerCondAr = snap.trigger_condition_ar || null;
+      const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
+
       return {
         ...t,
         direction: (t.direction || 'buy').toLowerCase(),
@@ -88,7 +93,9 @@ export async function GET(req: NextRequest) {
         confidence_warning: requiresWarning,
         fra_disclaimer: FRA_DISCLAIMER_AR,
         explanation_ar: t.explanation_ar || defaultRationale,
-        expected_target_date: t.expected_target_date || expectedTargetDate
+        expected_target_date: dynamicExpDate,
+        order_type: orderType,
+        trigger_condition_ar: triggerCondAr
       };
     });
 

@@ -89,14 +89,16 @@ export default function PerformancePage() {
         ml_probability: t.ml_probability ? parseFloat(t.ml_probability) : undefined,
         timeframe: t.timeframe || '1d',
         rationale_ar: t.explanation_ar,
-        expected_target_date: t.expected_target_date
+        expected_target_date: t.expected_target_date,
+        order_type: t.order_type || 'MARKET',
+        trigger_condition_ar: t.trigger_condition_ar
       }));
   }, [platformTrades]);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetch('/api/trades?limit=150').then(res => res.json()),
+      fetch('/api/trades?limit=350').then(res => res.json()),
       fetch('/api/user-trades').then(res => res.json())
     ])
       .then(([platData, persData]) => {
