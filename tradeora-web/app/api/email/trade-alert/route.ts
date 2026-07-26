@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendTradeAlert } from '@/lib/email';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { user_id, type, symbol, price, pnl } = await req.json();

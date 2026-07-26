@@ -1,76 +1,56 @@
 import { NextResponse } from 'next/server';
 
-export const revalidate = 5; // 5 seconds cache for real-time live indexing
+export const revalidate = 10;
 
-export async function GET() {
-  const providers: Record<string, { value: number; change: number }> = {};
-  const values: number[] = [];
-  const changes: number[] = [];
+const TV_HEADERS = {
+  'Content-Type': 'application/json',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'Origin': 'https://www.tradingview.com',
+  'Referer': 'https://www.tradingview.com/',
+};
 
-  // 1. Fetch Mubasher Egypt summary page directly
+async function fetchFromTradingView(ticker: string): Promise<{ value: number; change: number } | null> {
   try {
-    const mubRes = await fetch('https://www.mubasher.info/markets/EGX', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      next: { revalidate: 5 }
-    });
-    if (mubRes.ok) {
-      const html = await mubRes.text();
-      const text = html.replace(/<[^>]*>/g, '\n').replace(/\s+/g, ' ');
-      const egx70Match = text.match(/مؤشر إيجى إكس 70 متساوي الأوزان\s*([\d,.]+)\s*([\d,.+\-]+)\s*([\d,.+\-]+)%/);
-      if (egx70Match) {
-        const val = parseFloat(egx70Match[1].replace(/,/g, ''));
-        const chg = parseFloat(egx70Match[3]);
-        providers.mubasher = { value: val, change: chg };
-        values.push(val);
-        changes.push(chg);
-      }
-    }
-  } catch (e) {
-    console.warn('Mubasher EGX70 fetch failed:', e);
-  }
-
-  // 2. Fetch TradingView Live Index
-  try {
-    const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
+    const res = await fetch('https://scanner.tradingview.com/egypt/scan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      headers: TV_HEADERS,
       body: JSON.stringify({
-        symbols: { tickers: ['EGX:EGX70'] },
-        columns: ['name', 'close', 'change']
+        symbols: { tickers: [ticker] },
+        columns: ['close', 'change'],
       }),
-      next: { revalidate: 5 }
+      next: { revalidate: 10 },
     });
-    if (tvRes.ok) {
-      const tvData = await tvRes.json();
-      const row = tvData?.data?.[0]?.d;
-      if (row && row[1] != null) {
-        const val = Number(row[1]);
-        const chg = Number(row[2] ?? 0);
-        providers.tradingview = { value: parseFloat(val.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        if (values.length === 0) {
-          values.push(val);
-          changes.push(chg);
-        }
-      }
+    if (!res.ok) return null;
+    const data = await res.json();
+    const row = data?.data?.[0]?.d;
+    if (row && row[0] != null) {
+      return {
+        value: parseFloat(Number(row[0]).toFixed(2)),
+        change: parseFloat(Number(row[1] ?? 0).toFixed(2)),
+      };
     }
-  } catch (e) {
-    console.warn('TradingView EGX70 fetch failed:', e);
-  }
+  } catch { /* silent */ }
+  return null;
+}
 
-  // 3. Fetch Yahoo Finance Live Index
-  const yahooTickers = ['^EGX70EWI.CA', '^EGX70.CA'];
-  for (const ticker of yahooTickers) {
-    if (providers.yahoo || providers.mubasher) break; // Skip if we already have Mubasher
+async function fetchFromYahoo(tickers: string[]): Promise<{ value: number; change: number } | null> {
+  for (const ticker of tickers) {
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 5 } });
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        next: { revalidate: 10 },
+      });
       if (!res.ok) continue;
       const data = await res.json();
       const result = data?.chart?.result?.[0];
-      const closes = (result?.indicators?.quote?.[0]?.close ?? []).filter((c: any) => typeof c === 'number' && !isNaN(c));
-      
+
       let latest: number | null = null;
       let prev: number | null = null;
+
+      const closes = (result?.indicators?.quote?.[0]?.close ?? []).filter(
+        (c: unknown) => typeof c === 'number' && !isNaN(c as number)
+      );
       if (closes.length >= 2) {
         latest = closes[closes.length - 1];
         prev = closes[closes.length - 2];
@@ -81,22 +61,29 @@ export async function GET() {
 
       if (latest !== null && prev !== null && prev > 0) {
         const chg = ((latest - prev) / prev) * 100;
-        providers.yahoo = { value: parseFloat(latest.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        if (values.length === 0) {
-          values.push(latest);
-          changes.push(chg);
-        }
+        return {
+          value: parseFloat(latest.toFixed(2)),
+          change: parseFloat(chg.toFixed(2)),
+        };
       }
     } catch { continue; }
   }
+  return null;
+}
 
-  const avgValue = values.length > 0 ? parseFloat((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)) : null;
-  const avgChange = changes.length > 0 ? parseFloat((changes.reduce((a, b) => a + b, 0) / changes.length).toFixed(2)) : null;
+export async function GET() {
+  // 1. TradingView — Primary source
+  const tv = await fetchFromTradingView('EGX:EGX70');
+  if (tv) {
+    return NextResponse.json({ value: tv.value, change: tv.change, source: 'tradingview' });
+  }
 
-  return NextResponse.json({
-    value: avgValue,
-    change: avgChange,
-    providersCount: Object.keys(providers).length,
-    providers
-  });
+  // 2. Yahoo Finance — Fallback (EGX70 EWI)
+  const yahoo = await fetchFromYahoo(['^EGX70EWI.CA', '^EGX70.CA']);
+  if (yahoo) {
+    return NextResponse.json({ value: yahoo.value, change: yahoo.change, source: 'yahoo' });
+  }
+
+  // 3. No data available
+  return NextResponse.json({ value: null, change: null, source: 'unavailable' });
 }

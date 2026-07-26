@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+export const dynamic = 'force-dynamic';
 
-const supabase = createClient(url, key);
-
-export const revalidate = 300; // Cache for 5 minutes
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return createClient(url, key);
+}
 
 export async function GET() {
   try {
     const todayStr = new Date().toISOString().split('T')[0];
+    const supabase = getSupabase();
 
     // Fetch active trade recommendations
     const { data: trades, error: tradesErr } = await supabase

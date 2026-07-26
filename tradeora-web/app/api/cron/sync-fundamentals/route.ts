@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fetchHybridFundamentals } from '@/lib/data-aggregator';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     // Basic auth check for cron jobs if needed

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 export async function POST(req: NextRequest) {

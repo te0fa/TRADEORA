@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { calcMarketRegime } from '@/lib/ta-utils';
 import { TradeRiskLevelsEvaluator, MarketDataEvaluator, TechnicalIndicatorEvaluator } from '@/lib/domain';
 
+export const dynamic = 'force-dynamic';
+
 // Constitution Constants (Article 5.3 & Article 11.3)
 const CONSTITUTIONAL_MIN_CONFIDENCE = 0.65;
 const FRA_DISCLAIMER_AR = "تنويه الهيئة العامة للرقابة المالية: مستويات الدعم والمقاومة وأهداف الصفقة هي لأغراض الدراسة والتعليم فقط وليست توصية بالبيع أو الشراء.";

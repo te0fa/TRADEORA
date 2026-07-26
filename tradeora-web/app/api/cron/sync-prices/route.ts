@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data: companies, error: compError } = await sb
+    const { data: companies, error: compError } = await getSb()
       .from('companies')
       .select('id, symbol');
 
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (results.length > 0) {
-      const { error: upsertError } = await sb
+      const { error: upsertError } = await getSb()
         .from('market_prices')
         .upsert(results, { onConflict: 'company_id,price_date,source' });
         

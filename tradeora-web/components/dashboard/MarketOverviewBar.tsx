@@ -77,19 +77,20 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
     return num.toString();
   };
 
-  // Fetch Live Index Consensus for EGX30, EGX70, EGX100
-  const [indices, setIndices] = React.useState<{
-    egx30?: { name: string; value: number; change: number };
-    egx70?: { name: string; value: number; change: number };
-    egx100?: { name: string; value: number; change: number };
-    providersCount?: number;
-  }>({});
+  // Fetch Live Index data for EGX30, EGX70, EGX33 from each dedicated route
+  const [egx30Idx, setEgx30Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
+  const [egx70Idx, setEgx70Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
+  const [egx33Idx, setEgx33Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
 
   React.useEffect(() => {
-    fetch('/api/egx30')
-      .then(r => r.json())
-      .then(d => setIndices(d))
-      .catch(() => {});
+    const fetchAll = () => {
+      fetch('/api/egx30').then(r => r.json()).then(setEgx30Idx).catch(() => {});
+      fetch('/api/egx70').then(r => r.json()).then(setEgx70Idx).catch(() => {});
+      fetch('/api/egx33').then(r => r.json()).then(setEgx33Idx).catch(() => {});
+    };
+    fetchAll();
+    const id = setInterval(fetchAll, 10000);
+    return () => clearInterval(id);
   }, []);
 
   // Ensure non-zero session defaults when market is closed
@@ -115,33 +116,45 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
           <div className="flex flex-col p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
             <span className="text-[10px] font-bold text-slate-400">EGX 30</span>
             <span className="text-sm font-mono font-extrabold text-white mt-0.5">
-              {indices.egx30?.value ? indices.egx30.value.toLocaleString() : '53,931.9'}
+              {egx30Idx?.value != null ? egx30Idx.value.toLocaleString('en-US') : '---'}
             </span>
-            <span className={`text-[11px] font-mono font-bold mt-0.5 ${(indices.egx30?.change ?? -0.11) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} dir="ltr">
-              {(indices.egx30?.change ?? -0.11) >= 0 ? '+' : ''}{indices.egx30?.change ?? -0.11}%
-            </span>
+            {egx30Idx?.change != null ? (
+              <span className={`text-[11px] font-mono font-bold mt-0.5 ${egx30Idx.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} dir="ltr">
+                {egx30Idx.change >= 0 ? '+' : ''}{egx30Idx.change}%
+              </span>
+            ) : (
+              <span className="text-[11px] font-mono font-bold mt-0.5 text-slate-500">---</span>
+            )}
           </div>
 
           {/* EGX 70 */}
           <div className="flex flex-col p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
             <span className="text-[10px] font-bold text-slate-400">EGX 70 EWI</span>
             <span className="text-sm font-mono font-extrabold text-white mt-0.5">
-              {indices.egx70?.value ? indices.egx70.value.toLocaleString() : '7,420.5'}
+              {egx70Idx?.value != null ? egx70Idx.value.toLocaleString('en-US') : '---'}
             </span>
-            <span className={`text-[11px] font-mono font-bold mt-0.5 ${(indices.egx70?.change ?? 0.85) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} dir="ltr">
-              {(indices.egx70?.change ?? 0.85) >= 0 ? '+' : ''}{indices.egx70?.change ?? 0.85}%
-            </span>
+            {egx70Idx?.change != null ? (
+              <span className={`text-[11px] font-mono font-bold mt-0.5 ${egx70Idx.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} dir="ltr">
+                {egx70Idx.change >= 0 ? '+' : ''}{egx70Idx.change}%
+              </span>
+            ) : (
+              <span className="text-[11px] font-mono font-bold mt-0.5 text-slate-500">---</span>
+            )}
           </div>
 
-          {/* EGX 100 */}
+          {/* EGX 33 Shariah */}
           <div className="flex flex-col p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
-            <span className="text-[10px] font-bold text-slate-400">EGX 100 EWI</span>
+            <span className="text-[10px] font-bold text-slate-400">EGX 33 Shariah</span>
             <span className="text-sm font-mono font-extrabold text-white mt-0.5">
-              {indices.egx100?.value ? indices.egx100.value.toLocaleString() : '10,850.3'}
+              {egx33Idx?.value != null ? egx33Idx.value.toLocaleString('en-US') : '---'}
             </span>
-            <span className={`text-[11px] font-mono font-bold mt-0.5 ${(indices.egx100?.change ?? 0.62) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} dir="ltr">
-              {(indices.egx100?.change ?? 0.62) >= 0 ? '+' : ''}{indices.egx100?.change ?? 0.62}%
-            </span>
+            {egx33Idx?.change != null ? (
+              <span className={`text-[11px] font-mono font-bold mt-0.5 ${egx33Idx.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`} dir="ltr">
+                {egx33Idx.change >= 0 ? '+' : ''}{egx33Idx.change}%
+              </span>
+            ) : (
+              <span className="text-[11px] font-mono font-bold mt-0.5 text-slate-500">---</span>
+            )}
           </div>
         </div>
       </div>

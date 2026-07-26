@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 // PATCH: Update a trade's status/exit info
 export async function PATCH(
   request: NextRequest,

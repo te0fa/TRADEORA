@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 function getRollingMean(values: number[], window: number): number[] {
   const result: number[] = [];
   for (let i = 0; i < values.length; i++) {

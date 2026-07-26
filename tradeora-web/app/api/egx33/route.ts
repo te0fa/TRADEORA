@@ -1,99 +1,45 @@
 import { NextResponse } from 'next/server';
 
-export const revalidate = 5; // 5 seconds cache for real-time live indexing
+export const revalidate = 10;
+
+const TV_HEADERS = {
+  'Content-Type': 'application/json',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'Origin': 'https://www.tradingview.com',
+  'Referer': 'https://www.tradingview.com/',
+};
+
+async function fetchFromTradingView(ticker: string): Promise<{ value: number; change: number } | null> {
+  try {
+    const res = await fetch('https://scanner.tradingview.com/egypt/scan', {
+      method: 'POST',
+      headers: TV_HEADERS,
+      body: JSON.stringify({
+        symbols: { tickers: [ticker] },
+        columns: ['close', 'change'],
+      }),
+      next: { revalidate: 10 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const row = data?.data?.[0]?.d;
+    if (row && row[0] != null) {
+      return {
+        value: parseFloat(Number(row[0]).toFixed(2)),
+        change: parseFloat(Number(row[1] ?? 0).toFixed(2)),
+      };
+    }
+  } catch { /* silent */ }
+  return null;
+}
 
 export async function GET() {
-  const providers: Record<string, { value: number; change: number }> = {};
-  const values: number[] = [];
-  const changes: number[] = [];
-
-  // 1. Fetch Mubasher Egypt summary page directly (Primary for EGX33 Shariah index)
-  try {
-    const mubRes = await fetch('https://www.mubasher.info/markets/EGX', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      next: { revalidate: 5 }
-    });
-    if (mubRes.ok) {
-      const html = await mubRes.text();
-      const text = html.replace(/<[^>]*>/g, '\n').replace(/\s+/g, ' ');
-      const shariahMatch = text.match(/مؤشر الشريعة 33\s*([\d,.]+)\s*([\d,.+\-]+)\s*([\d,.+\-]+)%/);
-      if (shariahMatch) {
-        const val = parseFloat(shariahMatch[1].replace(/,/g, ''));
-        const chg = parseFloat(shariahMatch[3]);
-        providers.mubasher = { value: val, change: chg };
-        values.push(val);
-        changes.push(chg);
-      }
-    }
-  } catch (e) {
-    console.warn('Mubasher EGX33 fetch failed:', e);
+  // 1. TradingView — Primary source (EGX:EGX33 = EGX Shariah Index)
+  const tv = await fetchFromTradingView('EGX:EGX33');
+  if (tv) {
+    return NextResponse.json({ value: tv.value, change: tv.change, source: 'tradingview' });
   }
 
-  // 2. Fetch TradingView Live Index
-  try {
-    const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      body: JSON.stringify({
-        symbols: { tickers: ['EGX:EGX33'] },
-        columns: ['name', 'close', 'change']
-      }),
-      next: { revalidate: 5 }
-    });
-    if (tvRes.ok) {
-      const tvData = await tvRes.json();
-      const row = tvData?.data?.[0]?.d;
-      if (row && row[1] != null) {
-        const val = Number(row[1]);
-        const chg = Number(row[2] ?? 0);
-        providers.tradingview = { value: parseFloat(val.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        if (values.length === 0) {
-          values.push(val);
-          changes.push(chg);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('TradingView EGX33 fetch failed:', e);
-  }
-
-  // 3. Fetch Yahoo Finance Live Index fallback
-  const yahooTickers = ['^EGX100EWI.CA', '^CASE30'];
-  for (const ticker of yahooTickers) {
-    if (providers.yahoo || providers.mubasher) break; // Skip if we already have Mubasher
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 5 } });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const result = data?.chart?.result?.[0];
-      const closes = (result?.indicators?.quote?.[0]?.close ?? []).filter((c: any) => typeof c === 'number' && !isNaN(c));
-      
-      let latest: number | null = null;
-      let prev: number | null = null;
-      if (closes.length >= 2) {
-        latest = closes[closes.length - 1];
-        prev = closes[closes.length - 2];
-      }
-
-      if (latest !== null && prev !== null && prev > 0) {
-        const chg = ((latest - prev) / prev) * 100;
-        providers.yahoo = { value: parseFloat(latest.toFixed(2)), change: parseFloat(chg.toFixed(2)) };
-        if (values.length === 0) {
-          values.push(latest);
-          changes.push(chg);
-        }
-      }
-    } catch { continue; }
-  }
-
-  const finalValue = values.length > 0 ? parseFloat((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)) : 3450.25;
-  const finalChange = changes.length > 0 ? parseFloat((changes.reduce((a, b) => a + b, 0) / changes.length).toFixed(2)) : 0.42;
-
-  return NextResponse.json({
-    value: finalValue,
-    change: finalChange,
-    providersCount: Object.keys(providers).length,
-    providers
-  });
+  // 2. No reliable Yahoo ticker for EGX33 Shariah — return unavailable
+  return NextResponse.json({ value: null, change: null, source: 'unavailable' });
 }
