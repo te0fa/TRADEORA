@@ -1728,28 +1728,29 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     // Generate educational note based on score
     let noteAR = '';
     let noteEN = '';
+    const safeRSIStr = (lastRSI != null && !isNaN(Number(lastRSI))) ? Number(lastRSI).toFixed(0) : '50';
     
     if (isNearATH) {
       if (lastRSI > 70) {
-        noteAR = `🔴 تشبع شرائي عند قمة تاريخية\n\nRSI (${lastRSI.toFixed(0)}) في منطقة التشبع الشرائي والسهم عند أعلى مستوياته التاريخية. هذا مزيج يرفع احتمال التصحيح.\nالمتداولون المحترفون يأخذون أرباحاً أو يخففون مراكزهم في هذه الحالة.\n\nلا ينصح بالدخول الجديد — انتظر تصحيحاً أو إغلاق يومي قوي جديد.`;
-        noteEN = `🔴 Overbought at All-Time High\n\nRSI (${lastRSI.toFixed(0)}) is overbought while testing ATH, increasing correction risk. Professionals usually take profits here.\nWait for a pullback before entering new positions.`;
+        noteAR = `🔴 تشبع شرائي عند قمة تاريخية\n\nRSI (${safeRSIStr}) في منطقة التشبع الشرائي والسهم عند أعلى مستوياته التاريخية. هذا مزيج يرفع احتمال التصحيح.\nالمتداولون المحترفون يأخذون أرباحاً أو يخففون مراكزهم في هذه الحالة.\n\nلا ينصح بالدخول الجديد — انتظر تصحيحاً أو إغلاق يومي قوي جديد.`;
+        noteEN = `🔴 Overbought at All-Time High\n\nRSI (${safeRSIStr}) is overbought while testing ATH, increasing correction risk. Professionals usually take profits here.\nWait for a pullback before entering new positions.`;
       } else if (lastRSI >= 65) {
-        noteAR = `⚠️ شراء مع حذر — منطقة تشبع قريبة\n\nالسهم عند قمة تاريخية والـ RSI (${lastRSI.toFixed(0)}) يقترب من منطقة التشبع الشرائي (70+). الزخم لا يزال إيجابياً لكن المخاطرة ترتفع عند هذه المستويات.\n\nنصيحة: استخدم وقف خسارة محكم وأهدافاً أصغر عند ATH.`;
-        noteEN = `⚠️ Cautious Buy — approaching overbought\n\nTesting ATH with RSI (${lastRSI.toFixed(0)}) nearing overbought (70+). Momentum is positive but risk is elevated.\nTip: Use tight stop losses and smaller targets.`;
+        noteAR = `⚠️ شراء مع حذر — منطقة تشبع قريبة\n\nالسهم عند قمة تاريخية والـ RSI (${safeRSIStr}) يقترب من منطقة التشبع الشرائي (70+). الزخم لا يزال إيجابياً لكن المخاطرة ترتفع عند هذه المستويات.\n\nنصيحة: استخدم وقف خسارة محكم وأهدافاً أصغر عند ATH.`;
+        noteEN = `⚠️ Cautious Buy — approaching overbought\n\nTesting ATH with RSI (${safeRSIStr}) nearing overbought (70+). Momentum is positive but risk is elevated.\nTip: Use tight stop losses and smaller targets.`;
       } else if (analysisData?.macd && analysisData.macd > (analysisData.macdSignal ?? 0)) {
-        noteAR = `📈 شراء قوي عند قمة تاريخية\n\nلماذا الشراء رغم القمة التاريخية؟\nالسهم كسر أعلى مستوياته السابقة بزخم قوي (MACD موجب). RSI (${lastRSI.toFixed(0)}) لم يصل لمنطقة التشبع بعد، مما يعني أن هناك مساحة للصعود.\n\nفي مثل هذه الحالات (Breakout)، القمة القديمة تصبح دعماً جديداً.\n⚠️ انتبه: بدون مقاومات تاريخية، الهدف يُحسب بنسبة % وليس من مستوى محدد.`;
-        noteEN = `📈 Strong Breakout Buy\n\nWhy buy at ATH? Breakout confirmed with strong momentum (MACD positive). RSI (${lastRSI.toFixed(0)}) has room to grow.\nOld resistance becomes new support.\n⚠️ Targets are calculated by % since no historical resistance exists.`;
+        noteAR = `📈 شراء قوي عند قمة تاريخية\n\nلماذا الشراء رغم القمة التاريخية؟\nالسهم كسر أعلى مستوياته السابقة بزخم قوي (MACD موجب). RSI (${safeRSIStr}) لم يصل لمنطقة التشبع بعد، مما يعني أن هناك مساحة للصعود.\n\nفي مثل هذه الحالات (Breakout)، القمة القديمة تصبح دعماً جديداً.\n⚠️ انتبه: بدون مقاومات تاريخية، الهدف يُحسب بنسبة % وليس من مستوى محدد.`;
+        noteEN = `📈 Strong Breakout Buy\n\nWhy buy at ATH? Breakout confirmed with strong momentum (MACD positive). RSI (${safeRSIStr}) has room to grow.\nOld resistance becomes new support.\n⚠️ Targets are calculated by % since no historical resistance exists.`;
       } else {
         noteAR = `⚖️ السهم يختبر قمة تاريخية بزخم محايد\n\nالسعر عند مستويات عليا ولكن مؤشر الـ MACD لم يؤكد الاختراق بقوة بعد. يفضل انتظار شمعة تأكيد فوق القمة قبل الشراء.`;
         noteEN = `⚖️ Testing ATH with neutral momentum\n\nWait for strong breakout confirmation (MACD crossover) before entering.`;
       }
     } else {
       if (action === 'buy') {
-        noteAR = `📈 إشارة شراء قوية\n\nالمؤشرات متوافقة: RSI (${lastRSI.toFixed(0)}) في منطقة محايدة → مساحة للصعود. MACD موجب → زخم صاعد. السعر ${analysisData?.close! > (analysisData?.sma20 ?? 0) ? 'فوق' : 'تحت'} المتوسط المتحرك 20 → اتجاه إيجابي.`;
-        noteEN = `📈 Strong Buy Signal\n\nIndicators aligned: RSI (${lastRSI.toFixed(0)}) has room to grow, MACD positive. Price ${analysisData?.close! > (analysisData?.sma20 ?? 0) ? 'above' : 'below'} SMA20.`;
+        noteAR = `📈 إشارة شراء قوية\n\nالمؤشرات متوافقة: RSI (${safeRSIStr}) في منطقة محايدة → مساحة للصعود. MACD موجب → زخم صاعد. السعر ${analysisData?.close! > (analysisData?.sma20 ?? 0) ? 'فوق' : 'تحت'} المتوسط المتحرك 20 → اتجاه إيجابي.`;
+        noteEN = `📈 Strong Buy Signal\n\nIndicators aligned: RSI (${safeRSIStr}) has room to grow, MACD positive. Price ${analysisData?.close! > (analysisData?.sma20 ?? 0) ? 'above' : 'below'} SMA20.`;
       } else if (action === 'sell') {
-        noteAR = `🔴 إشارات هبوط\n\nRSI (${lastRSI.toFixed(0)}) يميل للبيع والـ MACD سلبي يعكس ضعف الزخم. السعر ${analysisData?.close! < (analysisData?.sma20 ?? 0) ? 'تحت' : 'فوق'} المتوسط المتحرك 20.`;
-        noteEN = `🔴 Bearish signals\n\nRSI (${lastRSI.toFixed(0)}) favors sell, MACD negative. Price ${analysisData?.close! < (analysisData?.sma20 ?? 0) ? 'below' : 'above'} SMA20.`;
+        noteAR = `🔴 إشارات هبوط\n\nRSI (${safeRSIStr}) يميل للبيع والـ MACD سلبي يعكس ضعف الزخم. السعر ${analysisData?.close! < (analysisData?.sma20 ?? 0) ? 'تحت' : 'فوق'} المتوسط المتحرك 20.`;
+        noteEN = `🔴 Bearish signals\n\nRSI (${safeRSIStr}) favors sell, MACD negative. Price ${analysisData?.close! < (analysisData?.sma20 ?? 0) ? 'below' : 'above'} SMA20.`;
       } else {
         const resPriceStr = (resistancesAbove[0]?.price != null && !isNaN(Number(resistancesAbove[0].price))) ? Number(resistancesAbove[0].price).toFixed(2) : '-';
         const supPriceStr = (supportsBelow[0]?.price != null && !isNaN(Number(supportsBelow[0].price))) ? Number(supportsBelow[0].price).toFixed(2) : '-';
