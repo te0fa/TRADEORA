@@ -23,10 +23,10 @@ INTERVAL_MAP = {
     '30m':  Interval.in_30_minute,
     '1h':   Interval.in_1_hour,
     '4h':   Interval.in_4_hour,
+    '1d':   Interval.in_daily,
 }
 
-def backfill_symbol(tv, symbol: str, interval_key: str,
-                    n_bars: int = 2000):
+def backfill_symbol(tv, symbol: str, interval_key: str, n_bars: int = 2000):
     """جيب وخزّن البيانات التاريخية لسهم واحد"""
     try:
         df = tv.get_hist(
@@ -39,38 +39,71 @@ def backfill_symbol(tv, symbol: str, interval_key: str,
             print(f"  [SKIP] {symbol} ({interval_key}) — لا توجد بيانات على TradingView", flush=True)
             return 0
 
-        # جيب company_id
+        # جيب company_id بمطابقة دقيقة أولاً
         res = sb.table('companies')\
-                .select('id')\
-                .ilike('symbol', f'%{symbol}%')\
+                .select('id, symbol')\
+                .eq('status', 'active')\
+                .ilike('symbol', symbol)\
                 .execute()
+        if not res.data:
+            res = sb.table('companies')\
+                    .select('id, symbol')\
+                    .eq('status', 'active')\
+                    .ilike('symbol', f'%{symbol}%')\
+                    .execute()
+
         if not res.data:
             print(f"  [SKIP] {symbol} — غير موجود بقاعدة البيانات", flush=True)
             return 0
 
         company_id = res.data[0]['id']
         rows = []
+        market_price_rows = []
 
         for ts, row in df.iterrows():
+            ts_str = ts.isoformat()
+            date_str = ts.strftime('%Y-%m-%d')
             rows.append({
                 'company_id':   company_id,
-                'snapshot_time': ts.isoformat(),
+                'snapshot_time': ts_str,
                 'price':        float(row['close']),
                 'open_price':   float(row['open']),
                 'high_price':   float(row['high']),
                 'low_price':    float(row['low']),
-                'volume':       int(row['volume'])
-                                if pd.notna(row['volume']) else 0,
+                'volume':       int(row['volume']) if pd.notna(row['volume']) else 0,
                 'source':       f'tradingview_{interval_key}',
             })
 
-        # upsert في دفعات
+            if interval_key == '1d':
+                market_price_rows.append({
+                    'company_id':   company_id,
+                    'price_date':   date_str,
+                    'open_price':   float(row['open']),
+                    'high_price':   float(row['high']),
+                    'low_price':    float(row['low']),
+                    'close_price':  float(row['close']),
+                    'volume':       int(row['volume']) if pd.notna(row['volume']) else 0,
+                    'change_value': round(float(row['close']) - float(row['open']), 4),
+                    'change_percent': round(((float(row['close']) - float(row['open'])) / float(row['open'])) * 100, 2) if float(row['open']) > 0 else 0.0,
+                    'source':       'tradingview_1d'
+                })
+
+        # upsert في دفعات لـ intraday_snapshots
         batch = 500
         for i in range(0, len(rows), batch):
             sb.table('intraday_snapshots')\
-              .upsert(rows[i:i+batch],
-                      on_conflict='company_id,snapshot_time,source')\
+              .upsert(rows[i:i+batch], on_conflict='company_id,snapshot_time,source')\
               .execute()
+
+        # إذا كانت يومية، أدخل في market_prices أيضاً
+        if market_price_rows:
+            for i in range(0, len(market_price_rows), batch):
+                try:
+                    sb.table('market_prices')\
+                      .upsert(market_price_rows[i:i+batch], on_conflict='company_id,price_date')\
+                      .execute()
+                except Exception as m_err:
+                    pass
 
         print(f"  [OK] {symbol} — تم إدخال {len(rows)} شمعة لفريم {interval_key}", flush=True)
         return len(rows)
@@ -80,35 +113,32 @@ def backfill_symbol(tv, symbol: str, interval_key: str,
         return 0
 
 def main():
-    # التحقق من تمرير وسيطات سهم معين
     args = sys.argv[1:]
     
     if args:
         symbols = [s.upper().split('.')[0] for s in args]
         print(f"بدء Backfill مخصص للأسهم المحددة: {symbols}", flush=True)
     else:
-        # جيب كل الشركات
         companies = sb.table('companies')\
                       .select('symbol')\
+                      .eq('status', 'active')\
                       .execute().data
         all_symbols = [c['symbol'].split('.')[0] for c in companies]
         
-        # ترتيب الشركات الأهم أولاً لتسريع الحصول على بيانات الأسهم النشطة
         priority_symbols = ['TMGH', 'COMI', 'FWRY', 'SWDY', 'ABUK', 'AMOC', 'EKHO', 'ORAS', 'CCAP', 'PHDC', 'EAST', 'TALM', 'TAQA', 'CICH']
         
-        # دمج الترتيب (الأولوية أولاً ثم البقية)
         symbols = [s for s in priority_symbols if s in all_symbols]
         symbols += [s for s in all_symbols if s not in priority_symbols]
-        print(f"بدء backfill لـ {len(symbols)} سهم (مع أولوية الأسهم النشطة)...", flush=True)
+        print(f"بدء backfill لـ {len(symbols)} سهم نشط...", flush=True)
 
     tv = get_tv()
-    intervals = ['15m', '30m', '1h', '4h']
+    intervals = ['15m', '30m', '1h', '4h', '1d']
 
     for i, sym in enumerate(symbols):
         print(f"\n[{i+1}/{len(symbols)}] معالجة السهم: {sym}...", flush=True)
         for ivl in intervals:
             backfill_symbol(tv, sym, ivl, n_bars=2000)
-            time.sleep(0.5)  # تجنب rate limiting
+            time.sleep(0.3)
 
     print("\n✅ انتهى الـ backfill بنجاح!", flush=True)
 

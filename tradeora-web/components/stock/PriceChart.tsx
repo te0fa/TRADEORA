@@ -504,16 +504,9 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     if (historicalPrices?.length > 0) setDbPrices(historicalPrices);
   }, [historicalPrices]);
 
-  // Intraday fetching: DB first, fallback to Yahoo
+  // Universal candles fetching for all timeframes (15m, 30m, 1h, 4h, 1d)
   useEffect(() => {
-    const isIntraday = ['15m', '30m', '1h', '4h'].includes(interval);
-    if (!isIntraday) {
-      setDbIntradayCandles([]);
-      setYahooCandles([]);
-      return;
-    }
-
-    const fetchIntraday = async () => {
+    const fetchCandlesData = async () => {
       setIsIntradayLoading(true);
       try {
         const cairoFormatter = new Intl.DateTimeFormat('en-US', {
@@ -547,46 +540,46 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         if (interval === '30m') minuteInterval = 30;
         else if (interval === '1h') minuteInterval = 60;
         else if (interval === '4h') minuteInterval = 240;
+        else if (interval === '1d') minuteInterval = 1440;
 
-        // 1. Fetch real DB intraday candles
-        const dbRes = await fetch(`/api/intraday?symbol=${symbol}&interval=${minuteInterval}&days=90`);
+        // 1. Fetch real DB candles via resilient API endpoint
+        const dbRes = await fetch(`/api/intraday?symbol=${encodeURIComponent(symbol)}&interval=${minuteInterval}&days=90`);
         const { candles: fetchedDbCandles } = await dbRes.json();
         const formattedDb = (fetchedDbCandles || []).map(formatCandle);
-        setDbIntradayCandles(formattedDb);
-        setDbCandlesCount(formattedDb.length);
-
-        // 2. Fetch Yahoo Finance candles if DB candles are insufficient
-        if (formattedDb.length < 10) {
+        
+        if (formattedDb.length > 0) {
+          setDbIntradayCandles(formattedDb);
+          setDbCandlesCount(formattedDb.length);
+          setYahooCandles([]);
+        } else {
+          // Fallback to Yahoo candles if DB is empty
           const { candles: yfCandles, events: yfEvents } = await fetchYahooCandles(symbol, interval);
           const formattedYahoo = yfCandles.map(formatCandle);
           setYahooCandles(formattedYahoo);
           
           if (yfEvents && yfEvents.dividends) {
-            // Find dividends in the next 30 days
             const now = Date.now() / 1000;
             const upcoming = Object.values(yfEvents.dividends).filter((d: any) => d.date >= now && d.date <= now + 30 * 24 * 60 * 60);
-            if (upcoming.length > 0) {
-              setUpcomingDividends(upcoming);
-            } else {
-              setUpcomingDividends([]);
-            }
+            setUpcomingDividends(upcoming);
           }
-        } else {
-          setYahooCandles([]);
         }
         setLastUpdated(new Date());
       } catch (err) {
-        console.error('Error fetching intraday data:', err);
+        console.error('Error fetching candles data:', err);
       } finally {
         setIsIntradayLoading(false);
       }
     };
 
-    fetchIntraday();
+    fetchCandlesData();
   }, [interval, symbol]);
 
-  // Selected active prices (Smart Fallback)
+  // Selected active prices (Smart Fallback & Synthesis)
   const activePrices = useMemo(() => {
+    if (dbIntradayCandles.length > 0) {
+      return dbIntradayCandles;
+    }
+
     if (interval === '1w') {
       const data = aggregateWeekly(dbPrices);
       return data.map(d => ({ ...d, time: d.price_date }));
@@ -599,13 +592,9 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       return dbPrices.map(d => ({ ...d, time: d.price_date }));
     }
 
-    // Intraday Fallback logic:
-    if (dbIntradayCandles.length >= 10) {
-      return dbIntradayCandles;
-    } else if (yahooCandles.length >= 10) {
+    if (yahooCandles.length >= 10) {
       return yahooCandles;
     } else {
-      // Fallback to daily candles if both intraday sources have insufficient data
       return dbPrices.map(d => ({ ...d, time: d.price_date }));
     }
   }, [interval, dbPrices, dbIntradayCandles, yahooCandles]);
