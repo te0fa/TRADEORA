@@ -221,6 +221,7 @@ interface SREntry extends SRLevel {
   isClosest: boolean;
   label?: string;
   isATH?: boolean;
+  is52WHigh?: boolean;
   isProjected?: boolean;
 }
 
@@ -801,17 +802,17 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
 
   // Build S/R entries list
   const buildEntries = useCallback((
-    levels: { price: number; strength: number; label?: string; isATH?: boolean; isProjected?: boolean }[],
+    levels: { price: number; strength: number; label?: string; isATH?: boolean; is52WHigh?: boolean; isProjected?: boolean }[],
     isResistance: boolean
   ): SREntry[] => {
-    const sorted = [...levels].sort((a, b) => b.strength - a.strength);
-    const filtered: { price: number; strength: number; label?: string; isATH?: boolean; isProjected?: boolean }[] = [];
+    const sorted = [...levels].sort((a, b) => isResistance ? (b.price - a.price) : (a.price - b.price));
+    const filtered: { price: number; strength: number; label?: string; isATH?: boolean; is52WHigh?: boolean; isProjected?: boolean }[] = [];
     for (const lvl of sorted) {
-      if (lvl.strength < 2 && !lvl.isATH && !lvl.isProjected) continue;
+      if (lvl.strength < 2 && !lvl.isATH && !lvl.is52WHigh && !lvl.isProjected) continue;
       const tooClose = filtered.some(f => Math.abs(f.price - lvl.price) / lvl.price < 0.01);
       if (!tooClose) filtered.push(lvl);
     }
-    const top = filtered.slice(0, 3);
+    const top = filtered.slice(0, 4);
 
     // Find the closest level above (for resistance) or below (for support) currentPrice
     const validRelative = top.filter(l =>
@@ -834,6 +835,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         isClosest: lvl.price === closestPrice,
         label: lvl.label,
         isATH: lvl.isATH,
+        is52WHigh: lvl.is52WHigh,
         isProjected: lvl.isProjected,
       };
     });
@@ -2310,6 +2312,11 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
                         ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]' 
                         : 'bg-transparent border-white/10 text-text-secondary/50';
                       titleElement = <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1" title={entry.label}>🏆 {entry.label}</span>;
+                    } else if (entry.is52WHigh) {
+                      bgClass = isVisible 
+                        ? 'bg-purple-500/15 border-purple-500/40 text-purple-300 shadow-[0_0_12px_rgba(168,85,247,0.15)]' 
+                        : 'bg-transparent border-white/10 text-text-secondary/50';
+                      titleElement = <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded flex items-center gap-1" title={entry.label}>📈 {entry.label}</span>;
                     } else if (entry.isProjected) {
                       bgClass = isVisible 
                         ? 'bg-blue-500/15 border-blue-500/40 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.15)]' 
@@ -2340,7 +2347,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
                               {entry.price.toFixed(3)}
                             </span>
                             <div className="flex items-center gap-1.5">
-                              {!entry.isProjected && !entry.isATH && (
+                              {!entry.isProjected && !entry.isATH && !entry.is52WHigh && (
                                 <span className="text-[9px]">
                                   {locale === 'ar' ? `لمس ${entry.strength}×` : `${entry.strength}× touch`}
                                 </span>
@@ -2352,8 +2359,15 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
                         {entry.isATH && (
                           <div className="text-[9px] text-amber-500/80 italic mt-0.5 px-2">
                             {locale === 'ar' 
-                              ? 'هذا هو أعلى سعر وصله السهم في تاريخه — ليس له مقاومة تاريخية فوقه.' 
-                              : 'This is the highest price the stock has ever reached — no historical resistance above it.'}
+                              ? 'هذا هو أعلى سعر وصله السهم في تاريخه على الإطلاق — قمة تاريخية مطلقة (ATH).' 
+                              : 'This is the highest price the stock has ever reached — absolute All-Time High.'}
+                          </div>
+                        )}
+                        {entry.is52WHigh && (
+                          <div className="text-[9px] text-purple-400/80 italic mt-0.5 px-2">
+                            {locale === 'ar' 
+                              ? 'أعلى سعر وصله السهم خلال 52 أسبوعاً (آخر عام) — قمة مقاومة سنوية.' 
+                              : 'Highest price reached in 52 weeks (past year) — annual key resistance.'}
                           </div>
                         )}
                       </div>
