@@ -165,14 +165,14 @@ export async function GET(req: NextRequest) {
           let pushBody = '';
 
           if (updates.status === 'tp1_hit') {
-            pushTitle = `🎯 ${t.symbol} — الهدف الأول!`;
-            pushBody = `السعر وصل لـ ${currentPrice.toFixed(2)} EGP`;
+            pushTitle = `🎯 ${t.symbol} — تحقق الهدف الأول!`;
+            pushBody = `السعر وصل إلى ${currentPrice.toFixed(2)} EGP (+${updates.pnl_percent || 0}%). اخرج بـ 50% من الكمية وانقل الاستوب لسعر الدخول.`;
           } else if (updates.exit_reason === 'trailing_sl' || updates.exit_reason === 'sl') {
-            pushTitle = `⚠️ ${t.symbol} — الوقف تفعّل`;
-            pushBody = `السعر ضرب الوقف عند ${currentPrice.toFixed(2)} EGP`;
+            pushTitle = `⚠️ ${t.symbol} — تفعيل الوقف الأمني`;
+            pushBody = `السعر عند ${currentPrice.toFixed(2)} EGP. تم حماية رأس المال وفق قواعد إدارة المخاطر.`;
           } else if (updates.exit_reason === 'tp2') {
-            pushTitle = `🏆 ${t.symbol} — الهدف الثاني!`;
-            pushBody = `السعر وصل للهدف الثاني عند ${currentPrice.toFixed(2)} EGP`;
+            pushTitle = `🏆 ${t.symbol} — تحقق الهدف الثاني الكامل!`;
+            pushBody = `السعر وصل للهدف الثاني عند ${currentPrice.toFixed(2)} EGP (+${updates.pnl_percent || 0}%). اخرج بالـ 50% المتبقية.`;
           }
 
           if (pushTitle) {
@@ -223,11 +223,11 @@ export async function GET(req: NextRequest) {
             if (tgData?.chat_id) {
               let msg = '';
               if (updates.status === 'tp1_hit') {
-                msg = `🎯 <b>الهدف الأول TP1 - ${t.symbol}</b>\n\n✅ السعر وصل لـ <b>{price:.2f} EGP</b>\n💰 جني 50% من الكمية الآن\n\n<i>الهدف الثاني: ${t.tp2} EGP</i>`;
+                msg = `🎯 <b>الهدف الأول TP1 - ${t.symbol}</b>\n\n✅ السعر وصل إلى <b>{price:.2f} EGP</b> (+${updates.pnl_percent}%)\n💡 <b>الإجراء المطلوب الآن:</b>\n1️⃣ اخرج بـ <b>50% من كمية أسهمك</b> وجني الربح الأول.\n2️⃣ نقل الستوب فوراً إلى <b>سعر الدخول (Breakeven)</b> لتأمين بافي الصفقة.\n\n🎯 <i>الهدف الثاني المستهدف: ${t.tp2} EGP</i>`;
               } else if (updates.exit_reason === 'sl') {
-                msg = `🚨 <b>وقف الخسارة - ${t.symbol}</b>\n\n⚠️ السعر ضرب الوقف عند <b>{price:.2f} EGP</b>\n📉 الخسارة: ${updates.pnl_percent}%\n\n<i>لا بأس، الإدارة الصحيحة تحمي رأس المال</i>`;
+                msg = `🚨 <b>وقف الخسارة - ${t.symbol}</b>\n\n⚠️ السعر ضرب الوقف عند <b>{price:.2f} EGP</b>\n📉 الخسارة: ${updates.pnl_percent}%\n\n<i>الالتزام بوقف الخسارة يحمي رأس مالك لصفقات قادمة</i>`;
               } else if (updates.exit_reason === 'tp2') {
-                msg = `🏆 <b>الهدف الثاني TP2 - ${t.symbol}</b>\n\n💰 ربح كامل: <b>+${updates.pnl_percent}%</b>\n🎉 صفقة ناجحة بالكامل!\n\n<i>TRADEORA يهنئك بهذا الربح</i>`;
+                msg = `🏆 <b>الهدف الثاني TP2 - ${t.symbol}</b>\n\n💰 ربح كامل: <b>+${updates.pnl_percent}%</b>\n🎉 اخرج بالـ 50% المتبقية لحصد الأرباح الكاملة!\n\n<i>TRADEORA يهنئك بهذا الربح المفترس</i>`;
               }
 
               if (msg) {

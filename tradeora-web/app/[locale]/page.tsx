@@ -12,7 +12,8 @@ import {
   Activity, 
   ArrowRight,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Info
 } from 'lucide-react';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { Card } from '@/components/ui/Card';
@@ -335,7 +336,15 @@ export default function DashboardPage({ params }: Props) {
           ))}
         </div>
         <div className="flex items-center gap-4 text-[11px]">
-          <span className="text-zinc-400 hidden sm:inline">{t('إشارات اليوم:', 'Today signals:')}</span>
+          <span className="text-zinc-400 hidden sm:inline-flex items-center gap-1">
+            <span>{isAr ? 'إشارات اليوم:' : 'Today signals:'}</span>
+            <span 
+              className="relative group cursor-pointer inline-flex items-center text-accent-blue hover:text-white"
+              title={isAr ? "الفرز الفني اللحظي للمؤشرات لجميع أسهم البورصة (281 سهم). يختلف عن صفقات وتوصيات التداول المحددة في صفحة الأداء." : "Instant technical screener signals for all 281 EGX stocks."}
+            >
+              <Info className="w-3.5 h-3.5" />
+            </span>
+          </span>
           <span className="text-up-green bg-up-green-bg px-2 py-0.5 rounded-md font-mono">{statsData.buySignals} Buy</span>
           <span className="text-down-red bg-down-red-bg px-2 py-0.5 rounded-md font-mono">{statsData.sellSignals} Sell</span>
           <span className="text-accent-blue bg-blue-500/10 px-2 py-0.5 rounded-md font-mono hidden sm:inline">Vol: {statsData.highestVolume} {statsData.highestVolumeName ? `(${statsData.highestVolumeName})` : ''}</span>

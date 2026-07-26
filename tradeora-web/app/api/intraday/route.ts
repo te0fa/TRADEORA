@@ -69,7 +69,9 @@ export async function GET(req: NextRequest) {
 
   // 3. Determine intervalKey for intraday
   let intervalKey = '15m'
-  if (interval === 30) intervalKey = '30m'
+  if (interval === 1) intervalKey = '1m'
+  else if (interval === 5) intervalKey = '5m'
+  else if (interval === 30) intervalKey = '30m'
   else if (interval === 60) intervalKey = '1h'
   else if (interval === 240) intervalKey = '4h'
 

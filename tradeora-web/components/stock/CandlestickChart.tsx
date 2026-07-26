@@ -46,7 +46,7 @@ interface CandlestickChartProps {
   showSMA: boolean;
   showBB: boolean;
   showVol: boolean;
-  interval: '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m';
+  interval: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1M';
   srLevels?: { price: number; type: 'support' | 'resistance'; strength: number; distance: number; isStrong?: boolean; isWeekly?: boolean }[];
   onCrosshairMove?: (time: string | null, data?: {
     open: number;
@@ -123,7 +123,7 @@ const CandlestickChartInner = (
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return;
 
-    const isIntraday = interval === '15m' || interval === '30m' || interval === '1h' || interval === '4h';
+    const isIntraday = interval === '1m' || interval === '5m' || interval === '15m' || interval === '30m' || interval === '1h' || interval === '4h';
 
     // Create Chart
     const chart = createChart(containerRef.current, {
@@ -191,16 +191,24 @@ const CandlestickChartInner = (
       wickDownColor: '#EF4444',
     });
 
+    const isValidNum = (v: any): v is number => typeof v === 'number' && !isNaN(v) && isFinite(v);
+    const getClose = (d: any) => d.close_price ?? d.close;
+    const getOpen  = (d: any) => d.open_price  ?? d.open  ?? getClose(d);
+    const getHigh  = (d: any) => d.high_price  ?? d.high  ?? getClose(d);
+    const getLow   = (d: any) => d.low_price   ?? d.low   ?? getClose(d);
+
     candlestickSeriesRef.current = candleSeries;
 
     candleSeries.setData(
-      data.map((d) => ({
-        time: d.time as Time,
-        open: d.open_price ?? d.close_price,
-        high: d.high_price ?? d.close_price,
-        low: d.low_price ?? d.close_price,
-        close: d.close_price,
-      }))
+      data
+        .filter((d) => d && d.time !== undefined && d.time !== null && isValidNum(getClose(d)))
+        .map((d) => ({
+          time: d.time as Time,
+          open: isValidNum(getOpen(d)) ? getOpen(d) : getClose(d),
+          high: isValidNum(getHigh(d)) ? getHigh(d) : getClose(d),
+          low: isValidNum(getLow(d)) ? getLow(d) : getClose(d),
+          close: getClose(d),
+        }))
     );
 
     // 2. Volume Histogram
@@ -215,13 +223,15 @@ const CandlestickChartInner = (
         scaleMargins: { top: 0.82, bottom: 0 },
       });
       volumeSeries.setData(
-        data.map((d) => ({
-          time: d.time as Time,
-          value: d.volume || 0,
-          color: d.close_price >= (d.open_price ?? d.close_price)
-            ? 'rgba(16, 185, 129, 0.35)'
-            : 'rgba(239, 68, 68, 0.35)',
-        }))
+        data
+          .filter((d) => d && d.time !== undefined && d.time !== null && isValidNum(getClose(d)))
+          .map((d) => ({
+            time: d.time as Time,
+            value: isValidNum(d.volume) ? d.volume : 0,
+            color: getClose(d) >= (isValidNum(getOpen(d)) ? getOpen(d) : getClose(d))
+              ? 'rgba(16, 185, 129, 0.35)'
+              : 'rgba(239, 68, 68, 0.35)',
+          }))
       );
     }
 
@@ -230,7 +240,7 @@ const CandlestickChartInner = (
       if (!showBB) {
         const s20 = chart.addSeries(LineSeries, { color: 'rgba(16,185,129,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
         s20.setData(
-          data.filter(d => d.sma20 !== null).map(d => ({
+          data.filter(d => isValidNum(d.sma20)).map(d => ({
             time: d.time as Time,
             value: d.sma20 as number,
           }))
@@ -238,14 +248,14 @@ const CandlestickChartInner = (
       }
       const s50 = chart.addSeries(LineSeries, { color: 'rgba(59,130,246,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
       s50.setData(
-        data.filter(d => d.sma50 !== null).map(d => ({
+        data.filter(d => isValidNum(d.sma50)).map(d => ({
           time: d.time as Time,
           value: d.sma50 as number,
         }))
       );
       const s200 = chart.addSeries(LineSeries, { color: 'rgba(245,158,11,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
       s200.setData(
-        data.filter(d => d.sma200 !== null).map(d => ({
+        data.filter(d => isValidNum(d.sma200)).map(d => ({
           time: d.time as Time,
           value: d.sma200 as number,
         }))
@@ -256,16 +266,17 @@ const CandlestickChartInner = (
     if (showBB) {
       const bbColor = 'rgba(99,102,241,0.5)';
       const bbUp = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
-      bbUp.setData(data.filter(d => d.bbUpper !== null).map(d => ({ time: d.time as Time, value: d.bbUpper as number })));
+      bbUp.setData(data.filter(d => isValidNum(d.bbUpper)).map(d => ({ time: d.time as Time, value: d.bbUpper as number })));
       const bbMid = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-      bbMid.setData(data.filter(d => d.bbMiddle !== null).map(d => ({ time: d.time as Time, value: d.bbMiddle as number })));
+      bbMid.setData(data.filter(d => isValidNum(d.bbMiddle)).map(d => ({ time: d.time as Time, value: d.bbMiddle as number })));
       const bbLow = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
-      bbLow.setData(data.filter(d => d.bbLower !== null).map(d => ({ time: d.time as Time, value: d.bbLower as number })));
+      bbLow.setData(data.filter(d => isValidNum(d.bbLower)).map(d => ({ time: d.time as Time, value: d.bbLower as number })));
     }
 
     // Draw Support & Resistance Levels (Part 6)
     if (srLevels && srLevels.length > 0) {
       srLevels.slice(0, 4).forEach((level) => {
+        if (!isValidNum(level.price)) return;
         const line = chart.addSeries(LineSeries, {
           color: level.isStrong
             ? (level.type === 'support' ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)')
@@ -276,8 +287,9 @@ const CandlestickChartInner = (
           lastValueVisible: false,
         });
 
-        const firstTime = data[0]?.time as Time;
-        const lastTime  = data[data.length - 1]?.time as Time;
+        const validData = data.filter(d => d && d.time !== undefined && d.time !== null);
+        const firstTime = validData[0]?.time as Time;
+        const lastTime  = validData[validData.length - 1]?.time as Time;
 
         if (firstTime && lastTime) {
           line.setData([
@@ -288,8 +300,8 @@ const CandlestickChartInner = (
       });
     }
 
-    // Scroll to the latest data
-    chart.timeScale().scrollToRealTime();
+    // Scroll and fit chart
+    chart.timeScale().fitContent();
 
     // 5. Crosshair subscription (emit OHLCV for the header panel)
     chart.subscribeCrosshairMove((param) => {
@@ -390,7 +402,9 @@ const CandlestickChartInner = (
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver(() => {
-      chartRef.current?.applyOptions({ width: containerRef.current!.clientWidth });
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
+      }
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();

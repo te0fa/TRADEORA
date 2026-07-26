@@ -20,7 +20,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { ActiveTradesModal } from '@/components/performance/ActiveTradesModal';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -88,7 +88,8 @@ export default function PerformancePage() {
         stop_loss: Number(t.sl),
         ml_probability: t.ml_probability ? parseFloat(t.ml_probability) : undefined,
         timeframe: t.timeframe || '1d',
-        rationale_ar: t.explanation_ar
+        rationale_ar: t.explanation_ar,
+        expected_target_date: t.expected_target_date
       }));
   }, [platformTrades]);
 
@@ -290,7 +291,15 @@ export default function PerformancePage() {
                       className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-accent-blue/40 transition-all group"
                     >
                       <div className="flex items-center justify-between text-zinc-400 mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider group-hover:text-accent-blue transition-colors">Total Signals (Open/Closed)</span>
+                        <span className="text-xs font-bold uppercase tracking-wider group-hover:text-accent-blue transition-colors flex items-center gap-1">
+                          Total Signals (Open/Closed)
+                          <span 
+                            className="inline-flex items-center text-accent-blue cursor-pointer"
+                            title="إجمالي صفقات وتوصيات الذكاء الاصطناعي المحددة (نقاط دخول، أهداف ربح، وقف خسارة). يختلف عن عدد الأسهم الإيجابية/السلبية في شريط الفرز الفني اليومي."
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                          </span>
+                        </span>
                         <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
                       </div>
                       <div>

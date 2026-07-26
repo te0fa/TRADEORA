@@ -56,7 +56,7 @@ interface PriceChartProps {
   priceRecord?: PriceRecord | null;
 }
 
-type Interval = '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1m';
+type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1M';
 
 function isMarketOpen(): boolean {
   try {
@@ -631,13 +631,24 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       if (seenTimes.has(c.time)) continue;
       seenTimes.add(c.time);
 
+      const openVal  = parseFloat(c.open_price  ?? c.open  ?? c.close_price ?? c.close ?? 0);
+      const highVal  = parseFloat(c.high_price  ?? c.high  ?? c.close_price ?? c.close ?? 0);
+      const lowVal   = parseFloat(c.low_price   ?? c.low   ?? c.close_price ?? c.close ?? 0);
+      const closeVal = parseFloat(c.close_price ?? c.close ?? 0);
+      const volVal   = parseInt(c.volume ?? 0, 10);
+
       cleaned.push({
+        ...c,
         time: c.time,
-        open: parseFloat(c.open_price ?? c.open ?? c.close_price ?? c.close),
-        high: parseFloat(c.high_price ?? c.high ?? c.close_price ?? c.close),
-        low: parseFloat(c.low_price ?? c.low ?? c.close_price ?? c.close),
-        close: parseFloat(c.close_price ?? c.close),
-        volume: parseInt(c.volume ?? 0, 10)
+        open: openVal,
+        high: highVal,
+        low: lowVal,
+        close: closeVal,
+        open_price: openVal,
+        high_price: highVal,
+        low_price: lowVal,
+        close_price: closeVal,
+        volume: volVal
       });
     }
 
@@ -2033,13 +2044,15 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   };
 
   const INTERVALS: { label: string; value: Interval }[] = [
+    { label: '1m', value: '1m' },
+    { label: '5m', value: '5m' },
     { label: '15m', value: '15m' },
     { label: '30m', value: '30m' },
     { label: '1H', value: '1h' },
     { label: '4H', value: '4h' },
     { label: '1D', value: '1d' },
     { label: '1W', value: '1w' },
-    { label: '1M', value: '1m' },
+    { label: '1M', value: '1M' },
   ];
 
   const resistanceEntries = topLevels.filter(e => e.isResistance);

@@ -8,7 +8,8 @@ export function calcSMA(closes: number[], period: number): (number | null)[] {
   try {
     const result = SMA.calculate({ period, values: closes });
     const diff = closes.length - result.length;
-    return Array(diff).fill(null).concat(result);
+    const mapped = result.map((v: any) => (v !== undefined && !isNaN(v) && isFinite(v)) ? v : null);
+    return Array(diff).fill(null).concat(mapped);
   } catch (e) {
     console.error('Error calculating SMA:', e);
     return Array(closes.length).fill(null);
@@ -22,7 +23,8 @@ export function calcEMA(closes: number[], period: number): (number | null)[] {
   try {
     const result = EMA.calculate({ period, values: closes });
     const diff = closes.length - result.length;
-    return Array(diff).fill(null).concat(result);
+    const mapped = result.map((v: any) => (v !== undefined && !isNaN(v) && isFinite(v)) ? v : null);
+    return Array(diff).fill(null).concat(mapped);
   } catch (e) {
     console.error('Error calculating EMA:', e);
     return Array(closes.length).fill(null);
@@ -36,7 +38,8 @@ export function calcRSI(closes: number[], period = 14): (number | null)[] {
   try {
     const result = RSI.calculate({ period, values: closes });
     const diff = closes.length - result.length;
-    return Array(diff).fill(null).concat(result);
+    const mapped = result.map((v: any) => (v !== undefined && !isNaN(v) && isFinite(v)) ? v : null);
+    return Array(diff).fill(null).concat(mapped);
   } catch (e) {
     console.error('Error calculating RSI:', e);
     return Array(closes.length).fill(null);

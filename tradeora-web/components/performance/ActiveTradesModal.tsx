@@ -30,6 +30,7 @@ export interface ActiveTrade {
   ml_probability?: number;
   timeframe: string;
   rationale_ar?: string;
+  expected_target_date?: string;
 }
 
 interface ActiveTradesModalProps {
@@ -181,6 +182,23 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
             </select>
           </div>
 
+        </div>
+
+        {/* Risk Management & Execution Strategy Guide Banner */}
+        <div className="bg-gradient-to-r from-accent-blue/15 via-purple-500/10 to-accent-gold/15 p-3.5 rounded-2xl border border-accent-blue/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-5 h-5 text-accent-gold shrink-0" />
+            <div>
+              <span className="font-extrabold text-white block">
+                {isAr ? '🛡️ إستراتيجية التنفيذ المؤمّنة (قاعدة 50 / 50):' : '🛡️ Secured Execution Strategy (50/50 Rule):'}
+              </span>
+              <p className="text-[11px] text-zinc-300 mt-0.5 leading-relaxed">
+                {isAr 
+                  ? 'عند وصول السهم للهدف الأول (TP1): بيع 50% من محفظتك وتأمين الـ 50% المتبقية برفع الاستوب تلقائياً إلى سعر الدخول (Breakeven). وعند الوصول للهدف الثاني (TP2): بيع الـ 50% المتبقية لحصد الأرباح الكاملة.'
+                  : 'At TP1: Sell 50% and move Stop-Loss to Entry Price. At TP2: Sell remaining 50% to secure maximum gain.'}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Modal Content / Trades List */}
@@ -366,12 +384,23 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                     </div>
                   </div>
 
-                  {/* Rationale description if present */}
-                  {t.rationale_ar && (
-                    <div className="text-xs text-zinc-300 bg-white/[0.02] p-2.5 rounded-xl border border-white/5 leading-relaxed font-sans mt-1">
-                      💡 <span className="font-semibold text-white">{isAr ? 'التحليل:' : 'Rationale:'}</span> {t.rationale_ar}
-                    </div>
-                  )}
+                  {/* Rationale description & Expected Target Date */}
+                  <div className="flex flex-col gap-2 font-sans mt-1">
+                    {t.rationale_ar && (
+                      <div className="text-xs text-zinc-300 bg-white/[0.02] p-2.5 rounded-xl border border-white/5 leading-relaxed">
+                        💡 <span className="font-semibold text-white">{isAr ? 'سبب التوصية والتحليل:' : 'Rationale:'}</span> {t.rationale_ar}
+                      </div>
+                    )}
+                    {t.expected_target_date && (
+                      <div className="text-xs text-accent-gold bg-accent-gold/10 p-2 rounded-xl border border-accent-gold/20 flex items-center justify-between font-mono font-medium">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{isAr ? 'تاريخ الهدف المتوقع:' : 'Expected Target Date:'}</span>
+                        </span>
+                        <span className="font-bold text-white">{t.expected_target_date}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })

@@ -19,6 +19,8 @@ def get_tv():
     return TvDatafeed()  # anonymous
 
 INTERVAL_MAP = {
+    '1m':   Interval.in_1_minute,
+    '5m':   Interval.in_5_minute,
     '15m':  Interval.in_15_minute,
     '30m':  Interval.in_30_minute,
     '1h':   Interval.in_1_hour,
@@ -26,19 +28,43 @@ INTERVAL_MAP = {
     '1d':   Interval.in_daily,
 }
 
-def backfill_symbol(tv, symbol: str, interval_key: str, n_bars: int = 2000):
-    """جيب وخزّن البيانات التاريخية لسهم واحد"""
-    try:
-        df = tv.get_hist(
-            symbol=symbol,
-            exchange='EGX',
-            interval=INTERVAL_MAP[interval_key],
-            n_bars=n_bars,
-        )
-        if df is None or df.empty:
-            print(f"  [SKIP] {symbol} ({interval_key}) — لا توجد بيانات على TradingView", flush=True)
-            return 0
+# Known symbol alias map for EGX stocks on TradingView
+ALIAS_MAP = {
+    'MNHD': 'MASR',      # Madinet Nasr -> Madinet Masr
+    'ACRO': 'ACAMD',     # Acrow Misr
+    'PHGC': 'PHDC',
+}
 
+def backfill_symbol(tv, symbol: str, interval_key: str, n_bars: int = 2000):
+    """جيب وخزّن البيانات التاريخية لسهم واحد مع محاولات إعادة الاتصال عند انقطاع الشبكة"""
+    tv_symbol = ALIAS_MAP.get(symbol, symbol)
+    df = None
+
+    # محاولة الجلب مع إمكانية إعادة إنشاء الاتصال عند حدوث خطأ شبكة
+    for attempt in range(1, 4):
+        try:
+            df = tv.get_hist(
+                symbol=tv_symbol,
+                exchange='EGX',
+                interval=INTERVAL_MAP[interval_key],
+                n_bars=n_bars,
+            )
+            break
+        except Exception as e:
+            err_msg = str(e)
+            print(f"  [RETRY {attempt}/3] {symbol} ({interval_key}): {err_msg}", flush=True)
+            if 'getaddrinfo' in err_msg or 'Connection' in err_msg or 'timed out' in err_msg:
+                time.sleep(2)
+                try:
+                    tv = get_tv()  # إعادة فتح الاتصال
+                except Exception:
+                    pass
+
+    if df is None or df.empty:
+        print(f"  [SKIP] {symbol} ({interval_key}) — لا توجد بيانات على TradingView", flush=True)
+        return 0
+
+    try:
         # جيب company_id بمطابقة دقيقة أولاً
         res = sb.table('companies')\
                 .select('id, symbol')\
@@ -102,7 +128,7 @@ def backfill_symbol(tv, symbol: str, interval_key: str, n_bars: int = 2000):
                     sb.table('market_prices')\
                       .upsert(market_price_rows[i:i+batch], on_conflict='company_id,price_date')\
                       .execute()
-                except Exception as m_err:
+                except Exception:
                     pass
 
         print(f"  [OK] {symbol} — تم إدخال {len(rows)} شمعة لفريم {interval_key}", flush=True)
@@ -132,7 +158,7 @@ def main():
         print(f"بدء backfill لـ {len(symbols)} سهم نشط...", flush=True)
 
     tv = get_tv()
-    intervals = ['15m', '30m', '1h', '4h', '1d']
+    intervals = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
 
     for i, sym in enumerate(symbols):
         print(f"\n[{i+1}/{len(symbols)}] معالجة السهم: {sym}...", flush=True)

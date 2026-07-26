@@ -126,6 +126,21 @@ export function DailyReportView({ data }: DailyReportProps) {
         </div>
       </div>
 
+      {/* Risk Management & Execution Strategy Guide Banner */}
+      <div className="bg-slate-900/80 border border-amber-500/30 p-4 rounded-2xl flex items-start sm:items-center gap-3 print:hidden backdrop-blur-md">
+        <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+        <div className="text-xs">
+          <span className="font-extrabold text-white block">
+            {isAr ? '🛡️ إرشادات تنفيذ التصفية التأمينية (قاعدة 50 / 50):' : '🛡️ Secured Execution Guide (50/50 Rule):'}
+          </span>
+          <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
+            {isAr 
+              ? 'عند وصول سعر السهم للهدف الأول (TP1): يُوصى ببيع 50% من كمية أسهمك وجني الربح الأول، وتأمين النصف المتبقي بنقل الاستوب فوراً إلى سعر الدخول. وعند الوصول للهدف الثاني (TP2): يتم بيع الـ 50% المتبقية لحصد الربح الكامل.'
+              : 'At TP1: Sell 50% position to lock first gain & move SL to entry price. At TP2: Sell remaining 50% to maximize profit.'}
+          </p>
+        </div>
+      </div>
+
       {/* Printable Report Document Container */}
       <div id="printable-report" className="glass-card p-6 sm:p-10 rounded-3xl border border-white/10 text-slate-100 print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
         

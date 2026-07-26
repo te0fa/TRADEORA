@@ -209,9 +209,11 @@ def track_user_trades():
                             if updates.get('status') == 'tp1_hit':
                                 msg = (
                                     f"🎯 <b>الهدف الأول TP1 - {t['symbol']}</b>\n\n"
-                                    f"✅ السعر وصل لـ <b>{price:.2f} EGP</b>\n"
-                                    f"💰 جني 50% من الكمية الآن\n\n"
-                                    f"<i>الهدف الثاني: {t['tp2']:.2f} EGP</i>"
+                                    f"✅ السعر وصل إلى <b>{price:.2f} EGP</b> (+{pnl_val:.1f}%)\n"
+                                    f"💡 <b>الإجراء المطلوب الآن:</b>\n"
+                                    f"1️⃣ اخرج بـ <b>50% من كمية أسهمك</b> وجني الربح الأول.\n"
+                                    f"2️⃣ انقل الستوب فوراً إلى <b>سعر الدخول (Breakeven)</b> لتأمين بافي الصفقة.\n\n"
+                                    f"🎯 <i>الهدف الثاني المستهدف: {t['tp2']:.2f} EGP</i>"
                                 )
                             elif updates.get('exit_reason') == 'sl':
                                 msg = (
@@ -219,14 +221,14 @@ def track_user_trades():
                                     f"⚠️ السعر ضرب الوقف عند "
                                     f"<b>{price:.2f} EGP</b>\n"
                                     f"📉 الخسارة: {updates.get('pnl_percent',''):.2f}%\n\n"
-                                    f"<i>لا بأس، الإدارة الصحيحة تحمي رأس المال</i>"
+                                    f"<i>الالتزام بوقف الخسارة يحمي رأس مالك لصفقات قادمة</i>"
                                 )
                             elif updates.get('exit_reason') == 'tp2':
                                 msg = (
                                     f"🏆 <b>الهدف الثاني TP2 - {t['symbol']}</b>\n\n"
-                                    f"💰 ربح كامل: <b>+{updates.get('pnl_percent',''):.2f}%</b>\n"
-                                    f"🎉 صفقة ناجحة بالكامل!\n\n"
-                                    f"<i>TRADEORA يهنئك بهذا الربح</i>"
+                                    f"💰 ربح كامل للصفقة: <b>+{updates.get('pnl_percent',''):.2f}%</b>\n"
+                                    f"🎉 اخرج بالـ 50% المتبقية لحصد الأرباح الكاملة!\n\n"
+                                    f"<i>TRADEORA يهنئك بهذا الربح المفترس</i>"
                                 )
 
                             if msg:
@@ -247,8 +249,8 @@ def track_user_trades():
                     if updates.get('status') == 'tp1_hit':
                         send_push(
                             t['user_id'],
-                            f"🎯 {t['symbol']} — الهدف الأول!",
-                            f"السعر وصل لـ {price:.2f} EGP (+{pnl_val:.1f}%)",
+                            f"🎯 {t['symbol']} — تحقق الهدف الأول!",
+                            f"السعر {price:.2f} EGP (+{pnl_val:.1f}%). اخرج بـ 50% من الكمية وانقل الاستوب لسعر الدخول لتأمين الصفقة.",
                             f"/ar/my-trades"
                         )
                         send_email_via_api(t['user_id'], 'tp1', t['symbol'], price, pnl_val)
@@ -342,6 +344,11 @@ def track_recommended_trades():
             curr_high = float(c["high_price"] if c["high_price"] is not None else c["close_price"])
             curr_close = float(c["close_price"])
             curr_date = c["price_date"]
+
+            # Safeguard: If current market price is >40% away from entry price on day 1 (indicates unadjusted split data mismatch)
+            if entry_price > 0 and (curr_close / entry_price > 1.4 or curr_close / entry_price < 0.6) and idx == 0:
+                logger.warning(f"⚠️ Split data anomaly detected for {symbol}: entry={entry_price}, current={curr_close}. Skipping tracking.")
+                break
 
             # Select SL trigger logic based on timeframe (Scenario B: Close trigger for 1d and 1h)
             use_close_trigger = timeframe in ['1d', '1h', 'D']

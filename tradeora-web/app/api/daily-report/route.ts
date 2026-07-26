@@ -9,13 +9,15 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const { searchParams } = new URL(req.url);
+    const dateParam = searchParams.get('date');
+    const todayStr = dateParam || new Date().toISOString().split('T')[0];
     const supabase = getSupabase();
 
-    // Fetch active trade recommendations
-    const { data: trades, error: tradesErr } = await supabase
+    // Fetch trade recommendations (filtered by date if specified)
+    let query = supabase
       .from('recommended_trades')
       .select(`
         *,
@@ -28,6 +30,12 @@ export async function GET() {
         )
       `)
       .order('ml_probability', { ascending: false });
+
+    if (dateParam) {
+      query = query.gte('recommended_at', `${dateParam}T00:00:00Z`).lte('recommended_at', `${dateParam}T23:59:59Z`);
+    }
+
+    const { data: trades, error: tradesErr } = await query;
 
     if (tradesErr) {
       console.error('Error fetching recommended trades:', tradesErr);

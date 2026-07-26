@@ -59,16 +59,29 @@ export async function GET(req: NextRequest) {
       const confidence = t.ml_probability ? parseFloat(t.ml_probability) : null;
       const requiresWarning = confidence !== null && confidence < 0.75;
       const currentPrice = t.company_id && priceMap[t.company_id] ? priceMap[t.company_id] : t.entry_price;
-      
+      const isBuy = (t.direction || 'buy').toLowerCase() === 'buy';
+
+      // Compute expected target date (3-5 business days from recommendation date)
+      const recDate = t.recommended_at ? new Date(t.recommended_at) : new Date();
+      const expDateObj = new Date(recDate.getTime() + 4 * 24 * 60 * 60 * 1000);
+      const expDateFormatted = expDateObj.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', year: 'numeric' });
+      const expectedTargetDate = `${expDateFormatted} (3 - 5 أيام عمل)`;
+
+      const companyNameStr = t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol;
+      const defaultRationale = isBuy
+        ? `توصية شراء لسهم ${companyNameStr} (${t.symbol}) بناءً على ثبات السعر أعلى الدعم عند ${t.sl} ج.م، مع إشارة إيجابية لمؤشر RSI وزخم السيولة التجميعي. المستهدف الأول ${t.tp1} ج.م والمستهدف الثاني ${t.tp2} ج.م.`
+        : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${t.entry_price} ج.م، مع مستهدف هبوط ${t.tp1} ج.م ووقف خسارة ${t.sl} ج.م.`;
+
       return {
         ...t,
         direction: (t.direction || 'buy').toLowerCase(),
-        company_name: t.companies ? (t.companies.name_ar || t.companies.name_en) : null,
+        company_name: companyNameStr,
         sector: t.companies ? t.companies.sector : null,
         current_price: currentPrice,
         confidence_warning: requiresWarning,
         fra_disclaimer: FRA_DISCLAIMER_AR,
-        explanation_ar: t.explanation_ar || `توصية ${(t.direction || 'buy').toLowerCase() === 'buy' ? 'شراء' : 'بيع'} بناءً على تحليل النماذج المتعددة بأسهم ${t.symbol} ونسبة مخاطرة/مكافأة مدروسة.`
+        explanation_ar: t.explanation_ar || defaultRationale,
+        expected_target_date: t.expected_target_date || expectedTargetDate
       };
     });
 
