@@ -139,44 +139,65 @@ export default function ScreenerPage() {
         </Button>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      {/* KPI Stats Cards (Clickable Filter Buttons) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-8">
         {[
           {
+            key: 'buy',
             label: isAr ? 'إشارات الشراء' : 'Buy Signals',
             value: stocks.filter(s => s.signal === 'buy').length,
-            color: 'text-up-green',
-            bgClass: 'bg-up-green-bg border-up-green/20',
-            icon: <TrendingUp className="w-5 h-5" />
+            color: 'text-emerald-400',
+            bgClass: filterSignal === 'buy' ? 'bg-emerald-500/25 border-emerald-500 shadow-lg' : 'glass-panel hover:border-emerald-500/40',
+            icon: <TrendingUp className="w-4 h-4 text-emerald-400" />,
+            onClick: () => setFilterSignal(filterSignal === 'buy' ? 'all' : 'buy')
           },
           {
+            key: 'sell',
             label: isAr ? 'إشارات البيع' : 'Sell Signals',
             value: stocks.filter(s => s.signal === 'sell').length,
-            color: 'text-down-red',
-            bgClass: 'bg-down-red-bg border-down-red/20',
-            icon: <TrendingDown className="w-5 h-5" />
+            color: 'text-rose-400',
+            bgClass: filterSignal === 'sell' ? 'bg-rose-500/25 border-rose-500 shadow-lg' : 'glass-panel hover:border-rose-500/40',
+            icon: <TrendingDown className="w-4 h-4 text-rose-400" />,
+            onClick: () => setFilterSignal(filterSignal === 'sell' ? 'all' : 'sell')
           },
           {
+            key: 'neutral',
+            label: isAr ? 'أسهم محايدة' : 'Neutral Stocks',
+            value: stocks.filter(s => s.signal === 'neutral' || !s.signal).length,
+            color: 'text-amber-400',
+            bgClass: filterSignal === 'neutral' ? 'bg-amber-500/25 border-amber-500 shadow-lg' : 'glass-panel hover:border-amber-500/40',
+            icon: <span className="text-amber-400 font-bold">●</span>,
+            onClick: () => setFilterSignal(filterSignal === 'neutral' ? 'all' : 'neutral')
+          },
+          {
+            key: 'up',
             label: isAr ? 'الأسهم الصاعدة' : 'Rising Stocks',
             value: stocks.filter(s => s.change > 0).length,
             color: 'text-emerald-400',
-            bgClass: 'glass-panel',
-            icon: <span>▲</span>
+            bgClass: filterChange === 'up' ? 'bg-emerald-500/25 border-emerald-500 shadow-lg' : 'glass-panel hover:border-emerald-500/40',
+            icon: <span className="text-emerald-400 font-bold">▲</span>,
+            onClick: () => setFilterChange(filterChange === 'up' ? 'all' : 'up')
           },
           {
+            key: 'down',
             label: isAr ? 'الأسهم الهابطة' : 'Falling Stocks',
             value: stocks.filter(s => s.change < 0).length,
-            color: 'text-red-400',
-            bgClass: 'glass-panel',
-            icon: <span>▼</span>
+            color: 'text-rose-400',
+            bgClass: filterChange === 'down' ? 'bg-rose-500/25 border-rose-500 shadow-lg' : 'glass-panel hover:border-rose-500/40',
+            icon: <span className="text-rose-400 font-bold">▼</span>,
+            onClick: () => setFilterChange(filterChange === 'down' ? 'all' : 'down')
           }
         ].map(card => (
-          <Card key={card.label} hoverEffect={false} className={`p-5 flex justify-between items-center ${card.bgClass}`}>
+          <Card 
+            key={card.key} 
+            onClick={card.onClick} 
+            className={`p-4 flex justify-between items-center cursor-pointer transition-all duration-300 border ${card.bgClass}`}
+          >
             <div>
-              <p className="text-zinc-400 text-xs mb-1.5 font-semibold">{card.label}</p>
-              <p className={`text-3xl font-black font-mono ${card.color}`}>{card.value}</p>
+              <p className="text-zinc-400 text-[11px] mb-1 font-bold">{card.label}</p>
+              <p className={`text-2xl font-black font-mono ${card.color}`}>{card.value}</p>
             </div>
-            <div className={`p-3 rounded-xl bg-white/5 ${card.color}`}>{card.icon}</div>
+            <div className="p-2 rounded-xl bg-white/5">{card.icon}</div>
           </Card>
         ))}
       </div>

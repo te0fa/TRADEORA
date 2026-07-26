@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Newspaper, ExternalLink, TrendingUp, TrendingDown, Minus, Clock, ShieldAlert, Sparkles } from 'lucide-react';
+import { NewsDetailModal } from '@/components/news/NewsDetailModal';
 
 interface NewsItem {
   id: string;
@@ -82,6 +83,8 @@ export function StockNewsTab({ symbol, companyId, locale }: StockNewsTabProps) {
     });
   };
 
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+
   if (loading) {
     return (
       <div className="flex flex-col gap-4 p-4">
@@ -120,7 +123,11 @@ export function StockNewsTab({ symbol, companyId, locale }: StockNewsTabProps) {
 
       <div className="grid grid-cols-1 gap-4">
         {news.map((item) => (
-          <Card key={item.id} className="p-5 glass-card flex flex-col gap-3 relative overflow-hidden group">
+          <Card 
+            key={item.id} 
+            onClick={() => setSelectedNews(item)}
+            className="p-5 glass-card flex flex-col gap-3 relative overflow-hidden group cursor-pointer hover:border-cyan-500/40 transition-all"
+          >
             {/* Header / Category & Impact */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-3">
               <div className="flex items-center gap-2">
@@ -166,21 +173,21 @@ export function StockNewsTab({ symbol, companyId, locale }: StockNewsTabProps) {
             {/* Footer Source Link */}
             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-white/5">
               <span>{isAr ? `المصدر: ${item.source}` : `Source: ${item.source}`}</span>
-              {item.url && (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-cyan-400 hover:underline font-bold"
-                >
-                  <span>{isAr ? 'قراءة الخبر الاصلي' : 'Read Full Source'}</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              )}
+              <span className="text-cyan-400 font-bold hover:underline">
+                {isAr ? 'عرض تفاصيل الخبر ➔' : 'View Details ➔'}
+              </span>
             </div>
           </Card>
         ))}
       </div>
+
+      {/* News Detail Modal */}
+      <NewsDetailModal 
+        news={selectedNews}
+        isOpen={Boolean(selectedNews)}
+        onClose={() => setSelectedNews(null)}
+        locale={locale}
+      />
     </div>
   );
 }

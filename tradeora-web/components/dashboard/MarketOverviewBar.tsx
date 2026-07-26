@@ -110,7 +110,7 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
             جلسة رسمية 100%
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {/* EGX 30 */}
           <div className="flex flex-col p-2.5 rounded-xl bg-slate-900/60 border border-white/5">
             <span className="text-[10px] font-bold text-slate-400">EGX 30</span>

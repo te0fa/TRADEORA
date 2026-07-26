@@ -113,11 +113,11 @@ export function DailyReportView({ data }: DailyReportProps) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/10 print:border-black/20 print:bg-gray-50 mb-8">
           <div>
             <span className="text-[11px] text-text-secondary print:text-gray-600 block">{locale === 'ar' ? 'مؤشر EGX 30' : 'EGX 30 Index'}</span>
-            <span className="text-lg font-mono font-bold text-text-primary print:text-black">
+            <span className="text-lg font-mono font-bold text-text-primary print:text-black block">
               {market_overview.egx30_value.toLocaleString()}
             </span>
-            <span className={`text-xs font-bold mr-1.5 ltr inline-block ${market_overview.egx30_change >= 0 ? 'text-up-green' : 'text-down-red'}`}>
-              ({market_overview.egx30_change >= 0 ? '+' : ''}{market_overview.egx30_change}%)
+            <span dir="ltr" className={`text-xs font-bold font-mono inline-block ${market_overview.egx30_change >= 0 ? 'text-up-green' : 'text-down-red'}`}>
+              {market_overview.egx30_change >= 0 ? `+${market_overview.egx30_change.toFixed(2)}%` : `${market_overview.egx30_change.toFixed(2)}%`}
             </span>
           </div>
 

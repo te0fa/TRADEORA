@@ -10,12 +10,14 @@ import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { MacroNewsPanel } from '@/components/dashboard/MacroNewsPanel';
+import { SectorDetailModal } from '@/components/sectors/SectorDetailModal';
 
 export default function SectorsPage() {
   const { locale } = useParams();
   const router = useRouter();
   const [sectors, setSectors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSector, setSelectedSector] = useState<any | null>(null);
 
   useEffect(() => {
     fetch('/api/sectors')
@@ -61,173 +63,106 @@ export default function SectorsPage() {
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, scale: 0.95, y: 15 },
-    show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } }
-  };
+  const chartData = sectors.map(s => ({
+    name: s.sector || s.name,
+    strength: s.rising - s.falling,
+    rising: s.rising,
+    falling: s.falling,
+    avg_change: s.avg_change ?? s.avgChange ?? 0
+  }));
 
   return (
-    <motion.div 
-      initial="hidden"
-      animate="show"
-      variants={containerVariants}
-      className="min-h-screen pb-20 font-sans text-text-primary" 
+    <div 
+      className="min-h-screen pb-20 font-sans text-text-primary max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" 
       dir={locale === 'ar' ? 'rtl' : 'ltr'}
     >
-      <motion.h1 variants={itemVariants} className="text-3xl font-black text-white mb-8 flex items-center gap-3">
-        <span className="text-accent-blue">🏭</span>
-        <span>{locale === 'ar' ? 'تحليل القطاعات المصرية' : 'Egypt EGX Sector Analysis'}</span>
-      </motion.h1>
+      <h1 className="text-3xl font-black text-white mb-8 flex items-center gap-3 pt-4">
+        <span className="p-2 rounded-2xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">🏭</span>
+        <span>{locale === 'ar' ? 'تحليل وتوزيع القطاعات المصرية' : 'Egypt EGX Sector Analysis'}</span>
+      </h1>
 
       {/* Bar Chart */}
-      <motion.div variants={itemVariants}>
-        <Card hoverEffect={false} className="p-6 mb-8">
-          <h3 className="text-white font-bold text-base mb-6 flex items-center gap-2">
-            <span className="text-accent-gold">📊</span>
-            {locale === 'ar' ? 'قوة كل قطاع (شراء - بيع)' : 'Sector Strength (Buy - Sell)'}
-          </h3>
-          <div className="w-full h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sectors.slice(0, 10)} margin={{ bottom: 60 }}>
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: '#71717a', fontSize: 11, fontWeight: 500 }}
-                  angle={-35}
-                  textAnchor="end"
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tick={{ fill: '#71717a', fontSize: 11 }} 
-                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                  tickLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-                  contentStyle={{
-                    background: 'rgba(11, 15, 25, 0.9)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '16px',
-                    color: 'white',
-                    fontSize: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                />
-                <Bar dataKey="strength" radius={[6, 6, 0, 0]} maxBarSize={50}>
-                  {sectors.slice(0, 10).map((s, i) => (
-                    <Cell
-                      key={i}
-                      fill={s.strength > 0 ? '#10B981' : s.strength < 0 ? '#EF4444' : '#71717A'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </motion.div>
+      <Card hoverEffect={false} className="p-6 mb-8 glass-panel border border-cyan-500/20">
+        <h3 className="text-white font-bold text-base mb-6 flex items-center gap-2">
+          <span className="text-cyan-400">📊</span>
+          {locale === 'ar' ? 'مقياس القوة النسبية للقطاعات (الأسهم الصاعدة - الهابطة)' : 'Sector Net Strength (Rising - Falling)'}
+        </h3>
+        <div className="w-full h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData.slice(0, 10)} margin={{ bottom: 40, top: 10 }}>
+              <XAxis 
+                dataKey="name" 
+                stroke="#94a3b8" 
+                fontSize={11} 
+                interval={0} 
+                angle={-20} 
+                textAnchor="end" 
+              />
+              <YAxis stroke="#94a3b8" fontSize={11} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }}
+                formatter={(val: any) => [`${val} سهم`, 'صافي قوة القطاع']}
+              />
+              <Bar dataKey="strength" radius={[6, 6, 0, 0]}>
+                {chartData.slice(0, 10).map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.strength >= 0 ? '#10b981' : '#f43f5e'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
-      <motion.div variants={itemVariants}>
-        <MacroNewsPanel />
-      </motion.div>
-
-      {/* Sector Cards */}
-      <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {sectors.map(s => {
+      {/* Sectors Grid Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {sectors.map((s) => {
           const regime = getSectorRegime(s);
+          const avgChange = s.avg_change ?? s.avgChange ?? 0;
+          const formattedAvgChange = avgChange >= 0 ? `+${avgChange.toFixed(2)}%` : `${avgChange.toFixed(2)}%`;
           return (
-            <motion.div variants={itemVariants} key={s.name}>
-              <Card hoverEffect={true} className="p-5 h-full flex flex-col cursor-default">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-white font-extrabold text-base leading-tight">
-                      {s.name}
-                    </h3>
-                    <Badge variant={regime.variant} className="w-max">
-                      {regime.text}
-                    </Badge>
-                  </div>
-                  <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${
-                    s.avgChange > 0
-                      ? 'bg-up-green-bg text-up-green border border-up-green/20'
-                      : s.avgChange < 0
-                        ? 'bg-down-red-bg text-down-red border border-down-red/20'
-                        : 'bg-white/5 text-zinc-400 border border-white/10'
-                  }`}>
-                    {s.avgChange > 0 ? '+' : ''}
-                    {s.avgChange?.toFixed(2)}%
+            <Card 
+              key={s.sector || s.name} 
+              onClick={() => setSelectedSector(s)}
+              className="p-5 glass-card cursor-pointer hover:border-cyan-500/50 transition-all flex flex-col justify-between gap-4 group"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2 border-b border-white/5 pb-2">
+                  <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20">
+                    {formattedAvgChange}
                   </span>
+                  <Badge variant={regime.variant}>{regime.text}</Badge>
                 </div>
+                <h3 className="text-base font-black text-white group-hover:text-cyan-300 transition-colors">
+                  {s.sector || s.name}
+                </h3>
+              </div>
 
-                <div className="grid grid-cols-3 gap-3 text-center mb-4 mt-auto">
-                  <div className="glass-input rounded-xl p-3 flex flex-col justify-center items-center">
-                    <p className="text-zinc-500 text-[10px] font-bold mb-1 uppercase tracking-wider">
-                      {locale === 'ar' ? 'الأسهم' : 'Stocks'}
-                    </p>
-                    <p className="text-white font-black text-lg">
-                      {s.total}
-                    </p>
-                  </div>
-                  <div className="bg-up-green-bg/50 border border-up-green/10 rounded-xl p-3 flex flex-col justify-center items-center">
-                    <p className="text-up-green/80 text-[10px] font-bold mb-1 uppercase tracking-wider">
-                      {locale === 'ar' ? 'شراء' : 'Buy'}
-                    </p>
-                    <p className="text-up-green font-black text-lg">
-                      {s.buySignals}
-                    </p>
-                  </div>
-                  <div className="bg-down-red-bg/50 border border-down-red/10 rounded-xl p-3 flex flex-col justify-center items-center">
-                    <p className="text-down-red/80 text-[10px] font-bold mb-1 uppercase tracking-wider">
-                      {locale === 'ar' ? 'بيع' : 'Sell'}
-                    </p>
-                    <p className="text-down-red font-black text-lg">
-                      {s.sellSignals}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono border-t border-white/5 pt-3">
+                <div className="flex flex-col bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 font-bold">{locale === 'ar' ? 'صاعد' : 'Rising'}</span>
+                  <span className="text-emerald-400 font-bold mt-0.5">{s.rising} 🟢</span>
                 </div>
-
-                <div className="flex justify-between text-xs items-center font-mono mt-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-up-green/70 text-[11px] font-bold bg-up-green/5 px-2 py-0.5 rounded">
-                      ▲ {s.rising}
-                    </span>
-                    <span className="text-down-red/70 text-[11px] font-bold bg-down-red/5 px-2 py-0.5 rounded">
-                      ▼ {s.falling}
-                    </span>
-                  </div>
-                  {s.avgWinRate > 0 && (
-                    <span className={`font-bold text-[11px] px-2 py-0.5 rounded ${
-                      s.avgWinRate >= 60 ? 'bg-accent-gold/10 text-accent-gold' : 'bg-zinc-800 text-zinc-400'
-                    }`}>
-                      WR: {s.avgWinRate.toFixed(0)}%
-                    </span>
-                  )}
+                <div className="flex flex-col bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 font-bold">{locale === 'ar' ? 'هابط' : 'Falling'}</span>
+                  <span className="text-rose-400 font-bold mt-0.5">{s.falling} 🔴</span>
                 </div>
-
-                {/* Progress Bar for Strength */}
-                <div className="mt-4 h-1.5 bg-white/5 rounded-full overflow-hidden relative">
-                  <div
-                    className={`absolute top-0 bottom-0 rounded-full transition-all duration-1000 ${s.strength > 0 ? 'bg-up-green shadow-[0_0_10px_#10B981]' : 'bg-down-red shadow-[0_0_10px_#EF4444]'}`}
-                    style={{
-                      width: `${s.total > 0 ? Math.min(Math.abs(s.strength) / s.total * 100, 100) : 0}%`,
-                      [locale === 'ar' ? 'right' : 'left']: 0
-                    }}
-                  />
+                <div className="flex flex-col bg-slate-900/60 p-2 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 font-bold">{locale === 'ar' ? 'الأسهم' : 'Total'}</span>
+                  <span className="text-white font-bold mt-0.5">{s.total}</span>
                 </div>
-              </Card>
-            </motion.div>
+              </div>
+            </Card>
           );
         })}
-      </motion.div>
-    </motion.div>
+      </div>
+
+      {/* Sector Detail Modal */}
+      <SectorDetailModal 
+        sector={selectedSector}
+        isOpen={Boolean(selectedSector)}
+        onClose={() => setSelectedSector(null)}
+        locale={locale as string}
+      />
+    </div>
   );
 }

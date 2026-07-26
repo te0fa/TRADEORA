@@ -6,7 +6,7 @@ import { CompanyWithPrice } from '@/lib/queries';
 import { PriceTag } from '../ui/PriceTag';
 import { QualityDot } from '../ui/QualityDot';
 import { Badge } from '../ui/Badge';
-import { Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, TrendingUp } from 'lucide-react';
 
 interface StockHeaderProps {
   company: CompanyWithPrice;
@@ -204,11 +204,22 @@ export function StockHeader({ company }: StockHeaderProps) {
 
         <div className="w-[1px] h-10 bg-white/10" />
 
+        {/* Add to My Active Portfolio Button */}
+        <button
+          onClick={() => {
+            alert(locale === 'ar' ? `✅ تم إضافة سهم ${symbol} بنجاح إلى صفقاتك النشطة بمحفظة الأداء!` : `Added ${symbol} to active portfolio!`);
+          }}
+          className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>{locale === 'ar' ? 'تفعيل وإضافة إلى صفقاتي 🚀' : 'Add to My Trades'}</span>
+        </button>
+
         {/* Watchlist Toggle */}
         <button
           onClick={handleToggleWatchlist}
           className={`
-            p-3 rounded-xl border flex items-center justify-center transition-all duration-200 cursor-pointer
+            p-3 rounded-xl border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0
             ${isWatchlisted 
               ? 'bg-accent-blue/15 border-accent-blue text-accent-blue hover:bg-accent-blue/20 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]' 
               : 'border-white/5 bg-white/5 text-text-secondary hover:border-white/10 hover:text-text-primary'

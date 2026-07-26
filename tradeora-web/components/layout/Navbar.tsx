@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import Image from 'next/image';
 import { TradeoraLogo } from '@/components/ui/TradeoraLogo';
+import { NotificationCenter } from '@/components/layout/NotificationCenter';
 import { useMarketStatus } from '@/hooks/useMarketStatus';
 import { toEasternArabic } from '@/lib/formatters';
 import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
@@ -115,12 +116,14 @@ export function Navbar({ locale }: NavbarProps) {
     { href: `/${locale}/performance`, icon: TrendingUp, label: isAr ? 'الأداء' : 'Performance' },
   ];
 
+  const [showNotifications, setShowNotifications] = useState(false);
+
   return (
-    <header className="sticky top-0 z-50 w-full glass-header border-b border-cyan-500/20 shadow-xl shadow-black/40">
+    <header className="sticky top-0 z-50 w-full glass-header border-b border-cyan-500/20 shadow-xl shadow-black/40 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Left Side: Logo & Main Navigation Links */}
-        <div className="flex items-center gap-6 lg:gap-8">
+        <div className="flex items-center gap-4 lg:gap-6">
           {/* Logo */}
           <Link href={`/${locale}`} className="flex items-center transition-all hover:scale-105 active:scale-95 py-1">
             <TradeoraLogo width={150} height={38} showSubtitle={true} />
@@ -128,7 +131,7 @@ export function Navbar({ locale }: NavbarProps) {
 
           {/* Navigation Links (Visible only if logged in) */}
           {session && (
-            <nav className="hidden lg:flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-[13px] font-bold text-slate-400">
+            <nav className="hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-slate-900/60 border border-white/10 backdrop-blur-md text-[12px] font-bold text-slate-400">
               {navLinks.map((link) => {
                 const isActive = link.exact 
                   ? pathname === link.href 
@@ -138,7 +141,7 @@ export function Navbar({ locale }: NavbarProps) {
                   <Link 
                     key={link.href}
                     href={link.href}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all duration-300 relative group ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all duration-300 relative group ${
                       isActive ? 'text-white font-extrabold' : 'hover:text-white'
                     }`}
                   >
@@ -149,7 +152,7 @@ export function Navbar({ locale }: NavbarProps) {
                         transition={{ type: "spring", stiffness: 350, damping: 28 }}
                       />
                     )}
-                    <link.icon className={`w-4 h-4 z-10 transition-colors ${link.color || ''} ${isActive && !link.color ? 'text-cyan-400' : ''} group-hover:${link.color ? link.color.split(' ')[0] : 'text-cyan-400'}`} />
+                    <link.icon className={`w-3.5 h-3.5 z-10 transition-colors ${link.color || ''} ${isActive && !link.color ? 'text-cyan-400' : ''}`} />
                     <span className="z-10">{link.label}</span>
                   </Link>
                 );
@@ -158,68 +161,66 @@ export function Navbar({ locale }: NavbarProps) {
               {userRole === 'admin' && (
                 <Link 
                   href={`/${locale}/admin`}
-                  className="px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-black hover:bg-rose-500/30 transition-all flex items-center gap-1.5 ml-1"
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs font-black hover:bg-rose-500/30 transition-all flex items-center gap-1 ml-1"
                 >
-                  <Shield className="w-4 h-4" />
+                  <Shield className="w-3.5 h-3.5" />
                   <span>{isAr ? 'الإدارة' : 'Admin'}</span>
                 </Link>
               )}
-
-              <Link 
-                href={`/${locale}/settings`}
-                className={`flex items-center gap-1.5 hover:text-white px-2.5 py-1.5 rounded-xl transition-all ml-1 ${
-                  pathname.includes('/settings') ? 'text-white bg-white/10' : ''
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-              </Link>
             </nav>
           )}
         </div>
 
         {/* Right Side: Market Clock & User Controls */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           
           {/* Live Status and Clock (Desktop) */}
-          <div className="hidden xl:flex items-center gap-4 text-xs text-zinc-400 mr-2 bg-black/20 px-4 py-1.5 rounded-full border border-white/5">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
+          <div className="hidden xl:flex items-center gap-3 text-xs text-zinc-400 mr-1 bg-black/20 px-3.5 py-1.5 rounded-full border border-white/5">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
                 {isOpen && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-up-green opacity-75"></span>}
-                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOpen ? 'bg-up-green' : 'bg-down-red'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isOpen ? 'bg-up-green' : 'bg-down-red'}`}></span>
               </span>
-              <span className="font-bold tracking-wide">
+              <span className="font-bold text-[11px]">
                 {isOpen ? (t('sessionStatus.open') || 'Session Open') : (t('sessionStatus.closed') || 'Session Closed')}
               </span>
             </div>
             <div className="w-[1px] h-3 bg-white/10" />
-            <div className="flex items-center gap-1.5 font-mono font-bold text-zinc-300">
-              <Clock className="w-4 h-4 text-accent-blue" />
+            <div className="flex items-center gap-1 font-mono font-bold text-zinc-300 text-[11px]">
+              <Clock className="w-3.5 h-3.5 text-cyan-400" />
               <span>{formattedTime}</span>
-              <span className="text-[10px] text-zinc-500">({t('clockCairo') || 'Cairo'})</span>
             </div>
           </div>
 
           {/* Language Switcher */}
           <button
             onClick={toggleLocale}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/5 transition-all duration-200 cursor-pointer"
+            className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/5 transition-all cursor-pointer"
             title={isAr ? 'Switch to English' : 'تحويل للغة العربية'}
           >
-            <Globe className="w-4 h-4 text-accent-blue" />
+            <Globe className="w-3.5 h-3.5 text-cyan-400" />
             <span>{isAr ? 'EN' : 'عربي'}</span>
           </button>
 
           {/* User Profile & LogOut */}
           {session ? (
-            <div className="flex items-center gap-3 border-l border-white/10 pl-3">
+            <div className="flex items-center gap-2 border-l border-white/10 pl-2">
               {/* Notification Bell */}
               <button 
+                onClick={() => setShowNotifications(!showNotifications)}
                 className="p-2 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-colors cursor-pointer relative"
                 title={isAr ? 'التنبيهات' : 'Notifications'}
               >
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-blue rounded-full border-2 border-[#0B0F19]"></span>
+                <Bell className="w-4 h-4 text-cyan-400" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-cyan-400 rounded-full animate-ping"></span>
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-cyan-400 rounded-full"></span>
               </button>
+
+              <NotificationCenter 
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(false)}
+                locale={locale}
+              />
 
               {/* Username display */}
               <div className="hidden md:flex flex-col text-right ml-1 mr-2">
