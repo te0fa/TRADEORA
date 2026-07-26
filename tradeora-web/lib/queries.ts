@@ -48,11 +48,12 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
   }
 
   // Call the database RPC function to retrieve the resolved latest price for each company
-  const { data: prices, error: rpcError } = await supabase.rpc('get_latest_prices');
-
-  if (rpcError) {
-    console.error('Error calling get_latest_prices RPC:', rpcError);
-    throw rpcError;
+  let prices = null;
+  try {
+    const { data: rpcPrices } = await supabase.rpc('get_latest_prices');
+    prices = rpcPrices;
+  } catch (rpcErr) {
+    console.warn('RPC get_latest_prices failed in fetchCompaniesWithPrices, fallback activated.', rpcErr);
   }
 
   // Group latest price records by company_id for quick lookup
@@ -187,14 +188,29 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     console.warn('Fundamentals table not loaded or missing:', err);
   }
 
-  // Get the latest resolved price for this specific company using RPC
-  const { data: prices, error: rpcError } = await supabase.rpc('get_latest_prices');
-  if (rpcError) {
-    console.error('Error calling get_latest_prices RPC for detail:', rpcError);
-    return null;
+  // Get the latest resolved price for this specific company using RPC with fallback
+  let rawPrice = null;
+  try {
+    const { data: prices, error: rpcError } = await supabase.rpc('get_latest_prices');
+    if (!rpcError && prices) {
+      rawPrice = (prices || []).find((p: any) => p.company_id === company.id);
+    }
+  } catch (rpcErr) {
+    console.warn('RPC get_latest_prices failed, using direct query fallback.', rpcErr);
   }
 
-  const rawPrice = (prices || []).find((p: any) => p.company_id === company.id);
+  // Fallback to direct market_prices lookup if RPC didn't return a price
+  if (!rawPrice) {
+    const { data: directPrice } = await supabase
+      .from('market_prices')
+      .select('*')
+      .eq('company_id', company.id)
+      .order('fetched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    rawPrice = directPrice;
+  }
+
   let priceRecord: PriceRecord | null = null;
   let labelAr = '';
   let labelEn = '';
