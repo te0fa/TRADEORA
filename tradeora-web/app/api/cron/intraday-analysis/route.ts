@@ -87,8 +87,8 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Analyse each company and update signals ──────────────────────
-    let inserted = 0;
-    let closed   = 0;
+    const tradesToInsert: any[] = [];
+    const updatePromises: Promise<any>[] = [];
 
     for (const comp of companies as any[]) {
       const latest = latestPriceMap[comp.id];
@@ -131,23 +131,24 @@ export async function GET(req: NextRequest) {
         const entryPrice: number = existingTrade.entry_price ?? closePrice;
         const pnl = ((closePrice - entryPrice) / entryPrice) * 100;
 
-        await sb
-          .from('recommended_trades')
-          .update({
-            status:     'closed',
-            exit_price: closePrice,
-            pnl_percent: parseFloat(pnl.toFixed(2)),
-            closed_at:  now.toISOString(),
-          })
-          .eq('id', existingTrade.id);
+        updatePromises.push(
+          sb
+            .from('recommended_trades')
+            .update({
+              status:     'closed',
+              exit_price: closePrice,
+              pnl_percent: parseFloat(pnl.toFixed(2)),
+              closed_at:  now.toISOString(),
+            })
+            .eq('id', existingTrade.id)
+            .then()
+        );
 
-        closed++;
         delete existingTradeMap[comp.id];
       }
 
-      // ── Insert new trade if signal detected and none exists ──────────
+      // ── Queue new trade if signal detected and none exists ──────────
       if (!existingTradeMap[comp.id] && newSignal) {
-        // TP1 = +5%, TP2 = +8%, SL = -5% for buy; inverse for sell
         const tp1 = newSignal === 'buy'
           ? parseFloat((closePrice * 1.05).toFixed(4))
           : parseFloat((closePrice * 0.95).toFixed(4));
@@ -158,7 +159,7 @@ export async function GET(req: NextRequest) {
           ? parseFloat((closePrice * 0.95).toFixed(4))
           : parseFloat((closePrice * 1.05).toFixed(4));
 
-        await sb.from('recommended_trades').insert({
+        tradesToInsert.push({
           company_id:      comp.id,
           symbol:          comp.symbol,
           direction:       newSignal,
@@ -172,7 +173,19 @@ export async function GET(req: NextRequest) {
           ml_probability:  mlProb,
           recommended_at:  now.toISOString(),
         });
-        inserted++;
+      }
+    }
+
+    // Execute bulk insert & updates concurrently
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+    }
+
+    if (tradesToInsert.length > 0) {
+      // Chunk bulk inserts into batches of 50 to prevent payload size errors
+      for (let i = 0; i < tradesToInsert.length; i += 50) {
+        const batch = tradesToInsert.slice(i, i + 50);
+        await sb.from('recommended_trades').insert(batch);
       }
     }
 
@@ -181,8 +194,8 @@ export async function GET(req: NextRequest) {
       message:   'Intraday analysis completed ✅',
       cairo_hour: cairoHour,
       analyzed:  companies.length,
-      inserted,
-      closed,
+      inserted:  tradesToInsert.length,
+      closed:    updatePromises.length,
       timestamp: now.toISOString(),
     });
 
