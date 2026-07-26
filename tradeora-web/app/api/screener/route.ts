@@ -63,17 +63,19 @@ export async function GET() {
 
         let signal: 'buy' | 'sell' | 'neutral' = 'neutral';
 
-        if (activeTrade && (activeTrade.ml_probability ?? 0) >= 0.70) {
-          signal = activeTrade.direction === 'buy' ? 'buy' : 'sell';
+        // Quantitative & Technical Signal Thresholds
+        if (change >= 2.2) {
+          signal = 'buy';
+        } else if (change <= -2.2) {
+          signal = 'sell';
+        } else if (activeTrade && (activeTrade.ml_probability ?? 0) >= 0.82) {
+          signal = activeTrade.direction === 'sell' ? 'sell' : 'buy';
+        } else if (change > 0.5) {
+          signal = 'buy';
+        } else if (change < -0.5) {
+          signal = 'sell';
         } else {
-          // Dynamic Technical Signal threshold based on price momentum & movement
-          if (change >= 1.5) {
-            signal = 'buy';
-          } else if (change <= -1.5) {
-            signal = 'sell';
-          } else {
-            signal = 'neutral';
-          }
+          signal = 'neutral';
         }
 
         return {

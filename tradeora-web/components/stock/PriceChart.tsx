@@ -1499,6 +1499,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
 
     const action = overallScore >= 2 ? 'buy' : overallScore <= -2 ? 'sell' : 'neutral';
     const isSell = action === 'sell';
+    const lastRSI = analysisData?.rsi ?? 50;
 
     // ATR calculations on analysisCandles:
     const atrValues = calcATR(analysisCandles, 14);
