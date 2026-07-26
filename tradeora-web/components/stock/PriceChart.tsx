@@ -572,10 +572,22 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
           setDbCandlesCount(formattedDb.length);
           setYahooCandles([]);
         } else {
-          // Fallback to Yahoo candles if DB is empty
+          // Fallback to Yahoo candles ONLY if DB is empty AND Yahoo price matches live price within 3%
           const { candles: yfCandles, events: yfEvents } = await fetchYahooCandles(symbol, interval);
           const formattedYahoo = yfCandles.map(formatCandle);
-          setYahooCandles(formattedYahoo);
+          
+          const livePrice = Number(priceRecord?.close_price || 0);
+          if (formattedYahoo.length > 0 && livePrice > 0) {
+            const yfLastClose = Number(formattedYahoo[formattedYahoo.length - 1]?.close_price || 0);
+            if (yfLastClose > 0 && Math.abs(yfLastClose - livePrice) / livePrice > 0.03) {
+              console.warn(`[Chart Safeguard] Discarding Yahoo Finance chart for ${symbol}: YF=${yfLastClose}, Live=${livePrice}`);
+              setYahooCandles([]);
+            } else {
+              setYahooCandles(formattedYahoo);
+            }
+          } else {
+            setYahooCandles(formattedYahoo);
+          }
           
           if (yfEvents && yfEvents.dividends) {
             const now = Date.now() / 1000;

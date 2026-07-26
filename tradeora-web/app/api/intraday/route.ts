@@ -31,21 +31,27 @@ export async function GET(req: NextRequest) {
   if (interval >= 1440) {
     const { data: dailyPrices } = await sb
       .from('market_prices')
-      .select('price_date, open_price, high_price, low_price, close_price, volume')
+      .select('price_date, open_price, high_price, low_price, close_price, volume, source')
       .eq('company_id', company.id)
       .order('price_date', { ascending: true })
       .limit(1000)
 
     if (dailyPrices && dailyPrices.length > 0) {
-      // Remove any duplicate dates
-      const seenDates = new Set<string>()
-      const formattedDaily: any[] = []
-
+      // Group by dateStr, giving 100% priority to tradingview source
+      const dateMap: Record<string, any> = {}
       for (const d of dailyPrices) {
         const dateStr = d.price_date.split('T')[0]
-        if (seenDates.has(dateStr)) continue
-        seenDates.add(dateStr)
+        const isTv = d.source === 'tradingview'
+        if (!dateMap[dateStr] || isTv) {
+          dateMap[dateStr] = d
+        }
+      }
 
+      const sortedDates = Object.keys(dateMap).sort()
+      const formattedDaily: any[] = []
+
+      for (const dateStr of sortedDates) {
+        const d = dateMap[dateStr]
         const close = parseFloat(d.close_price)
         const open = parseFloat(d.open_price ?? d.close_price)
         const high = parseFloat(d.high_price ?? d.close_price)
