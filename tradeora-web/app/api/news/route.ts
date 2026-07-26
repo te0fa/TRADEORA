@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const sb = createClient(supabaseUrl, supabaseKey);
 
   try {
-    let query = sb.from('company_news').select('*').order('published_at', { ascending: false }).limit(limit);
+    let query = sb.from('company_news').select('*, companies(id, symbol, name_ar, sector)').order('published_at', { ascending: false }).limit(limit);
 
     if (companyId) {
       // STRICTLY filter by company_id when companyId is requested
@@ -44,7 +44,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, news: [] }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, news: newsItems || [] });
+    const enriched = (newsItems || []).map((n: any) => ({
+      ...n,
+      sector_name: n.companies?.sector || n.sector_name || 'العقارات والإنشاءات',
+      company_symbol: n.companies?.symbol || null
+    }));
+
+    return NextResponse.json({ success: true, news: enriched });
   } catch (err: any) {
     console.error('API /api/news error:', err);
     return NextResponse.json({ success: false, news: [] }, { status: 500 });

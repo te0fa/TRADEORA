@@ -28,11 +28,11 @@ export function StockNewsPanel({ companyId }: StockNewsPanelProps) {
   useEffect(() => {
     async function loadNews() {
       try {
-        const res = await fetch(`/api/news-sentiment?companyId=${companyId}`);
+        const res = await fetch(`/api/news?companyId=${companyId}`);
         const data = await res.json();
         setNews(data.news || []);
       } catch (e) {
-        console.error('Failed to load stock news sentiment', e);
+        console.error('Failed to load stock news', e);
       } finally {
         setLoading(false);
       }

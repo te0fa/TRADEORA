@@ -58,7 +58,8 @@ export async function GET() {
         const p = priceMap[c.id];
         if (!p) return null;
 
-        const change = p.change_percent ?? 0;
+        const rawChange = p.change_percent ?? 0;
+        const change = rawChange !== 0 ? rawChange : (p.open_price > 0 ? parseFloat((((p.close_price - p.open_price) / p.open_price) * 100).toFixed(2)) : 0);
         const activeTrade = tradeMap[c.id];
 
         let signal: 'buy' | 'sell' | 'neutral' = 'neutral';
