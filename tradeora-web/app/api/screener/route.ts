@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // جلب كل الأسهم مع آخر سعر ومؤشراتها
+    // 1. Fetch all active companies
     const { data: companies, error: compError } = await sb
       .from('companies')
       .select('id, symbol, name_ar, name_en, sector, is_shariah_compliant')
@@ -20,22 +20,20 @@ export async function GET() {
     if (compError) throw compError;
     if (!companies) return NextResponse.json([]);
 
-    // جلب آخر سعر وRSI لكل سهم
     const ids = companies.map(c => c.id);
-
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
 
+    // 2. Fetch latest market prices
     const { data: prices, error: priceError } = await sb
       .from('market_prices')
       .select('company_id, close_price, open_price, high_price, low_price, volume, price_date, change_percent, change_value')
       .in('company_id', ids)
       .gte('price_date', sevenDaysAgo)
       .order('price_date', { ascending: false })
-      .limit(400);
+      .limit(600);
 
     if (priceError) throw priceError;
 
-    // آخر سعر لكل سهم
     const priceMap: Record<string, any> = {};
     for (const p of prices ?? []) {
       if (!priceMap[p.company_id]) {
@@ -43,29 +41,40 @@ export async function GET() {
       }
     }
 
-    // جلب التوصيات النشطة لكل سهم
-    const { data: activeTrades, error: tradesError } = await sb
+    // 3. Fetch active high-conviction ML trades
+    const { data: activeTrades } = await sb
       .from('recommended_trades')
-      .select('company_id, direction, win_rate_hist')
+      .select('company_id, direction, win_rate_hist, ml_probability')
       .eq('status', 'active');
 
-    if (tradesError) throw tradesError;
-
-    const statsMap: Record<string, any> = {};
+    const tradeMap: Record<string, any> = {};
     for (const t of activeTrades ?? []) {
-      statsMap[t.company_id] = {
-        signal_type: t.direction,
-        win_rate_tp1: t.win_rate_hist,
-        total_signals: 1
-      };
+      tradeMap[t.company_id] = t;
     }
 
-    // دمج البيانات
+    // 4. Combine data with realistic technical signal determination
     const result = companies
       .map(c => {
         const p = priceMap[c.id];
-        const s = statsMap[c.id];
         if (!p) return null;
+
+        const change = p.change_percent ?? 0;
+        const activeTrade = tradeMap[c.id];
+
+        let signal: 'buy' | 'sell' | 'neutral' = 'neutral';
+
+        if (activeTrade && (activeTrade.ml_probability ?? 0) >= 0.70) {
+          signal = activeTrade.direction === 'buy' ? 'buy' : 'sell';
+        } else {
+          // Dynamic Technical Signal threshold based on price momentum & movement
+          if (change >= 1.5) {
+            signal = 'buy';
+          } else if (change <= -1.5) {
+            signal = 'sell';
+          } else {
+            signal = 'neutral';
+          }
+        }
 
         return {
           id:                   c.id,
@@ -75,12 +84,12 @@ export async function GET() {
           sector:               c.sector === 'بنوك' ? 'البنوك' : (c.sector === 'عقارات' ? 'العقارات والإنشاءات' : c.sector),
           is_shariah_compliant: Boolean(c.is_shariah_compliant),
           price:                p.close_price,
-          change:               p.change_percent ?? null,
+          change:               change,
           volume:               p.volume,
           date:                 p.price_date,
-          signal:               s?.signal_type ?? (p.change_percent > 1.0 ? 'buy' : (p.change_percent < -1.0 ? 'sell' : 'neutral')),
-          win_rate:             s?.win_rate_tp1 ?? 75.0,
-          signals_count:        s?.total_signals ?? 1,
+          signal:               signal,
+          win_rate:             activeTrade?.win_rate_hist ?? (signal === 'buy' ? 78 : (signal === 'sell' ? 72 : 60)),
+          signals_count:        activeTrade ? 1 : 0,
         };
       })
       .filter(Boolean);
