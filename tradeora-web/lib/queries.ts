@@ -479,6 +479,23 @@ export async function fetchHistoricalPrices(companyId: string, limit: number = 5
     }
   });
 
+  // Always include the absolute historical ATH peak for accurate Support/Resistance ATH rendering
+  try {
+    const { data: athRow } = await supabase
+      .from('market_prices')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('high_price', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (athRow && athRow.high_price) {
+      dailyMap[athRow.price_date] = athRow;
+    }
+  } catch (athErr) {
+    console.warn('ATH fetch warning:', athErr);
+  }
+
   // Sort chronologically
   let historical = Object.values(dailyMap)
     .sort((a, b) => new Date(a.price_date).getTime() - new Date(b.price_date).getTime());
