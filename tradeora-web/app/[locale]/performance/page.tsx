@@ -74,17 +74,21 @@ export default function PerformancePage() {
 
   const activeTradesForModal = useMemo(() => {
     return platformTrades
-      .filter(t => t.status === 'active')
-      .map(t => ({
+      .filter((t: any) => t.status === 'active' || t.status === 'tp1_hit')
+      .map((t: any) => ({
         id: t.id,
         symbol: t.symbol,
-        trade_type: (t.direction === 'BUY' ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
-        entry_price: t.entry_price,
-        current_price: t.entry_price,
-        target_price_1: t.tp1,
-        target_price_2: t.tp2,
-        stop_loss: t.sl,
-        timeframe: '1d'
+        company_name: t.company_name,
+        sector: t.sector,
+        trade_type: ((t.direction || 'buy').toLowerCase() === 'buy' ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
+        entry_price: Number(t.entry_price),
+        current_price: Number(t.current_price || t.entry_price),
+        target_price_1: Number(t.tp1),
+        target_price_2: Number(t.tp2),
+        stop_loss: Number(t.sl),
+        ml_probability: t.ml_probability ? parseFloat(t.ml_probability) : undefined,
+        timeframe: t.timeframe || '1d',
+        rationale_ar: t.explanation_ar
       }));
   }, [platformTrades]);
 

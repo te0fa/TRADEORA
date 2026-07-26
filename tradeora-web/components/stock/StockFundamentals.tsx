@@ -44,9 +44,10 @@ export function StockFundamentals({ fundamentals, currentPrice, locale }: StockF
     );
   }
 
-  const formatVal = (val: number | null, suffix = '', decimals = 2) => {
-    if (val === null || val === undefined) return '-';
-    const formatted = val.toFixed(decimals);
+  const formatVal = (val: number | null | undefined, suffix = '', decimals = 2) => {
+    if (val === null || val === undefined || isNaN(Number(val))) return '-';
+    const numVal = Number(val);
+    const formatted = numVal.toFixed(decimals);
     return isAr ? `${toEasternArabic(formatted)}${suffix}` : `${formatted}${suffix}`;
   };
 

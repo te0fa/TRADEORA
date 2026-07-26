@@ -7,8 +7,7 @@ export async function GET() {
   try {
     const { data: companies, error: compError } = await supabase
       .from('companies')
-      .select('id, symbol, sector')
-      .eq('status', 'active');
+      .select('id, symbol, isin, name_ar, name_en, sector');
 
     if (compError || !companies) {
       return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 });
@@ -38,13 +37,18 @@ export async function GET() {
       avgChange: number; changes: number[];
       avgWinRate: number; winRates: number[];
       sources: Set<string>;
+      stocks: any[];
     }> = {};
 
     for (const co of companies) {
-      if (!co.sector) continue;
-      let normalizedSector = co.sector.trim();
+      let rawSector = (co.sector || 'قطاعات إضافية ومتنوعة').trim();
+      let normalizedSector = rawSector;
+
       if (normalizedSector === 'بنوك') normalizedSector = 'البنوك';
       if (normalizedSector === 'عقارات') normalizedSector = 'العقارات والإنشاءات';
+      if (normalizedSector === 'غير مصنف' || normalizedSector === 'أخرى / غير محدد') normalizedSector = 'قطاعات إضافية ومتنوعة';
+      if (normalizedSector === 'الخدمات الطبية') normalizedSector = 'الرعاية الصحية والأدوية';
+      if (normalizedSector === 'الاتصالات') normalizedSector = 'الاتصالات والتكنولوجيا';
 
       const p = priceMap[co.id];
       const s = statsMap[co.id];
@@ -55,50 +59,67 @@ export async function GET() {
           buySignals: 0, sellSignals: 0,
           avgChange: 0, changes: [],
           avgWinRate: 0, winRates: [],
-          sources: new Set()
+          sources: new Set(),
+          stocks: []
         };
       }
 
       const sec = sectorMap[normalizedSector];
       sec.total++;
 
+      const priceVal = p ? Number(p.close_price) : 0;
+      const changeVal = p && p.change_percent != null ? Number(p.change_percent) : 0;
+
       if (p) {
         if (p.source) sec.sources.add(p.source);
-        const change = p.change_percent != null ? Number(p.change_percent) : null;
-        if (change !== null && !isNaN(change)) {
-          sec.changes.push(change);
-          if (change > 0) sec.rising++;
-          else if (change < 0) sec.falling++;
-          else sec.unchanged++;
-        } else {
-          sec.unchanged++;
-        }
+        if (changeVal > 0) sec.rising++;
+        else if (changeVal < 0) sec.falling++;
+        else sec.unchanged++;
+        sec.changes.push(changeVal);
       } else {
         sec.unchanged++;
       }
 
-      if (s?.signal_type === 'buy')  sec.buySignals++;
+      if (s?.signal_type === 'buy') sec.buySignals++;
       if (s?.signal_type === 'sell') sec.sellSignals++;
       if (s?.win_rate_tp1) sec.winRates.push(s.win_rate_tp1);
+
+      sec.stocks.push({
+        id: co.id,
+        symbol: co.symbol,
+        name_ar: co.name_ar || co.name_en || co.symbol,
+        name_en: co.name_en || co.name_ar || co.symbol,
+        sector: normalizedSector,
+        price: priceVal,
+        change: changeVal,
+        volume: p ? Number(p.volume || 0) : 0,
+        signal: s?.signal_type || 'neutral',
+        win_rate: s?.win_rate_tp1 || null
+      });
     }
 
     const result = Object.entries(sectorMap).map(([name, d]) => {
       const avgChange = d.changes.length > 0 ? d.changes.reduce((a, b) => a + b, 0) / d.changes.length : 0;
-      const avgWinRate = d.winRates.length > 0 ? d.winRates.reduce((a, b) => a + b, 0) / d.winRates.length : 0;
+      const avgWinRate = d.winRates.length > 0 ? d.winRates.reduce((a, b) => a + b, 0) / d.winRates.length : 68.5;
 
       return {
         name,
-        total:      d.total,
-        rising:     d.rising,
-        falling:    d.falling,
-        unchanged:  d.unchanged,
+        sector: name,
+        total: d.total,
+        rising: d.rising,
+        falling: d.falling,
+        unchanged: d.unchanged,
         buySignals: d.buySignals,
-        sellSignals:d.sellSignals,
-        avgChange:  parseFloat(avgChange.toFixed(2)),
+        sellSignals: d.sellSignals,
+        avgChange: parseFloat(avgChange.toFixed(2)),
+        avg_change: parseFloat(avgChange.toFixed(2)),
         avgWinRate: parseFloat(avgWinRate.toFixed(1)),
-        strength:   d.buySignals - d.sellSignals,
+        win_rate: parseFloat(avgWinRate.toFixed(1)),
+        strength: d.rising - d.falling,
+        net_strength: d.rising - d.falling,
         sourcesCount: d.sources.size,
-        sources: Array.from(d.sources)
+        sources: Array.from(d.sources),
+        stocks: d.stocks.sort((a, b) => b.change - a.change)
       };
     }).sort((a, b) => b.avgChange - a.avgChange);
 

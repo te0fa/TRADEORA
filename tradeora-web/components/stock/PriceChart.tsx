@@ -1751,8 +1751,10 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         noteAR = `🔴 إشارات هبوط\n\nRSI (${lastRSI.toFixed(0)}) يميل للبيع والـ MACD سلبي يعكس ضعف الزخم. السعر ${analysisData?.close! < (analysisData?.sma20 ?? 0) ? 'تحت' : 'فوق'} المتوسط المتحرك 20.`;
         noteEN = `🔴 Bearish signals\n\nRSI (${lastRSI.toFixed(0)}) favors sell, MACD negative. Price ${analysisData?.close! < (analysisData?.sma20 ?? 0) ? 'below' : 'above'} SMA20.`;
       } else {
-        noteAR = `⚖️ السوق في حالة انتظار\n\nالمؤشرات لا تعطي اتجاهاً واضحاً الآن. MACD لم يتأكد والسعر بين المتوسطات.\n\nانتظر: كسر ${resistancesAbove[0]?.price.toFixed(2) ?? '-'} للشراء، أو كسر ${supportsBelow[0]?.price.toFixed(2) ?? '-'} للخروج.`;
-        noteEN = `⚖️ Market is waiting\n\nIndicators lack clear direction. MACD unconfirmed.\n\nWait: Break above ${resistancesAbove[0]?.price.toFixed(2) ?? '-'} to buy, or below ${supportsBelow[0]?.price.toFixed(2) ?? '-'} to sell.`;
+        const resPriceStr = (resistancesAbove[0]?.price != null && !isNaN(Number(resistancesAbove[0].price))) ? Number(resistancesAbove[0].price).toFixed(2) : '-';
+        const supPriceStr = (supportsBelow[0]?.price != null && !isNaN(Number(supportsBelow[0].price))) ? Number(supportsBelow[0].price).toFixed(2) : '-';
+        noteAR = `⚖️ السوق في حالة انتظار\n\nالمؤشرات لا تعطي اتجاهاً واضحاً الآن. MACD لم يتأكد والسعر بين المتوسطات.\n\nانتظر: كسر ${resPriceStr} للشراء، أو كسر ${supPriceStr} للخروج.`;
+        noteEN = `⚖️ Market is waiting\n\nIndicators lack clear direction. MACD unconfirmed.\n\nWait: Break above ${resPriceStr} to buy, or below ${supPriceStr} to sell.`;
       }
     }
     

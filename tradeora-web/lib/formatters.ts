@@ -11,33 +11,38 @@ export function toEasternArabic(n: string | number): string {
  * Formats stock prices to 2 decimal places with currency symbol.
  */
 export function formatPrice(price: number | null | undefined, locale: string): string {
-  if (price === null || price === undefined) {
+  if (price === null || price === undefined || isNaN(Number(price))) {
     return locale === 'ar' ? 'غير متاح' : 'N/A';
   }
   
-  const formatted = price.toFixed(2);
+  const numPrice = Number(price);
+  const formatted = numPrice.toFixed(2);
   return `${formatted} EGP`;
 }
 
-function formatChangeHelper(value: number): string {
-  const absVal = Math.abs(value);
+function formatChangeHelper(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(Number(value))) {
+    return "0.00";
+  }
+  const numValue = Number(value);
+  const absVal = Math.abs(numValue);
   
   if (absVal < 0.0005) {
     return "0.00";
   }
   
   if (absVal < 0.005) {
-    const sign = value > 0 ? '+' : '-';
+    const sign = numValue > 0 ? '+' : '-';
     return sign + absVal.toFixed(3);
   }
   
-  const roundedTo2 = Number(value.toFixed(2));
+  const roundedTo2 = Number(numValue.toFixed(2));
   if (roundedTo2 === 0) {
     return "0.00";
   }
   
-  const sign = value > 0 ? '+' : '';
-  return sign + value.toFixed(2);
+  const sign = numValue > 0 ? '+' : '';
+  return sign + numValue.toFixed(2);
 }
 
 /**
@@ -61,16 +66,17 @@ export function formatChangePercent(percent: number | null | undefined, locale: 
  * E.g., 1,234,567 -> 1.23M
  */
 export function formatVolume(volume: number | null | undefined, locale: string): string {
-  if (volume === null || volume === undefined || volume === 0) return '-';
+  if (volume === null || volume === undefined || volume === 0 || isNaN(Number(volume))) return '-';
+  const numVol = Number(volume);
   
-  if (volume >= 1_000_000_000) {
-    return (volume / 1_000_000_000).toFixed(2) + 'B';
-  } else if (volume >= 1_000_000) {
-    return (volume / 1_000_000).toFixed(2) + 'M';
-  } else if (volume >= 1_000) {
-    return (volume / 1_000).toFixed(2) + 'K';
+  if (numVol >= 1_000_000_000) {
+    return (numVol / 1_000_000_000).toFixed(2) + 'B';
+  } else if (numVol >= 1_000_000) {
+    return (numVol / 1_000_000).toFixed(2) + 'M';
+  } else if (numVol >= 1_000) {
+    return (numVol / 1_000).toFixed(2) + 'K';
   } else {
-    return volume.toLocaleString('en-US');
+    return numVol.toLocaleString('en-US');
   }
 }
 

@@ -162,7 +162,7 @@ export function DataSourcesPanel({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {resolvedSources.map((item) => {
           const hasPrice = item.price !== null && item.price !== undefined;
-          const divValue = item.divergence !== null ? item.divergence : 0;
+          const divValue = item.divergence != null && !isNaN(Number(item.divergence)) ? Number(item.divergence) : 0;
           const isNeutral = Math.abs(divValue) < 0.01;
           const isUp = divValue > 0 && !isNeutral;
           const isDown = divValue < 0 && !isNeutral;

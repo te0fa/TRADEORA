@@ -16,10 +16,10 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100');
     const symbol = searchParams.get('symbol');
 
-    // 1. Fetch trades
+    // 1. Fetch trades with company details
     let query = supabase
       .from('recommended_trades')
-      .select('*')
+      .select('*, companies(name_ar, name_en, sector)')
       .order('recommended_at', { ascending: false });
 
     if (symbol) {
@@ -32,20 +32,47 @@ export async function GET(req: NextRequest) {
       throw fetchError;
     }
 
-    // Enforce gating and append explainability / FRA disclaimer metadata to active trades
-    const processedTrades = (trades || []).map((t) => {
+    // 2. Fetch latest prices for active companies
+    const activeCompanyIds = Array.from(
+      new Set((trades || []).filter(t => t.company_id).map(t => t.company_id))
+    );
+
+    const priceMap: Record<string, number> = {};
+    if (activeCompanyIds.length > 0) {
+      const { data: latestPrices } = await supabase
+        .from('market_prices')
+        .select('company_id, close_price, price_date')
+        .in('company_id', activeCompanyIds)
+        .order('price_date', { ascending: false });
+
+      if (latestPrices) {
+        latestPrices.forEach((p: any) => {
+          if (!priceMap[p.company_id]) {
+            priceMap[p.company_id] = parseFloat(p.close_price);
+          }
+        });
+      }
+    }
+
+    // Enforce gating and append explainability / FRA disclaimer / current_price / sector
+    const processedTrades = (trades || []).map((t: any) => {
       const confidence = t.ml_probability ? parseFloat(t.ml_probability) : null;
       const requiresWarning = confidence !== null && confidence < 0.75;
+      const currentPrice = t.company_id && priceMap[t.company_id] ? priceMap[t.company_id] : t.entry_price;
       
       return {
         ...t,
+        direction: (t.direction || 'buy').toLowerCase(),
+        company_name: t.companies ? (t.companies.name_ar || t.companies.name_en) : null,
+        sector: t.companies ? t.companies.sector : null,
+        current_price: currentPrice,
         confidence_warning: requiresWarning,
         fra_disclaimer: FRA_DISCLAIMER_AR,
-        explanation_ar: t.explanation_ar || `توصية ${t.direction === 'buy' ? 'شراء' : 'بيع'} بناءً على تحليل النماذج المتعددة بأسهم ${t.symbol} ونسبة مخاطرة/مكافأة مدروسة.`
+        explanation_ar: t.explanation_ar || `توصية ${(t.direction || 'buy').toLowerCase() === 'buy' ? 'شراء' : 'بيع'} بناءً على تحليل النماذج المتعددة بأسهم ${t.symbol} ونسبة مخاطرة/مكافأة مدروسة.`
       };
     });
 
-    // 2. Fetch all closed trades to compute statistics
+    // 3. Fetch all closed trades to compute statistics
     const { data: allClosed, error: statsError } = await supabase
       .from('recommended_trades')
       .select('pnl_percent, status')
@@ -56,16 +83,15 @@ export async function GET(req: NextRequest) {
     }
 
     const totalTrades = (processedTrades || []).length;
-    const activeTrades = (processedTrades || []).filter(t => t.status === 'active').length;
+    const activeTrades = (processedTrades || []).filter((t: any) => t.status === 'active' || t.status === 'tp1_hit').length;
     
-    // Statistics for active live tracking from today onwards
+    // Statistics for active live tracking
     const closedCount = allClosed?.length || 0;
-    const winningTrades = allClosed?.filter(t => (t.pnl_percent || 0) > 0) || [];
-    const losingTrades = allClosed?.filter(t => (t.pnl_percent || 0) < 0) || [];
+    const winningTrades = allClosed?.filter((t: any) => (t.pnl_percent || 0) > 0) || [];
+    const losingTrades = allClosed?.filter((t: any) => (t.pnl_percent || 0) < 0) || [];
     
-    // Default to clean zero metrics when starting live tracking
     const winRate = closedCount > 0 ? (winningTrades.length / closedCount) * 100 : 0;
-    const totalPnl = allClosed?.reduce((sum, t) => sum + parseFloat(t.pnl_percent || 0), 0) || 0;
+    const totalPnl = allClosed?.reduce((sum: number, t: any) => sum + parseFloat(t.pnl_percent || 0), 0) || 0;
     const avgPnl = closedCount > 0 ? totalPnl / closedCount : 0;
 
     return NextResponse.json({
@@ -76,8 +102,8 @@ export async function GET(req: NextRequest) {
         closed_trades: closedCount,
         winning_trades: winningTrades.length,
         losing_trades: losingTrades.length,
-        win_rate: parseFloat(winRate.toFixed(2)),
-        total_pnl: parseFloat(totalPnl.toFixed(2)),
+        win_rate: parseFloat(winRate.toFixed(1)),
+        total_pnl: parseFloat(totalPnl.toFixed(1)),
         avg_pnl: parseFloat(avgPnl.toFixed(2))
       }
     });
