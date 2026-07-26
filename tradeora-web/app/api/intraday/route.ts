@@ -37,14 +37,32 @@ export async function GET(req: NextRequest) {
       .limit(1000)
 
     if (dailyPrices && dailyPrices.length > 0) {
-      const formattedDaily = dailyPrices.map((d: any) => ({
-        time: new Date(d.price_date).getTime() / 1000,
-        open: parseFloat(d.open_price ?? d.close_price),
-        high: parseFloat(d.high_price ?? d.close_price),
-        low: parseFloat(d.low_price ?? d.close_price),
-        close: parseFloat(d.close_price),
-        volume: parseInt(d.volume ?? 0, 10)
-      }))
+      // Remove any duplicate dates
+      const seenDates = new Set<string>()
+      const formattedDaily: any[] = []
+
+      for (const d of dailyPrices) {
+        const dateStr = d.price_date.split('T')[0]
+        if (seenDates.has(dateStr)) continue
+        seenDates.add(dateStr)
+
+        const close = parseFloat(d.close_price)
+        const open = parseFloat(d.open_price ?? d.close_price)
+        const high = parseFloat(d.high_price ?? d.close_price)
+        const low = parseFloat(d.low_price ?? d.close_price)
+
+        if (isNaN(close) || close <= 0) continue
+
+        formattedDaily.push({
+          time: dateStr, // YYYY-MM-DD string format required by Lightweight Charts for 1D!
+          open: open > 0 ? open : close,
+          high: Math.max(high, open, close),
+          low: Math.min(low > 0 ? low : close, open, close),
+          close: close,
+          volume: parseInt(d.volume ?? 0, 10)
+        })
+      }
+
       return NextResponse.json({ candles: formattedDaily })
     }
   }
@@ -65,18 +83,35 @@ export async function GET(req: NextRequest) {
     .limit(2000)
 
   if (tvSnapshots && tvSnapshots.length >= 10) {
-    const formattedCandles = tvSnapshots.map((s: any) => ({
-      time: new Date(s.snapshot_time).getTime() / 1000,
-      open: parseFloat(s.open_price ?? s.price),
-      high: parseFloat(s.high_price ?? s.price),
-      low: parseFloat(s.low_price ?? s.price),
-      close: parseFloat(s.price),
-      volume: parseInt(s.volume ?? 0, 10),
-    }))
+    const seenTimes = new Set<number>()
+    const formattedCandles: any[] = []
+
+    for (const s of tvSnapshots) {
+      const timeSec = Math.floor(new Date(s.snapshot_time).getTime() / 1000)
+      if (seenTimes.has(timeSec)) continue
+      seenTimes.add(timeSec)
+
+      const close = parseFloat(s.price)
+      const open = parseFloat(s.open_price ?? s.price)
+      const high = parseFloat(s.high_price ?? s.price)
+      const low = parseFloat(s.low_price ?? s.price)
+
+      if (isNaN(close) || close <= 0) continue
+
+      formattedCandles.push({
+        time: timeSec, // Unix timestamp in seconds for intraday!
+        open: open > 0 ? open : close,
+        high: Math.max(high, open, close),
+        low: Math.min(low > 0 ? low : close, open, close),
+        close: close,
+        volume: parseInt(s.volume ?? 0, 10),
+      })
+    }
+
     return NextResponse.json({ candles: formattedCandles })
   }
 
-  // 5. Fallback: If exact higher interval missing, aggregate from 15m candles
+  // 5. Fallback: Aggregate from 15m candles
   const { data: base15mSnapshots } = await sb
     .from('intraday_snapshots')
     .select('snapshot_time, open_price, high_price, low_price, price, volume')
@@ -86,20 +121,35 @@ export async function GET(req: NextRequest) {
     .limit(2000)
 
   if (base15mSnapshots && base15mSnapshots.length > 0) {
-    const raw15m = base15mSnapshots.map((s: any) => ({
-      time: new Date(s.snapshot_time).getTime() / 1000,
-      open: parseFloat(s.open_price ?? s.price),
-      high: parseFloat(s.high_price ?? s.price),
-      low: parseFloat(s.low_price ?? s.price),
-      close: parseFloat(s.price),
-      volume: parseInt(s.volume ?? 0, 10),
-    }))
+    const seenTimes = new Set<number>()
+    const raw15m: any[] = []
+
+    for (const s of base15mSnapshots) {
+      const timeSec = Math.floor(new Date(s.snapshot_time).getTime() / 1000)
+      if (seenTimes.has(timeSec)) continue
+      seenTimes.add(timeSec)
+
+      const close = parseFloat(s.price)
+      const open = parseFloat(s.open_price ?? s.price)
+      const high = parseFloat(s.high_price ?? s.price)
+      const low = parseFloat(s.low_price ?? s.price)
+
+      if (isNaN(close) || close <= 0) continue
+
+      raw15m.push({
+        time: timeSec,
+        open: open > 0 ? open : close,
+        high: Math.max(high, open, close),
+        low: Math.min(low > 0 ? low : close, open, close),
+        close: close,
+        volume: parseInt(s.volume ?? 0, 10),
+      })
+    }
 
     if (interval === 15) {
       return NextResponse.json({ candles: raw15m })
     }
 
-    // Aggregate 15m candles into 30m, 1h, 4h
     const groupSize = interval === 30 ? 2 : interval === 60 ? 4 : 16
     const aggregated: any[] = []
     for (let i = 0; i < raw15m.length; i += groupSize) {
@@ -127,22 +177,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ candles: aggregated })
   }
 
-  // 6. Final Fallback to RPC
-  const { data: rpcCandles } = await sb
-    .rpc('get_intraday_candles', {
-      p_company_id: company.id,
-      p_interval_minutes: interval,
-      p_days_back: daysBack,
-    })
-
-  const formattedRpc = (rpcCandles ?? []).map((c: any) => ({
-    time: new Date(c.candle_time).getTime() / 1000,
-    open: parseFloat(c.open_price),
-    high: parseFloat(c.high_price),
-    low: parseFloat(c.low_price),
-    close: parseFloat(c.close_price),
-    volume: parseInt(c.volume ?? 0, 10),
-  }))
-
-  return NextResponse.json({ candles: formattedRpc })
+  return NextResponse.json({ candles: [] })
 }

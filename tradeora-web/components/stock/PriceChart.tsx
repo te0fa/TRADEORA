@@ -599,24 +599,30 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     }
   }, [interval, dbPrices, dbIntradayCandles, yahooCandles]);
 
-  // Synchronize the last candle of activePrices with today's live priceRecord close price
+  // Sanitize and sort active prices for TradingView Lightweight Charts
   const finalActivePrices = useMemo(() => {
-    if (activePrices.length === 0) return [];
-    const copy = [...activePrices];
-    const lastIdx = copy.length - 1;
-    const lastCandle = copy[lastIdx];
+    if (!activePrices || activePrices.length === 0) return [];
     
-    if (priceRecord && priceRecord.close_price) {
-      const livePrice = priceRecord.close_price;
-      copy[lastIdx] = {
-        ...lastCandle,
-        close_price: livePrice,
-        high_price: lastCandle.high_price !== null ? Math.max(lastCandle.high_price, livePrice) : livePrice,
-        low_price: lastCandle.low_price !== null ? Math.min(lastCandle.low_price, livePrice) : livePrice,
-      };
+    const seenTimes = new Set<string | number>();
+    const cleaned: any[] = [];
+
+    for (const c of activePrices) {
+      if (!c || c.time === undefined || c.time === null) continue;
+      if (seenTimes.has(c.time)) continue;
+      seenTimes.add(c.time);
+
+      cleaned.push({
+        time: c.time,
+        open: parseFloat(c.open_price ?? c.open ?? c.close_price ?? c.close),
+        high: parseFloat(c.high_price ?? c.high ?? c.close_price ?? c.close),
+        low: parseFloat(c.low_price ?? c.low ?? c.close_price ?? c.close),
+        close: parseFloat(c.close_price ?? c.close),
+        volume: parseInt(c.volume ?? 0, 10)
+      });
     }
-    return copy;
-  }, [activePrices, priceRecord]);
+
+    return cleaned;
+  }, [activePrices]);
 
   // Toast notification for intraday fallback
   useEffect(() => {

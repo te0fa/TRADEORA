@@ -21,11 +21,15 @@ export async function GET(req: NextRequest) {
     let query = sb.from('company_news').select('*').order('published_at', { ascending: false }).limit(limit);
 
     if (companyId) {
-      query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+      // STRICTLY filter by company_id when companyId is requested
+      query = query.eq('company_id', companyId);
     } else if (symbol) {
+      // STRICTLY filter by company symbol when symbol is requested
       const { data: comp } = await sb.from('companies').select('id').ilike('symbol', symbol).maybeSingle();
       if (comp?.id) {
-        query = query.or(`company_id.eq.${comp.id},company_id.is.null`);
+        query = query.eq('company_id', comp.id);
+      } else {
+        return NextResponse.json({ success: true, news: [] });
       }
     }
 

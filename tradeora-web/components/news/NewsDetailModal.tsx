@@ -1,8 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
 import { 
   X, 
   ExternalLink, 
@@ -23,6 +22,17 @@ interface NewsDetailModalProps {
 
 export function NewsDetailModal({ news, isOpen, onClose, locale }: NewsDetailModalProps) {
   const isAr = locale === 'ar';
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen || !news) return null;
 
@@ -64,8 +74,14 @@ export function NewsDetailModal({ news, isOpen, onClose, locale }: NewsDetailMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-2xl glass-card rounded-3xl p-6 flex flex-col gap-5 border border-cyan-500/30 text-slate-100 max-h-[90vh] overflow-y-auto font-sans">
+    <div 
+      className="fixed inset-0 top-0 left-0 w-screen h-screen z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-2xl glass-card rounded-3xl p-6 flex flex-col gap-5 border border-cyan-500/40 text-slate-100 max-h-[85vh] overflow-y-auto font-sans shadow-2xl my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-2">
