@@ -191,8 +191,8 @@ export default function NewsHubPage() {
                       {item.category === 'macro_fx' 
                         ? '🌍 اقتصاد كلي وجيوسياسي' 
                         : item.category === 'corporate' 
-                          ? '🏢 إفصاح رسمى للشركة'
-                          : '🏗️ أخبار القطاع'}
+                          ? (item.sector_name ? `🏢 إفصاح (قطاع ${item.sector_name})` : '🏢 إفصاح رسمى للشركة')
+                          : (item.sector_name ? `🏗️ قطاع ${item.sector_name}` : '🏗️ أخبار القطاع')}
                     </span>
                     <div>{getImpactBadge(item)}</div>
                   </div>

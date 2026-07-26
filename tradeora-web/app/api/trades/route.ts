@@ -56,11 +56,12 @@ export async function GET(req: NextRequest) {
     const totalTrades = (processedTrades || []).length;
     const activeTrades = (processedTrades || []).filter(t => t.status === 'active').length;
     
-    // Statistics for all time closed trades
+    // Statistics for active live tracking from today onwards
     const closedCount = allClosed?.length || 0;
     const winningTrades = allClosed?.filter(t => (t.pnl_percent || 0) > 0) || [];
-    const losingTrades = allClosed?.filter(t => (t.pnl_percent || 0) <= 0) || [];
+    const losingTrades = allClosed?.filter(t => (t.pnl_percent || 0) < 0) || [];
     
+    // Default to clean zero metrics when starting live tracking
     const winRate = closedCount > 0 ? (winningTrades.length / closedCount) * 100 : 0;
     const totalPnl = allClosed?.reduce((sum, t) => sum + parseFloat(t.pnl_percent || 0), 0) || 0;
     const avgPnl = closedCount > 0 ? totalPnl / closedCount : 0;

@@ -1335,7 +1335,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
 
   // Sector Relative Volume Analysis
   const sectorVolumeDetails = useMemo(() => {
-    const val = lastSectorRelativeVol;
+    const val = typeof lastSectorRelativeVol === 'number' && !isNaN(lastSectorRelativeVol) ? lastSectorRelativeVol : 1.0;
     let scoreVal = 0;
     let signal = '🟡';
     let desc = '';
