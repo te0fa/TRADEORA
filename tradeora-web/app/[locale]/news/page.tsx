@@ -188,11 +188,7 @@ export default function NewsHubPage() {
                   {/* Top Bar: Category & Impact */}
                   <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-3">
                     <span className="text-[11px] font-extrabold px-3 py-1 rounded-xl bg-slate-800 text-cyan-400 border border-cyan-500/20">
-                      {item.category === 'macro_fx' 
-                        ? '🌍 اقتصاد كلي وجيوسياسي' 
-                        : item.category === 'corporate' 
-                          ? (item.sector_name ? `🏢 إفصاح (قطاع ${item.sector_name})` : '🏢 إفصاح رسمى للشركة')
-                          : (item.sector_name ? `🏗️ قطاع ${item.sector_name}` : '🏗️ أخبار القطاع')}
+                      {item.sector_name ? `📰 قطاع ${item.sector_name}` : (item.category === 'macro_fx' ? '🌍 اقتصاد كلي وجيوسياسي' : '🏢 إفصاح رسمى للشركة')}
                     </span>
                     <div>{getImpactBadge(item)}</div>
                   </div>
