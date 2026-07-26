@@ -34,36 +34,36 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ isOpen, onClose, locale }: NotificationCenterProps) {
   const isAr = locale === 'ar';
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: '1',
-      title: isAr ? '🎯 تحقيق هدف ربح: طلعت مصطفى (TMGH)' : 'Target Hit: TMGH',
-      message: isAr ? 'وصل سعر السهم إلى الهدف الأول (TP1) بنسبة ربح +3.46%' : 'TMGH reached TP1 with +3.46% profit.',
-      type: 'tp_hit',
-      symbol: 'TMGH',
-      time: isAr ? 'منذ 10 دقائق' : '10m ago',
-      read: false
-    },
-    {
-      id: '2',
-      title: isAr ? '🎯 تحقيق هدف ربح: السويدي إليكتريك (SWDY)' : 'Target Hit: SWDY',
-      message: isAr ? 'تم تحقيق الهدف الثاني (TP2) بنجاح وإغلاق الصفقة بنسبة +5.20%' : 'SWDY reached TP2 with +5.20% gain.',
-      type: 'tp_hit',
-      symbol: 'SWDY',
-      time: isAr ? 'منذ 45 دقيقة' : '45m ago',
-      read: false
-    },
-    {
-      id: '3',
-      title: isAr ? '📋 إفصاح جديد: البنك التجاري الدولي (COMI)' : 'New Disclosure: COMI',
-      message: isAr ? 'اعتماد النتائج المالية للنصف الأول وتحديد مواعيد توزيع الأرباح' : 'H1 financial results approval.',
-      type: 'disclosure',
-      symbol: 'COMI',
-      time: isAr ? 'منذ ساعتين' : '2h ago',
-      read: true
-    }
-  ]);
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Fetch real recent disclosures and notifications
+    fetch('/api/news?limit=5')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success && Array.isArray(data.news) && data.news.length > 0) {
+          const items: NotificationItem[] = data.news.map((n: any, idx: number) => ({
+            id: n.id || String(idx),
+            title: isAr ? `📋 إفصاح رسمى: ${n.title}` : `Disclosure: ${n.title}`,
+            message: n.content ? (n.content.slice(0, 90) + '...') : (isAr ? 'تابع تفاصيل الإفصاح المباشر بالمنصة' : 'View disclosure details'),
+            type: 'disclosure',
+            time: isAr ? 'أحدث إفصاح' : 'Latest',
+            read: false
+          }));
+          setNotifications(items);
+        } else {
+          setNotifications([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching notifications:', err);
+        setNotifications([]);
+      })
+      .finally(() => setLoading(false));
+  }, [isOpen, isAr]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -116,9 +116,14 @@ export function NotificationCenter({ isOpen, onClose, locale }: NotificationCent
 
         {/* Notifications List */}
         <div className="flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1">
-          {notifications.length === 0 ? (
+          {loading ? (
             <div className="p-6 text-center text-slate-400 text-xs">
-              {isAr ? 'لا توجد إشعارات جديدة' : 'No new notifications'}
+              {isAr ? 'جاري التحقق من التنبيهات الحية...' : 'Checking live alerts...'}
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+              <Bell className="w-8 h-8 text-slate-500 opacity-40" />
+              <span>{isAr ? 'لا توجد أهداف أرباح جديدة محققة الآن (البورصة مغلقة مغلق الجلسة)' : 'No new notifications right now (Market Closed)'}</span>
             </div>
           ) : (
             notifications.map((item) => (
