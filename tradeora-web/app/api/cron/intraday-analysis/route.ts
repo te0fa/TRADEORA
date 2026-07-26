@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
 
     // ── Analyse each company and update signals ──────────────────────
     const tradesToInsert: any[] = [];
-    const updatePromises: Promise<any>[] = [];
+    const updatePromises: any[] = [];
 
     for (const comp of companies as any[]) {
       const latest = latestPriceMap[comp.id];
