@@ -413,23 +413,25 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                       {/* Order Type Badge */}
                       <span
                         className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border shadow-sm ${
-                          t.order_type === 'LIMIT'
+                          !isBuy
+                            ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            : t.order_type === 'LIMIT'
                             ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                             : t.order_type === 'BREAKOUT_TRIGGER'
                             ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
-                            : isBuy
-                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                            : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                         }`}
                       >
-                        {t.order_type === 'LIMIT' ? (
-                          <span>⏳ {isAr ? 'أمر معلق (Limit)' : 'Limit Order'}</span>
-                        ) : t.order_type === 'BREAKOUT_TRIGGER' ? (
-                          <span>🎯 {isAr ? 'دخول مشروط باختراق' : 'Breakout Trigger'}</span>
-                        ) : isBuy ? (
-                          <span>🟢 {isAr ? 'شراء مباشر' : 'Market BUY'}</span>
+                        {isBuy ? (
+                          t.order_type === 'LIMIT' ? (
+                            <span>⏳ {isAr ? 'أمر شراء معلق (Limit Buy)' : 'Pending Limit Buy'}</span>
+                          ) : t.order_type === 'BREAKOUT_TRIGGER' ? (
+                            <span>🎯 {isAr ? 'شراء مشروط باختراق' : 'Breakout BUY'}</span>
+                          ) : (
+                            <span>🟢 {isAr ? 'شراء مباشر بسعر السوق' : 'Market BUY'}</span>
+                          )
                         ) : (
-                          <span>🔴 {isAr ? 'بيع مباشر' : 'Market SELL'}</span>
+                          <span>🔴 {isAr ? 'تنبيه بيع وخروج' : 'Market SELL / Exit'}</span>
                         )}
                       </span>
 
@@ -445,22 +447,22 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                   {/* 4 Metric Cards Row */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-black/40 border border-white/5 text-xs font-mono">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? 'سعر الدخول' : 'سعر الخروج') : (isBuy ? 'Entry Price' : 'Exit Price')}</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? '📍 نقطة الشراء' : '🚨 سعر الخروج والتصفية') : (isBuy ? 'Target Entry' : 'Exit Level')}</span>
                       <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? '💵 السعر الحالي (لايف)' : 'Current Price'}</span>
                       <span className={`font-bold text-sm ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {current.toFixed(2)} ج.م ({isPositive ? '+' : ''}{pnlPct.toFixed(1)}%)
                       </span>
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? 'الهدف الأول (TP1)' : 'هدف الهبوط الأول') : 'Target 1'}</span>
-                      <span className="font-bold text-emerald-400 text-sm">{tp1.toFixed(2)} ج.م</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? '🎯 الهدف الأول (TP1)' : '📉 هدف الهبوط الأول') : 'Target 1'}</span>
+                      <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? 'وقف الخسارة (SL)' : 'الحد الأقصى (SL)') : 'Stop Loss'}</span>
-                      <span className="font-bold text-rose-400 text-sm">{sl.toFixed(2)} ج.م</span>
+                      <span className="text-[10px] text-zinc-400 font-sans">{isAr ? (isBuy ? '🛑 وقف الخسارة (SL)' : '⚠️ شرط إلغاء الخروج') : 'Stop Loss'}</span>
+                      <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
                     </div>
                   </div>
 
