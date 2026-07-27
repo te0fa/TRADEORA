@@ -49,6 +49,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
+  const [strategyFilter, setStrategyFilter] = useState<'ALL' | 'DAY_TRADING' | 'SWING_POSITION'>('ALL');
 
   // Extract unique sectors list
   const sectorsList = useMemo(() => {
@@ -73,23 +74,30 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
         if (type !== orderTypeFilter) return false;
       }
 
-      // 3. Sector Filter
+      // 3. Strategy Horizon Filter (Day Trading 2-3% vs Swing/Position)
+      const entry = Number(t.entry_price || 1);
+      const tp1 = Number(t.target_price_1 || entry * 1.05);
+      const tp1Gain = Math.abs((tp1 - entry) / entry) * 100;
+      const isDayTrading = tp1Gain <= 4.5;
+
+      if (strategyFilter === 'DAY_TRADING' && !isDayTrading) return false;
+      if (strategyFilter === 'SWING_POSITION' && isDayTrading) return false;
+
+      // 4. Sector Filter
       if (selectedSector !== 'ALL' && t.sector !== selectedSector) return false;
 
-      // 4. Search Query
+      // 5. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
-        const sym = (t.symbol || '').toLowerCase();
-        const name = (t.company_name || '').toLowerCase();
-        const sec = (t.sector || '').toLowerCase();
-        if (!sym.includes(q) && !name.includes(q) && !sec.includes(q)) {
-          return false;
-        }
+        const symMatches = t.symbol.toLowerCase().includes(q);
+        const nameMatches = t.company_name?.toLowerCase().includes(q);
+        const secMatches = t.sector?.toLowerCase().includes(q);
+        if (!symMatches && !nameMatches && !secMatches) return false;
       }
 
       return true;
     });
-  }, [trades, dirFilter, orderTypeFilter, selectedSector, searchQuery]);
+  }, [trades, dirFilter, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -193,17 +201,55 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
         </div>
 
+        {/* Strategy Horizon Filter Tabs (Day Trading 2-3% vs Swing/Position) */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-black/40 border border-white/10 rounded-2xl text-xs font-semibold">
+          <button
+            onClick={() => setStrategyFilter('ALL')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer font-bold ${
+              strategyFilter === 'ALL'
+                ? 'bg-accent-blue text-black shadow-lg shadow-accent-blue/20 font-black'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            {isAr ? '✨ كافة أفق الصفقات' : 'All Horizonts'}
+          </button>
+
+          <button
+            onClick={() => setStrategyFilter('DAY_TRADING')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              strategyFilter === 'DAY_TRADING'
+                ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20 font-black'
+                : 'text-cyan-400/80 hover:text-cyan-400 hover:bg-cyan-500/10'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 fill-cyan-400" />
+            <span>⚡ {isAr ? 'صفقات مضاربة سريعة (2% - 3% يومي)' : 'Scalping / Day Trading (2-3% Daily)'}</span>
+          </button>
+
+          <button
+            onClick={() => setStrategyFilter('SWING_POSITION')}
+            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              strategyFilter === 'SWING_POSITION'
+                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20 font-black'
+                : 'text-purple-400/80 hover:text-purple-400 hover:bg-purple-500/10'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>🎯 {isAr ? 'صفقات سوينج واستثمار (أهداف بعيدة)' : 'Swing & Position Trades'}</span>
+          </button>
+        </div>
+
         {/* Order Type Section Filter Tabs */}
         <div className="flex flex-wrap items-center gap-2 p-1.5 bg-black/30 border border-white/10 rounded-2xl text-xs font-semibold">
           <button
             onClick={() => setOrderTypeFilter('ALL')}
             className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer font-bold ${
               orderTypeFilter === 'ALL'
-                ? 'bg-accent-blue text-black shadow-lg shadow-accent-blue/20 font-black'
+                ? 'bg-white/20 text-white shadow-lg font-black'
                 : 'text-zinc-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            {isAr ? '✨ كافة التوصيات' : 'All Orders'}
+            {isAr ? 'جميع الأوامر' : 'All Order Types'}
           </button>
           <button
             onClick={() => setOrderTypeFilter('MARKET')}
@@ -213,7 +259,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 : 'text-emerald-400/80 hover:text-emerald-400 hover:bg-emerald-500/10'
             }`}
           >
-            <span>🟢 {isAr ? 'صفقات مباشرة بسعر السوق' : 'Live Market Orders'}</span>
+            <span>🟢 {isAr ? 'شراء بسعر السوق' : 'Market BUY'}</span>
           </button>
           <button
             onClick={() => setOrderTypeFilter('LIMIT')}
@@ -223,7 +269,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 : 'text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10'
             }`}
           >
-            <span>⏳ {isAr ? 'أوامر معلقة (Limit Buy)' : 'Pending Limit Orders'}</span>
+            <span>⏳ {isAr ? 'أوامر معلقة (Limit)' : 'Pending Limit'}</span>
           </button>
           <button
             onClick={() => setOrderTypeFilter('BREAKOUT_TRIGGER')}
@@ -233,7 +279,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 : 'text-purple-400/80 hover:text-purple-400 hover:bg-purple-500/10'
             }`}
           >
-            <span>🎯 {isAr ? 'دخول مشروط باختراق شمعة' : 'Conditional Breakout Orders'}</span>
+            <span>🎯 {isAr ? 'دخول مشروط باختراق' : 'Breakout Orders'}</span>
           </button>
         </div>
 
@@ -344,6 +390,26 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Strategy Horizon Badge (Scalping vs Swing) */}
+                      {(() => {
+                        const isDayTrading = Math.abs((tp1 - entry) / entry) * 100 <= 4.5;
+                        return (
+                          <span
+                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1 border shadow-sm ${
+                              isDayTrading
+                                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                                : 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                            }`}
+                          >
+                            {isDayTrading ? (
+                              <span>⚡ {isAr ? 'مضاربة سريعة (2% - 3% يومي)' : 'Scalping (2-3% Daily)'}</span>
+                            ) : (
+                              <span>🎯 {isAr ? 'سوينج واستثمار (أهداف بعيدة)' : 'Swing & Position'}</span>
+                            )}
+                          </span>
+                        );
+                      })()}
+
                       {/* Order Type Badge */}
                       <span
                         className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border shadow-sm ${
