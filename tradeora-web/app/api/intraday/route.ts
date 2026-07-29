@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey || !symbol) {
-    return NextResponse.json({ candles: [] })
+    return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })
   }
 
   const sb = createClient(supabaseUrl, supabaseKey)
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (!company) {
-    return NextResponse.json({ candles: [] })
+    return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })
   }
 
   // 2. Handle Daily candles (1440 mins or 1d)
@@ -33,15 +33,16 @@ export async function GET(req: NextRequest) {
       .from('market_prices')
       .select('price_date, open_price, high_price, low_price, close_price, volume, source')
       .eq('company_id', company.id)
+      .in('source', ['tradingview_1d', 'tradingview', 'egx_bulletin', 'yahoo_historical', 'yahoo_live'])
       .order('price_date', { ascending: true })
       .limit(1000)
 
-    if (dailyPrices && dailyPrices.length > 0) {
+    if (dailyPrices && dailyPrices.length >= 10) {
       // Group by dateStr, giving 100% priority to tradingview source
       const dateMap: Record<string, any> = {}
       for (const d of dailyPrices) {
         const dateStr = d.price_date.split('T')[0]
-        const isTv = d.source === 'tradingview'
+        const isTv = d.source === 'tradingview_1d' || d.source === 'tradingview'
         if (!dateMap[dateStr] || isTv) {
           dateMap[dateStr] = d
         }
@@ -69,11 +70,20 @@ export async function GET(req: NextRequest) {
         })
       }
 
-      return NextResponse.json({ candles: formattedDaily })
+      if (formattedDaily.length >= 10) {
+        return NextResponse.json({
+          candles: formattedDaily,
+          source: 'tradingview',
+          count: formattedDaily.length,
+          fallback: false
+        })
+      }
     }
+
+    return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })
   }
 
-  // 3. Determine intervalKey for intraday
+  // 3. Determine intervalKey for intraday & priority sources
   let intervalKey = '15m'
   if (interval === 1) intervalKey = '1m'
   else if (interval === 5) intervalKey = '5m'
@@ -81,20 +91,32 @@ export async function GET(req: NextRequest) {
   else if (interval === 60) intervalKey = '1h'
   else if (interval === 240) intervalKey = '4h'
 
+  // Priority: official Canonical intraday sources
+  const CANONICAL_SOURCES_INTRADAY = [
+    'tradingview_15m',
+    'tradingview_30m',
+    'tradingview_1h',
+    'tradingview_4h',
+    'tradingview_1d',
+  ]
+
   // 4. Fetch exact source intraday snapshots
   const { data: tvSnapshots } = await sb
     .from('intraday_snapshots')
-    .select('snapshot_time, open_price, high_price, low_price, price, volume')
+    .select('snapshot_time, open_price, high_price, low_price, price, volume, source')
     .eq('company_id', company.id)
-    .eq('source', `tradingview_${intervalKey}`)
+    .in('source', CANONICAL_SOURCES_INTRADAY)
     .order('snapshot_time', { ascending: true })
     .limit(2000)
 
-  if (tvSnapshots && tvSnapshots.length >= 10) {
+  // Filter exact interval snapshots
+  const exactKeySnapshots = (tvSnapshots || []).filter(s => s.source === `tradingview_${intervalKey}`)
+
+  if (exactKeySnapshots && exactKeySnapshots.length >= 10) {
     const seenTimes = new Set<number>()
     const formattedCandles: any[] = []
 
-    for (const s of tvSnapshots) {
+    for (const s of exactKeySnapshots) {
       const timeSec = Math.floor(new Date(s.snapshot_time).getTime() / 1000)
       if (seenTimes.has(timeSec)) continue
       seenTimes.add(timeSec)
@@ -116,19 +138,20 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ candles: formattedCandles })
+    if (formattedCandles.length >= 10) {
+      return NextResponse.json({
+        candles: formattedCandles,
+        source: 'tradingview',
+        count: formattedCandles.length,
+        fallback: false
+      })
+    }
   }
 
   // 5. Fallback: Aggregate from 15m candles
-  const { data: base15mSnapshots } = await sb
-    .from('intraday_snapshots')
-    .select('snapshot_time, open_price, high_price, low_price, price, volume')
-    .eq('company_id', company.id)
-    .eq('source', 'tradingview_15m')
-    .order('snapshot_time', { ascending: true })
-    .limit(2000)
+  const base15mSnapshots = (tvSnapshots || []).filter(s => s.source === 'tradingview_15m')
 
-  if (base15mSnapshots && base15mSnapshots.length > 0) {
+  if (base15mSnapshots && base15mSnapshots.length >= 10) {
     const seenTimes = new Set<number>()
     const raw15m: any[] = []
 
@@ -155,72 +178,58 @@ export async function GET(req: NextRequest) {
     }
 
     if (interval === 1 || interval === 15) {
-      return NextResponse.json({ candles: raw15m })
-    }
+      if (raw15m.length >= 10) {
+        return NextResponse.json({
+          candles: raw15m,
+          source: 'tradingview',
+          count: raw15m.length,
+          fallback: false
+        })
+      }
+    } else {
+      const groupSize = interval === 30 ? 2 : interval === 60 ? 4 : 16
+      const aggregated: any[] = []
+      for (let i = 0; i < raw15m.length; i += groupSize) {
+        const chunk = raw15m.slice(i, i + groupSize)
+        if (chunk.length === 0) continue
+        const first = chunk[0]
+        const last = chunk[chunk.length - 1]
+        let maxHigh = chunk[0].high
+        let minLow = chunk[0].low
+        let sumVol = 0
+        chunk.forEach(c => {
+          if (c.high > maxHigh) maxHigh = c.high
+          if (c.low < minLow) minLow = c.low
+          sumVol += c.volume
+        })
+        // BUG FIX: Use first candle time, not last
+        aggregated.push({
+          time: first.time,
+          open: first.open,
+          high: maxHigh,
+          low: minLow,
+          close: last.close,
+          volume: sumVol
+        })
+      }
 
-    const groupSize = interval === 30 ? 2 : interval === 60 ? 4 : 16
-    const aggregated: any[] = []
-    for (let i = 0; i < raw15m.length; i += groupSize) {
-      const chunk = raw15m.slice(i, i + groupSize)
-      if (chunk.length === 0) continue
-      const first = chunk[0]
-      const last = chunk[chunk.length - 1]
-      let maxHigh = chunk[0].high
-      let minLow = chunk[0].low
-      let sumVol = 0
-      chunk.forEach(c => {
-        if (c.high > maxHigh) maxHigh = c.high
-        if (c.low < minLow) minLow = c.low
-        sumVol += c.volume
-      })
-      aggregated.push({
-        time: last.time,
-        open: first.open,
-        high: maxHigh,
-        low: minLow,
-        close: last.close,
-        volume: sumVol
-      })
+      if (aggregated.length >= 10) {
+        return NextResponse.json({
+          candles: aggregated,
+          source: 'tradingview',
+          count: aggregated.length,
+          fallback: false
+        })
+      }
     }
-    return NextResponse.json({ candles: aggregated })
   }
 
-  // 6. Ultimate Fallback: Fetch daily candles from market_prices (tradingview preferred)
-  const { data: dailyPrices } = await sb
-    .from('market_prices')
-    .select('price_date, open_price, high_price, low_price, close_price, volume, source')
-    .eq('company_id', company.id)
-    .order('price_date', { ascending: true })
-    .limit(1000)
-
-  if (dailyPrices && dailyPrices.length > 0) {
-    const seenDates = new Set<string>()
-    const formattedDaily: any[] = []
-
-    for (const d of dailyPrices) {
-      const dateStr = d.price_date.split('T')[0]
-      if (seenDates.has(dateStr)) continue
-      seenDates.add(dateStr)
-
-      const close = parseFloat(d.close_price)
-      const open = parseFloat(d.open_price ?? d.close_price)
-      const high = parseFloat(d.high_price ?? d.close_price)
-      const low = parseFloat(d.low_price ?? d.close_price)
-
-      if (isNaN(close) || close <= 0) continue
-
-      formattedDaily.push({
-        time: dateStr,
-        open: open > 0 ? open : close,
-        high: Math.max(high, open, close),
-        low: Math.min(low > 0 ? low : close, open, close),
-        close: close,
-        volume: parseInt(d.volume ?? 0, 10)
-      })
-    }
-
-    return NextResponse.json({ candles: formattedDaily })
-  }
-
-  return NextResponse.json({ candles: [] })
+  // If result is less than 10 candles, do not fallback here or mix sources.
+  // Leave fallback to frontend (Yahoo).
+  return NextResponse.json({
+    candles: [],
+    source: 'none',
+    count: 0,
+    fallback: true
+  })
 }

@@ -7,6 +7,7 @@ import { PriceTag } from '../ui/PriceTag';
 import { QualityDot } from '../ui/QualityDot';
 import { Badge } from '../ui/Badge';
 import { Bookmark, BookmarkCheck, TrendingUp } from 'lucide-react';
+import { PriceFreshnessIndicator } from './PriceFreshnessIndicator';
 
 interface StockHeaderProps {
   company: CompanyWithPrice;
@@ -183,21 +184,25 @@ export function StockHeader({ company }: StockHeaderProps) {
       <div className="flex items-center gap-4 sm:gap-6 self-start md:self-center">
         {/* Price display tag */}
         {company.priceRecord ? (
-          <div className="flex items-center gap-4">
-            <PriceTag
-              price={company.priceRecord.close_price}
-              change={company.priceRecord.change_value}
-              changePercent={company.priceRecord.change_percent}
-              locale={locale}
-              isLastResort={company.isLastResort}
-              size="lg"
-            />
-            
-            <div className="flex flex-col gap-1.5 items-end">
-              <QualityDot flag={company.priceRecord.data_quality_flag} showText={true} />
-              {getMarketStatusLabel()}
+            <div className="flex items-center gap-3 flex-wrap">
+              <PriceTag
+                price={company.priceRecord.close_price}
+                change={company.priceRecord.change_value}
+                changePercent={company.priceRecord.change_percent}
+                locale={locale}
+                isLastResort={company.isLastResort}
+                size="lg"
+              />
+              <PriceFreshnessIndicator
+                lastUpdatedAt={company.priceRecord.fetched_at || (company.priceRecord as any).updated_at || company.priceRecord.price_date}
+                className="self-end mb-0.5"
+              />
+              
+              <div className="flex flex-col gap-1.5 items-end">
+                <QualityDot flag={company.priceRecord.data_quality_flag} showText={true} />
+                {getMarketStatusLabel()}
+              </div>
             </div>
-          </div>
         ) : (
           <span className="text-sm text-text-secondary">{t('noDataAvailable')}</span>
         )}

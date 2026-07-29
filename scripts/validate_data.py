@@ -3,7 +3,16 @@ from supabase import create_client
 from datetime import date
 
 def validate_daily_import():
-    sb = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_SERVICE_ROLE_KEY'])
+    # Fallback: use SUPABASE_KEY if SUPABASE_SERVICE_ROLE_KEY is not set
+    supabase_key = (
+        os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or
+        os.environ.get('SUPABASE_KEY') or ''
+    )
+    if not supabase_key:
+        print("❌ ERROR: No Supabase key found in environment variables.")
+        print("   Set SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY in GitHub Secrets.")
+        return False
+    sb = create_client(os.environ['SUPABASE_URL'], supabase_key)
     today = date.today().isoformat()
     violations = []
     

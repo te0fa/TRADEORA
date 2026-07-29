@@ -38,6 +38,11 @@ async function scrapeMubasher(symbol: string) {
 }
 
 export async function GET(req: NextRequest) {
+  // Mubasher provides close price ONLY.
+  // OHLCV columns are intentionally null.
+  // This source is excluded from signal generation
+  // and chart rendering by source priority filters.
+
   const authHeader = req.headers.get('Authorization');
   const expectedSecret = process.env.CRON_SECRET;
   if (expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
@@ -45,7 +50,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data: companies, error: compError } = await getSb()
+    const supabase = getSb();
+    const { data: companies, error: compError } = await supabase
       .from('companies')
       .select('id, symbol');
 
@@ -54,49 +60,98 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ msg: 'No companies to sync' });
     }
 
+    const PRIORITY_SOURCES = [
+      'egx_bulletin',
+      'tradingview_1d',
+      'yahoo_historical',
+      'tradingview'
+    ];
+
+    const todayDate = new Date().toISOString().split('T')[0];
     const batchSize = 15;
-    const results: any[] = [];
+    let updatedCount = 0;
+    let insertedCount = 0;
+    const recordsToInsert: any[] = [];
     
     for (let i = 0; i < companies.length; i += batchSize) {
       const chunk = companies.slice(i, i + batchSize);
       
       const promises = chunk.map(async (company) => {
         const data = await scrapeMubasher(company.symbol);
-        if (data) {
-          const changeDecimal = data.change / 100;
-          const openPrice = data.price / (1 + changeDecimal);
-          
+        if (!data) return null;
+
+        // Step 1: Check if a record exists for this company for today from a higher priority source
+        const { data: existing } = await supabase
+          .from('market_prices')
+          .select('id, source, close_price')
+          .eq('company_id', company.id)
+          .eq('price_date', todayDate)
+          .in('source', PRIORITY_SOURCES)
+          .limit(1)
+          .maybeSingle();
+
+        // Step 2: If a record from a better source exists
+        if (existing) {
+          const currentClose = existing.close_price;
+          const diffRatio = currentClose ? Math.abs(data.price - currentClose) / currentClose : 1;
+
+          if (diffRatio > 0.005) {
+            await supabase
+              .from('market_prices')
+              .update({ close_price: data.price })
+              .eq('id', existing.id);
+
+            console.log(`[Mubasher] ${company.symbol}: Updated close_price only (preserving ${existing.source} OHLCV)`);
+            return { type: 'updated' };
+          }
+          return { type: 'skipped' };
+        } else {
+          // Step 3: If no record from a better source exists
           return {
-            company_id: company.id,
-            price_date: new Date().toISOString().split('T')[0],
-            close_price: data.price,
-            open_price: parseFloat(openPrice.toFixed(4)),
-            high_price: data.price,
-            low_price: data.price,
-            volume: 0,
-            source: 'mubasher'
+            type: 'insert',
+            record: {
+              company_id: company.id,
+              price_date: todayDate,
+              close_price: data.price,
+              open_price: null,
+              high_price: null,
+              low_price: null,
+              volume: null,
+              source: 'mubasher_close_only'
+            }
           };
         }
-        return null;
       });
       
       const batchResults = await Promise.all(promises);
-      results.push(...batchResults.filter(Boolean));
+      for (const res of batchResults) {
+        if (!res) continue;
+        if (res.type === 'updated') updatedCount++;
+        else if (res.type === 'insert' && res.record) {
+          recordsToInsert.push(res.record);
+        }
+      }
       
       // Polite delay between batches
       await new Promise(r => setTimeout(r, 200));
     }
 
-    if (results.length > 0) {
-      const { error: upsertError } = await getSb()
+    if (recordsToInsert.length > 0) {
+      const { error: upsertError } = await supabase
         .from('market_prices')
-        .upsert(results, { onConflict: 'company_id,price_date,source' });
+        .upsert(recordsToInsert, { onConflict: 'company_id,price_date,source' });
         
       if (upsertError) throw upsertError;
-      return NextResponse.json({ success: true, count: results.length });
-    } else {
-      return NextResponse.json({ success: true, count: 0, msg: 'No data scraped' });
+      insertedCount = recordsToInsert.length;
     }
+
+    return NextResponse.json({
+      success: true,
+      updated: updatedCount,
+      inserted: insertedCount,
+      count: updatedCount + insertedCount
+    });
+
   } catch (err: any) {
     console.error('Cron sync-prices failed:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

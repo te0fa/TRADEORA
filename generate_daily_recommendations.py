@@ -9,6 +9,7 @@ import joblib
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from pathlib import Path
+from scripts.split_detector import detect_price_anomaly, check_entry_price_validity
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -33,6 +34,42 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     sys.exit(1)
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ─── Model Version Control ───────────────────
+# لتغيير النموذج: بدّل MODEL_VERSION فقط
+# v2 = نموذج 2026-07-30 (MACD fix + clean data)
+# v1 = legacy (BUY bias 83.5% - deprecated)
+MODEL_VERSION = 'v2'
+
+_model_path  = f'models/model_1d_{MODEL_VERSION}.pkl'
+_scaler_path = f'models/scaler_1d_{MODEL_VERSION}.pkl'
+_meta_path   = f'models/model_v2_metadata.json'
+
+if not os.path.exists(_model_path):
+    raise FileNotFoundError(
+        f"Model file not found: {_model_path}\n"
+        f"Run train_model_v2.py first."
+    )
+
+model  = joblib.load(_model_path)
+scaler = joblib.load(_scaler_path)
+
+# قراءة metadata للـ logging
+import json
+if os.path.exists(_meta_path):
+    with open(_meta_path, encoding='utf-8') as _f:
+        _meta = json.load(_f)
+    buy_pct_val = _meta.get('class_distribution', {}).get('buy_pct') if isinstance(_meta.get('class_distribution'), dict) else _meta.get('buy_pct', '?')
+    acc_val = _meta.get('test_accuracy', _meta.get('oof_accuracy', '?'))
+    logger.info(
+        f"Model loaded: v{_meta.get('version','?')} | "
+        f"Accuracy={acc_val} | "
+        f"BUY%={buy_pct_val} | "
+        f"Trained={_meta.get('trained_at','?')[:10]}"
+    )
+else:
+    logger.info(f"Model loaded: {_model_path}")
+# ─────────────────────────────────────────────
 
 # ── Technical Indicator & Feature Extraction ──────────────────────────────
 
@@ -65,8 +102,60 @@ def calc_ema(closes, n):
             result[i] = closes[i]*k + result[i-1]*(1-k)
     return result
 
-def extract_features_for_stock(candles, fund_data):
+def calculate_macd_standard(closes: list,
+                             fast: int = 12,
+                             slow: int = 26,
+                             signal: int = 9) -> dict:
+    """
+    Standard MACD — Industry formula (TradingView/Bloomberg).
+    
+    MACD Line   = EMA(12) - EMA(26)
+    Signal Line = EMA(9) of MACD Line
+    Histogram   = MACD Line - Signal Line
+    
+    FIX: replaces incorrect histogram = MACD(i) - MACD(i-1)
+    """
+    import pandas as pd
+    
+    MIN_CANDLES = slow + signal  # 35 على الأقل
+    if len(closes) < MIN_CANDLES:
+        return {
+            'macd_line':   None,
+            'signal_line': None,
+            'histogram':   None,
+            'hist_prev':   None,
+            'crossover':   False,
+            'crossunder':  False,
+        }
+    
+    s            = pd.Series(closes, dtype=float)
+    ema_fast     = s.ewm(span=fast,   adjust=False).mean()
+    ema_slow     = s.ewm(span=slow,   adjust=False).mean()
+    macd_line    = ema_fast - ema_slow
+    signal_line  = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram    = macd_line - signal_line
+    
+    ml  = float(macd_line.iloc[-1])
+    sl  = float(signal_line.iloc[-1])
+    h   = float(histogram.iloc[-1])
+    ml2 = float(macd_line.iloc[-2])
+    sl2 = float(signal_line.iloc[-2])
+    h2  = float(histogram.iloc[-2])
+    
+    return {
+        'macd_line':   round(ml,  4),
+        'signal_line': round(sl,  4),
+        'histogram':   round(h,   4),
+        'hist_prev':   round(h2,  4),
+        'crossover':   (ml > sl and ml2 <= sl2),  # MACD crosses above Signal
+        'crossunder':  (ml < sl and ml2 >= sl2),  # MACD crosses below Signal
+    }
+
+def extract_features_for_stock(candles, fund_data, symbol=""):
     """Extracts features matching ML model input"""
+    if not candles or len(candles) < 35:
+        return None
+
     df = pd.DataFrame(candles)
     adx_df = df.ta.adx(length=14)
     if adx_df is not None and not adx_df.empty:
@@ -95,9 +184,26 @@ def extract_features_for_stock(candles, fund_data):
     if None in [rsi[i], ema12[i], ema26[i], ema20[i], ema50[i]]:
         return None
 
-    macd_raw  = ema12[i] - ema26[i]
-    macd_prev = ((ema12[i-1] or 0) - (ema26[i-1] or 0))
-    macd_hist = macd_raw - macd_prev
+    closes_list = [c['close'] for c in candles[:i+1]]
+    macd_result = calculate_macd_standard(closes_list)
+
+    if macd_result['histogram'] is None:
+        logger.debug(f"[{symbol}] MACD: insufficient data at i={i}")
+        return None
+
+    # Sanity check بعد الحساب
+    price = closes_list[-1]
+    if price > 0 and abs(macd_result['histogram']) > price * 0.3:
+        logger.warning(
+            f"[{symbol}] MACD histogram unusually large: "
+            f"{macd_result['histogram']:.4f} vs price={price:.2f}. "
+            f"Possible data quality issue."
+        )
+
+    macd_line   = macd_result['macd_line']
+    signal_line = macd_result['signal_line']
+    macd_hist   = macd_result['histogram']   # ← الصح
+    macd_raw    = macd_line                  # للـ feat_row
 
     trs = [max(highs[j]-lows[j], abs(highs[j]-closes[j-1]), abs(lows[j]-closes[j-1])) for j in range(max(1, i-13), i+1)]
     atr = sum(trs)/len(trs) if trs else (cl * 0.02)
@@ -159,7 +265,31 @@ def extract_features_for_stock(candles, fund_data):
     fv_ratio = cl / fv if fv > 0 else 1.0
 
     feat_row.extend([pe, eps, de, pm, rev_g, earn_g, div_y, fv_ratio])
-    return feat_row, cl, atr
+    return feat_row, cl, atr, macd_result
+
+from services.canonical import get_canonical_candles, get_canonical_price, CANONICAL_SOURCES_DAILY
+
+def fetch_canonical_candles(sb, company_id: str, 
+                            symbol: str,
+                            limit: int = 300) -> list:
+    """
+    Fetches clean, source-prioritized OHLCV candles via the official 
+    Canonical Market Data Layer (services.canonical).
+    """
+    # Duplicate Signal Check
+    existing = sb.table('recommended_trades') \
+                 .select('id') \
+                 .eq('company_id', company_id) \
+                 .in_('status', ['active', 'pending']) \
+                 .limit(1).execute()
+    if existing.data:
+        logger.info(
+            f"[{symbol}] Active signal already exists. "
+            f"Skipping new signal generation."
+        )
+        return []
+    
+    return get_canonical_candles(sb, company_id, symbol, limit=limit, interval='1d')
 
 # ── Main Pipeline Function ──────────────────────────────────────
 
@@ -178,15 +308,6 @@ def generate_daily_recommendations():
         logger.error(f"Error fetching active recommended trades: {e}")
         active_ids = set()
 
-    # Load 1d model and scaler
-    model_path = 'models/model_1d.pkl'
-    scaler_path = 'models/scaler_1d.pkl'
-    if not os.path.exists(model_path) or not os.path.exists(scaler_path):
-        logger.error("Model or scaler files missing: models/model_1d.pkl, models/scaler_1d.pkl")
-        return
-
-    model = joblib.load(model_path)
-    scaler = joblib.load(scaler_path)
     expected_n_features = getattr(scaler, 'n_features_in_', 15)
 
     # Fetch companies (ACTIVE ONLY) and fundamentals
@@ -204,28 +325,45 @@ def generate_daily_recommendations():
         cid = co['id']
         symbol = co['symbol']
 
-        # Fetch daily market prices
-        prices_res = sb.table("market_prices").select(
-            "open_price, high_price, low_price, close_price, volume"
-        ).eq("company_id", cid).order("price_date", desc=False).limit(300).execute()
-
-        rows = prices_res.data or []
-        if len(rows) < 50:
+        candles_raw = fetch_canonical_candles(sb, cid, symbol)
+        if len(candles_raw) < 50:
+            logger.warning(f"[{symbol}] Insufficient clean data ({len(candles_raw)} candles). Skipping.")
             continue
 
-        candles = [{
-            'open': float(r['open_price']) if r['open_price'] else float(r['close_price']),
-            'high': float(r['high_price']) if r['high_price'] else float(r['close_price']),
-            'low': float(r['low_price']) if r['low_price'] else float(r['close_price']),
-            'close': float(r['close_price']),
-            'volume': int(r['volume']) if r['volume'] else 0
-        } for r in rows if r['close_price']]
+        candles = candles_raw
 
-        extracted = extract_features_for_stock(candles, fund_map.get(cid, {}))
+        # ─── Split Detection Guard ──────────────────
+        if len(candles) >= 10:
+            closes_list = [c['close'] for c in candles]
+            dates_list  = [c.get('time', c.get('price_date', '')) for c in candles]
+
+            anomaly = detect_price_anomaly(closes_list, dates_list, symbol)
+
+            if anomaly['has_anomaly']:
+                logger.warning(
+                    f"[{symbol}] Corporate action detected "
+                    f"({anomaly['anomaly_type']}) on "
+                    f"{anomaly['anomaly_date']}. "
+                    f"Skipping signal generation for safety."
+                )
+                try:
+                    sb.table('companies').update({
+                        'notes': (
+                            f"SPLIT_DETECTED:{anomaly['anomaly_date']}:"
+                            f"{anomaly['anomaly_type']}"
+                        )
+                    }).eq('id', cid).execute()
+                except Exception:
+                    pass
+
+                continue  # skip this symbol
+        # ────────────────────────────────────────────
+
+        extracted = extract_features_for_stock(candles, fund_map.get(cid, {}), symbol=symbol)
         if not extracted:
             continue
 
-        feat_row, last_close, atr_val = extracted
+        feat_row, last_close, atr_val, macd_res = extracted
 
         # Model Prediction (Slice features to match trained scaler/model input size)
         feat_input = feat_row[:expected_n_features]
@@ -296,13 +434,27 @@ def generate_daily_recommendations():
             fra_disclaimer = "تنويه الهيئة العامة للرقابة المالية: مستويات الدعم والمقاومة وأهداف الصفقة هي لأغراض الدراسة والتعليم فقط وليست توصية بالبيع أو الشراء."
             explanation_ar = f"توصية شراء ودخول مؤكدة بدرجة ثقة {round(prob * 100, 1)}%. منطقة الارتداد المتوقعة عند {rebound_zone} ج.م مع أهداف عند {tp1_price} ج.م و {tp2_price} ج.م ووقف خسارة {sl_price} ج.م."
 
+            features_snap = {
+                'model_version': MODEL_VERSION,
+                'probability': round(prob, 4),
+                'atr_14': round(atr_eff, 4),
+                'rsi_14': round(feat_row[0], 2) if feat_row else None,
+                'macd_line': macd_res['macd_line'],
+                'macd_signal': macd_res['signal_line'],
+                'macd_hist': macd_res['histogram'],
+                'macd_hist_prev': macd_res['hist_prev'],
+                'macd_crossover': macd_res['crossover'],
+                'macd_crossunder': macd_res['crossunder'],
+            }
+
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
                         "ml_probability": round(prob, 4),
                         "tp1": tp1_price,
                         "tp2": tp2_price,
-                        "sl": sl_price
+                        "sl": sl_price,
+                        "features_snapshot": features_snap
                     }).eq("company_id", cid).eq("status", "active").execute()
                     updated_recs_count += 1
                     logger.info(f"🔄 Updated active buy trade probability for {symbol}: prob={prob:.4f}")
@@ -320,6 +472,7 @@ def generate_daily_recommendations():
                     'timeframe': '1d',
                     'status': 'active',
                     'ml_probability': round(prob, 4),
+                    'features_snapshot': features_snap,
                     'recommended_at': datetime.now(timezone.utc).isoformat()
                 }
                 try:
@@ -347,13 +500,27 @@ def generate_daily_recommendations():
                     logger.info(f"Skipping sell recommendation for {symbol}: R:R ratio {rr:.2f} out of bounds [1.2, 5.0]")
                     continue
 
+            features_snap_sell = {
+                'model_version': MODEL_VERSION,
+                'probability': round(prob, 4),
+                'atr_14': round(atr_eff, 4),
+                'rsi_14': round(feat_row[0], 2) if feat_row else None,
+                'macd_line': macd_res['macd_line'],
+                'macd_signal': macd_res['signal_line'],
+                'macd_hist': macd_res['histogram'],
+                'macd_hist_prev': macd_res['hist_prev'],
+                'macd_crossover': macd_res['crossover'],
+                'macd_crossunder': macd_res['crossunder'],
+            }
+
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
                         "ml_probability": round(prob, 4),
                         "tp1": tp1_price,
                         "tp2": tp2_price,
-                        "sl": sl_price
+                        "sl": sl_price,
+                        "features_snapshot": features_snap_sell
                     }).eq("company_id", cid).eq("status", "active").execute()
                     updated_recs_count += 1
                     logger.info(f"🔄 Updated active sell trade probability for {symbol}: prob={prob:.4f}")
@@ -371,6 +538,7 @@ def generate_daily_recommendations():
                     'timeframe': '1d',
                     'status': 'active',
                     'ml_probability': round(prob, 4),
+                    'features_snapshot': features_snap_sell,
                     'recommended_at': datetime.now(timezone.utc).isoformat()
                 }
                 try:

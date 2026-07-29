@@ -123,16 +123,14 @@ async function fetchYahooCandles(symbol: string, interval: string): Promise<{ ca
     for (let i = 0; i < timestamps.length; i++) {
       if (opens[i] === null || highs[i] === null || lows[i] === null || closes[i] === null) continue;
       
-      const close = closes[i];
-      const adjclose = adjcloses[i];
-      const ratio = (adjclose && close && close > 0) ? (adjclose / close) : 1;
-      
+      // DESIGN DECISION: Raw (unadjusted) prices only.
+      // Consistent with DB storage and signal engine.
       rawPoints.push({
         time: timestamps[i],
-        open: opens[i] * ratio,
-        high: highs[i] * ratio,
-        low: lows[i] * ratio,
-        close: close * ratio,
+        open: opens[i],
+        high: highs[i],
+        low: lows[i],
+        close: closes[i],
         volume: volumes[i] ?? 0
       });
     }
@@ -563,17 +561,18 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         else if (interval === '4h') minuteInterval = 240;
         else if (interval === '1d') minuteInterval = 1440;
 
-        // 1. Fetch real DB candles via resilient API endpoint
-        const dbRes = await fetch(`/api/intraday?symbol=${encodeURIComponent(symbol)}&interval=${minuteInterval}&days=90`);
+        // 1. Fetch real DB TradingView candles via official Canonical API endpoint
+        const dbRes = await fetch(`/api/canonical-price?company_id=${companyId}&interval=${interval}&limit=300`);
         const { candles: fetchedDbCandles } = await dbRes.json();
         const formattedDb = (fetchedDbCandles || []).map(formatCandle);
         
-        if (formattedDb.length > 0) {
+        if (formattedDb.length >= 10) {
           setDbIntradayCandles(formattedDb);
           setDbCandlesCount(formattedDb.length);
           setYahooCandles([]);
         } else {
-          // Fallback to Yahoo candles ONLY if DB is empty AND Yahoo price matches live price within 3%
+          // Fallback to Yahoo candles ONLY if TV snapshots < 10
+          setDbIntradayCandles([]);
           const { candles: yfCandles, events: yfEvents } = await fetchYahooCandles(symbol, interval);
           const formattedYahoo = yfCandles.map(formatCandle);
           
@@ -607,30 +606,55 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     fetchCandlesData();
   }, [interval, symbol]);
 
+  // Prioritized daily dbPrices (tradingview_1d > egx_bulletin > tradingview > yahoo_historical > yahoo_live)
+  const prioritizedDbPrices = useMemo(() => {
+    if (!dbPrices || dbPrices.length === 0) return [];
+    
+    const priority = (src?: string) => {
+      if (src === 'tradingview_1d') return 1;
+      if (src === 'egx_bulletin') return 2;
+      if (src === 'tradingview') return 3;
+      if (src === 'yahoo_historical') return 4;
+      if (src === 'yahoo_live') return 5;
+      return 99;
+    };
+
+    const dailyMap: Record<string, PriceRecord> = {};
+    dbPrices.forEach((p) => {
+      const date = p.price_date;
+      const existing = dailyMap[date];
+      if (!existing || priority(p.source) < priority(existing.source)) {
+        dailyMap[date] = p;
+      }
+    });
+
+    return Object.values(dailyMap);
+  }, [dbPrices]);
+
   // Selected active prices (Smart Fallback & Synthesis)
   const activePrices = useMemo(() => {
-    if (dbIntradayCandles.length > 0) {
+    if (dbIntradayCandles.length >= 10) {
       return dbIntradayCandles;
     }
 
     if (interval === '1w') {
-      const data = aggregateWeekly(dbPrices);
+      const data = aggregateWeekly(prioritizedDbPrices);
       return data.map(d => ({ ...d, time: d.price_date }));
     }
     if (interval === '1m') {
-      const data = aggregateMonthly(dbPrices);
+      const data = aggregateMonthly(prioritizedDbPrices);
       return data.map(d => ({ ...d, time: d.price_date }));
     }
     if (interval === '1d') {
-      return dbPrices.map(d => ({ ...d, time: d.price_date }));
+      return prioritizedDbPrices.map(d => ({ ...d, time: d.price_date }));
     }
 
     if (yahooCandles.length >= 10) {
       return yahooCandles;
     } else {
-      return dbPrices.map(d => ({ ...d, time: d.price_date }));
+      return prioritizedDbPrices.map(d => ({ ...d, time: d.price_date }));
     }
-  }, [interval, dbPrices, dbIntradayCandles, yahooCandles]);
+  }, [interval, prioritizedDbPrices, dbIntradayCandles, yahooCandles]);
 
   // Sanitize and sort active prices for TradingView Lightweight Charts
   const finalActivePrices = useMemo(() => {
@@ -674,14 +698,13 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       return tA - tB;
     });
 
-    // 100% Price Alignment Safeguard: Ensure the latest chart candle matches live header price
+    // 100% Price Alignment Safeguard: Snap last candle if deviation < 2%
     const liveHeaderPrice = Number(priceRecord?.close_price || 0);
     if (cleaned.length > 0 && liveHeaderPrice > 0) {
       const lastCandle = cleaned[cleaned.length - 1];
       const ratio = Math.abs(lastCandle.close - liveHeaderPrice) / liveHeaderPrice;
       
-      // If deviation is small (<15%), snap the last candle close to live header price
-      if (ratio <= 0.15) {
+      if (ratio < 0.02) {
         lastCandle.close = liveHeaderPrice;
         lastCandle.close_price = liveHeaderPrice;
         lastCandle.high = Math.max(lastCandle.high, liveHeaderPrice);
@@ -689,23 +712,26 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         lastCandle.low = Math.min(lastCandle.low > 0 ? lastCandle.low : liveHeaderPrice, liveHeaderPrice);
         lastCandle.low_price = Math.min(lastCandle.low_price > 0 ? lastCandle.low_price : liveHeaderPrice, liveHeaderPrice);
       } else {
-        // If deviation is large (e.g. ARVA YF dataset 7.35 vs 12.47), scale all candles so chart matches live header price 100%!
-        const scaleFactor = liveHeaderPrice / lastCandle.close;
-        for (const bar of cleaned) {
-          bar.open = parseFloat((bar.open * scaleFactor).toFixed(3));
-          bar.open_price = bar.open;
-          bar.high = parseFloat((bar.high * scaleFactor).toFixed(3));
-          bar.high_price = bar.high;
-          bar.low = parseFloat((bar.low * scaleFactor).toFixed(3));
-          bar.low_price = bar.low;
-          bar.close = parseFloat((bar.close * scaleFactor).toFixed(3));
-          bar.close_price = bar.close;
-        }
+        // Don't modify any candle
+        // Just log the mismatch for monitoring
+        console.warn(`[Chart] ${symbol}: Price mismatch ${(ratio * 100).toFixed(1)}% — source issue detected`);
       }
     }
 
     return cleaned;
   }, [activePrices, priceRecord?.close_price]);
+
+  const activePriceSource = useMemo(() => {
+    if (dbIntradayCandles.length >= 10) return 'tradingview';
+    if (yahooCandles.length >= 10) return 'yahoo';
+    return 'db';
+  }, [dbIntradayCandles.length, yahooCandles.length]);
+
+  const lastCandleTime = useMemo(() => {
+    if (finalActivePrices.length === 0) return '';
+    const last = finalActivePrices[finalActivePrices.length - 1];
+    return last?.time !== undefined ? String(last.time) : '';
+  }, [finalActivePrices]);
 
   // Toast notification for intraday fallback
   useEffect(() => {
@@ -2222,7 +2248,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
             </div>
 
             {/* Candlestick Chart */}
-            <div className="relative">
+            <div
+              id="price-chart-container"
+              data-price-source={activePriceSource}
+              data-last-candle-time={lastCandleTime}
+              className="relative"
+            >
               <CandlestickChart
                 ref={chartRef}
                 data={allChartData}
