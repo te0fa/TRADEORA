@@ -26,16 +26,23 @@ def generate_eod_daily_report_summary():
     cairo_tz = pytz.timezone('Africa/Cairo')
     today_str = datetime.datetime.now(cairo_tz).strftime('%Y-%m-%d')
 
-    # Fetch active recommendations (use correct column names)
+    # Fetch active recommendations with timeframe details
     recs_res = sb.table("recommended_trades").select(
-        "id, symbol, direction, entry_price, tp1, tp2, sl, ml_probability"
+        "id, symbol, direction, entry_price, tp1, tp2, sl, ml_probability, timeframe"
     ).eq("status", "active").order("ml_probability", desc=True).execute()
 
     trades = recs_res.data or []
     buy_trades  = [t for t in trades if t.get("direction") in ("buy",  "BUY")]
     sell_trades = [t for t in trades if t.get("direction") in ("sell", "SELL")]
 
-    logger.info(f"Total Extracted Opportunities for {today_str}: Buy={len(buy_trades)}, Sell/Hold={len(sell_trades)}")
+    scalp_trades = [t for t in trades if t.get("timeframe") in ("15m", "1h")]
+    swing_trades = [t for t in trades if t.get("timeframe") in ("4h", "1d", None)]
+
+    logger.info(
+        f"Total Extracted Opportunities for {today_str}: "
+        f"Buy={len(buy_trades)}, Sell/Hold={len(sell_trades)} | "
+        f"Scalp={len(scalp_trades)}, Swing={len(swing_trades)}"
+    )
 
     # Ensure system_logs or performance_reports table has daily report audit record
     try:
@@ -43,6 +50,8 @@ def generate_eod_daily_report_summary():
             "report_date": today_str,
             "total_buy_signals": len(buy_trades),
             "total_sell_signals": len(sell_trades),
+            "total_scalp_signals": len(scalp_trades),
+            "total_swing_signals": len(swing_trades),
             "created_at": datetime.datetime.now(cairo_tz).isoformat()
         }
         logger.info(f"Daily EOD Opportunities Report snapshot compiled successfully: {report_audit}")

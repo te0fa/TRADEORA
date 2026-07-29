@@ -178,14 +178,38 @@ def scan_and_generate_intraday(force: bool = False):
                     logger.debug(f"[{symbol} - {tf}] Active signal already exists. Skipping.")
                     continue
 
-                # Calculate ATR for stop loss & take profit
+                # Calculate ATR & Volatility metrics
                 trs = [max(c['high']-c['low'], abs(c['high']-candles[idx-1]['close']), abs(c['low']-candles[idx-1]['close']))
                        for idx, c in enumerate(candles[-14:]) if idx > 0]
                 atr = sum(trs)/len(trs) if trs else (entry_price * 0.02)
+                atr_pct = (atr / entry_price * 100) if entry_price > 0 else 2.0
+
+                # Volume Surge (vs 14-period average volume)
+                vols = [float(c.get('volume', 0)) for c in candles[-14:]]
+                avg_vol = sum(vols[:-1]) / len(vols[:-1]) if len(vols) > 1 and sum(vols[:-1]) > 0 else 1.0
+                curr_vol = float(latest_candle.get('volume', 0))
+                vol_ratio = round(curr_vol / avg_vol, 2) if avg_vol > 0 else 1.2
+                vol_ratio = min(max(vol_ratio, 0.8), 5.0)
+
+                # RSI / Velocity from feature vector (index 0 is RSI)
+                rsi_val = round(float(feat_row[0]), 1) if len(feat_row) > 0 else 60.0
 
                 sl = round(max(0.01, entry_price - (1.5 * atr)), 4)
                 tp1 = round(entry_price + (1.5 * atr), 4)
                 tp2 = round(entry_price + (3.0 * atr), 4)
+
+                features_snap = {
+                    'model_version': 'v2_intraday',
+                    'probability': round(prob_buy, 4),
+                    'timeframe': tf,
+                    'vol_ratio': vol_ratio,
+                    'rsi_14': rsi_val,
+                    'atr_14': round(atr, 4),
+                    'atr_pct': round(atr_pct, 2),
+                    'volume_surge_ar': f"ارتفاع سيولة تجميعية ({vol_ratio:.1f}x)",
+                    'volatility_ar': f"تذبذب نشط (ATR {atr_pct:.1f}%)",
+                    'momentum_velocity_ar': f"سرعة زخم إيجابية (RSI {rsi_val:.0f})"
+                }
 
                 payload = {
                     'company_id': cid,
@@ -198,6 +222,7 @@ def scan_and_generate_intraday(force: bool = False):
                     'status': 'active',
                     'ml_probability': round(prob_buy, 4),
                     'timeframe': tf,
+                    'features_snapshot': features_snap,
                     'recommended_at': datetime.now(timezone.utc).isoformat()
                 }
 

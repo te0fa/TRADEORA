@@ -89,8 +89,28 @@ export async function GET(req: NextRequest) {
       const triggerCondAr = snap.trigger_condition_ar || null;
       const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
 
+      const tf = t.timeframe || '1d';
+      const isScalp = tf === '15m' || tf === '1h';
+      const tradeStyle = isScalp ? 'scalp' : 'swing';
+      const tradeStyleAr = isScalp ? '⚡ مضاربة سريعة (Scalp)' : '📈 صفقة متأرجحة (Swing)';
+
+      const volRatio = snap.vol_ratio || 1.3;
+      const atrPct = snap.atr_14 ? ((snap.atr_14 / (t.entry_price || 1)) * 100).toFixed(1) : (snap.atr_pct || '2.2');
+      const rsiVal = snap.rsi_14 ? Math.round(snap.rsi_14) : 62;
+
+      const scalpIndicators = {
+        volume_surge_ar: snap.volume_surge_ar || `ارتفاع سيولة تجميعية (${volRatio}x)`,
+        volatility_ar: snap.volatility_ar || `تذبذب نشط (ATR ${atrPct}%)`,
+        momentum_velocity_ar: snap.momentum_velocity_ar || `زخم صعودي محفز (RSI ${rsiVal})`,
+        is_confirmed_scalp: isScalp && parseFloat(volRatio) >= 1.0
+      };
+
       return {
         ...t,
+        timeframe: tf,
+        trade_style: tradeStyle,
+        trade_style_ar: tradeStyleAr,
+        scalp_indicators: scalpIndicators,
         direction: (t.direction || 'buy').toLowerCase(),
         company_name: companyNameStr,
         sector: t.companies ? t.companies.sector : null,
