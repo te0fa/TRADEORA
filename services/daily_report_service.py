@@ -26,14 +26,14 @@ def generate_eod_daily_report_summary():
     cairo_tz = pytz.timezone('Africa/Cairo')
     today_str = datetime.datetime.now(cairo_tz).strftime('%Y-%m-%d')
 
-    # Fetch active recommendations
+    # Fetch active recommendations (use correct column names)
     recs_res = sb.table("recommended_trades").select(
-        "id, symbol, trade_type, entry_price, target_price_1, target_price_2, stop_loss, ml_probability, rationale_ar"
-    ).order("ml_probability", desc=True).execute()
+        "id, symbol, direction, entry_price, tp1, tp2, sl, ml_probability"
+    ).eq("status", "active").order("ml_probability", desc=True).execute()
 
     trades = recs_res.data or []
-    buy_trades = [t for t in trades if t["trade_type"] == "BUY"]
-    sell_trades = [t for t in trades if t["trade_type"] in ["SELL", "HOLD"]]
+    buy_trades  = [t for t in trades if t.get("direction") in ("buy",  "BUY")]
+    sell_trades = [t for t in trades if t.get("direction") in ("sell", "SELL")]
 
     logger.info(f"Total Extracted Opportunities for {today_str}: Buy={len(buy_trades)}, Sell/Hold={len(sell_trades)}")
 
