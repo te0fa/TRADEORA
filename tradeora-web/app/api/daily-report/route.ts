@@ -1,20 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key);
-}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get('date');
     const todayStr = dateParam || new Date().toISOString().split('T')[0];
-    const supabase = getSupabase();
 
     const LAUNCH_DATE = '2026-07-29T22:42:00+00:00';
     // Fetch trade recommendations (filtered by date if specified)
