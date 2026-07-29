@@ -2,8 +2,8 @@ name: Intraday Signal Scanner
 
 on:
   schedule:
-    # Runs every 30 minutes from 07:00 UTC to 11:30 UTC (10:00 AM -> 02:30 PM Cairo time) Sun-Thu
-    - cron: '0,30 7-11 * * 0-4'
+    # Runs every 15 minutes from 07:00 UTC to 11:30 UTC (10:00 AM -> 02:30 PM Cairo time) Sun-Thu
+    - cron: '*/15 7-11 * * 0-4'
   workflow_dispatch: # Allows manual trigger from GitHub Actions UI
 
 jobs:
