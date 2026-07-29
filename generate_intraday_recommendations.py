@@ -81,17 +81,41 @@ def scan_and_generate_intraday(force: bool = False):
         logger.info("Market is currently closed (EGX Session: Sun-Thu 10:00 - 14:30 Cairo time). Use --force to override.")
         return
 
-    # Load 1h and 15m models
+    # Determine which timeframes to evaluate based on Cairo local time
+    try:
+        cairo_tz = zoneinfo.ZoneInfo("Africa/Cairo")
+    except Exception:
+        cairo_tz = timezone.utc
+    now_cairo = datetime.now(cairo_tz)
+    curr_min = now_cairo.minute
+    curr_hour = now_cairo.hour
+
+    # Timeframe execution selection:
+    # 15m: Runs every 15 minutes (00, 15, 30, 45)
+    # 1h:  Runs on top of the hour (:00)
+    # 4h:  Runs at session start (10:00) and late session (14:00)
+    active_tfs = ['15m']
+    if force or curr_min == 0:
+        active_tfs.append('1h')
+    if force or (curr_hour in [10, 14] and curr_min == 0):
+        active_tfs.append('4h')
+
+    if specified_tf and specified_tf != 'all':
+        active_tfs = [specified_tf]
+
+    logger.info(f"Evaluating timeframes for this run: {active_tfs} (Cairo Time: {now_cairo.strftime('%H:%M')})")
+
+    # Load active models
     models = {}
     scalers = {}
-    for tf in ['1h', '15m']:
+    for tf in active_tfs:
         m, s = load_intraday_model(tf)
         if m and s:
             models[tf] = m
             scalers[tf] = s
 
     if not models:
-        logger.error("No intraday models loaded. Retrain models first using train_model_intraday_v2.py")
+        logger.error("No valid intraday models loaded for current schedule.")
         return
 
     # Fetch active companies
@@ -147,10 +171,11 @@ def scan_and_generate_intraday(force: bool = False):
                 existing = sb.table('recommended_trades') \
                              .select('id') \
                              .eq('company_id', cid) \
+                             .eq('timeframe', tf) \
                              .in_('status', ['active', 'pending']) \
                              .limit(1).execute()
                 if existing.data:
-                    logger.debug(f"[{symbol}] Active signal already exists. Skipping.")
+                    logger.debug(f"[{symbol} - {tf}] Active signal already exists. Skipping.")
                     continue
 
                 # Calculate ATR for stop loss & take profit
@@ -167,14 +192,13 @@ def scan_and_generate_intraday(force: bool = False):
                     'symbol': symbol,
                     'direction': 'buy',
                     'entry_price': entry_price,
-                    'target_price_1': tp1,
-                    'target_price_2': tp2,
-                    'stop_loss': sl,
+                    'tp1': tp1,
+                    'tp2': tp2,
+                    'sl': sl,
                     'status': 'active',
                     'ml_probability': round(prob_buy, 4),
                     'timeframe': tf,
-                    'recommended_at': datetime.now(timezone.utc).isoformat(),
-                    'notes': f'Intraday ML v2 signal ({tf}) - prob: {prob_buy:.1%}'
+                    'recommended_at': datetime.now(timezone.utc).isoformat()
                 }
 
                 try:
@@ -192,6 +216,8 @@ def scan_and_generate_intraday(force: bool = False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run Intraday Recommendation Scanner")
     parser.add_argument('--force', action='store_true', help="Force scan even if market is closed")
+    parser.add_argument('--timeframe', type=str, default=None, choices=['15m', '1h', '4h', 'all'], help="Target timeframe")
     args = parser.parse_args()
 
-    scan_and_generate_intraday(force=args.force)
+    scan_and_generate_intraday(force=args.force, specified_tf=args.timeframe)
+
