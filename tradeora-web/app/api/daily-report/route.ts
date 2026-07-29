@@ -16,6 +16,7 @@ export async function GET(req: Request) {
     const todayStr = dateParam || new Date().toISOString().split('T')[0];
     const supabase = getSupabase();
 
+    const LAUNCH_DATE = '2026-07-29T22:42:00+00:00';
     // Fetch trade recommendations (filtered by date if specified)
     let query = supabase
       .from('recommended_trades')
@@ -29,6 +30,8 @@ export async function GET(req: Request) {
           sector
         )
       `)
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE)
       .order('ml_probability', { ascending: false });
 
     if (dateParam) {
@@ -49,11 +52,18 @@ export async function GET(req: Request) {
     const funcMap = new Map();
     (funcs || []).forEach(f => funcMap.set(f.company_id, f));
 
-    // Combine trades with fundamentals
+    // Combine trades with fundamentals and normalize target price & stop loss field names for DailyReportView
     const enrichedTrades = (trades || []).map(t => {
       const f = t.company_id ? funcMap.get(t.company_id) : null;
+      const tp1 = t.target_price_1 ?? t.tp1 ?? null;
+      const tp2 = t.target_price_2 ?? t.tp2 ?? null;
+      const sl = t.stop_loss ?? t.sl ?? null;
+
       return {
         ...t,
+        target_price_1: tp1,
+        target_price_2: tp2,
+        stop_loss: sl,
         fair_value: f?.fair_value || null,
         upside_potential: f?.upside_potential || null,
         dividend_yield: f?.dividend_yield || null,
