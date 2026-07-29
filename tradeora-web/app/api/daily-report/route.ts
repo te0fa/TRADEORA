@@ -7,10 +7,26 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get('date');
-    const todayStr = dateParam || new Date().toISOString().split('T')[0];
-
     const LAUNCH_DATE = '2026-07-29T22:42:00+00:00';
-    // Fetch trade recommendations (filtered by date if specified)
+
+    // Fetch unique available recommendation dates
+    const { data: dateRows } = await supabase
+      .from('recommended_trades')
+      .select('recommended_at')
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE)
+      .order('recommended_at', { ascending: false });
+
+    const availableDatesSet = new Set<string>();
+    (dateRows || []).forEach(r => {
+      if (r.recommended_at) {
+        availableDatesSet.add(r.recommended_at.split('T')[0]);
+      }
+    });
+    const availableDates = Array.from(availableDatesSet);
+    const selectedDateStr = dateParam || (availableDates.length > 0 ? availableDates[0] : new Date().toISOString().split('T')[0]);
+
+    // Fetch trade recommendations for the specified date or default latest date
     let query = supabase
       .from('recommended_trades')
       .select(`
@@ -29,6 +45,10 @@ export async function GET(req: Request) {
 
     if (dateParam) {
       query = query.gte('recommended_at', `${dateParam}T00:00:00Z`).lte('recommended_at', `${dateParam}T23:59:59Z`);
+    } else if (availableDates.length > 0) {
+      // Default to latest date with trades
+      const latestDate = availableDates[0];
+      query = query.gte('recommended_at', `${latestDate}T00:00:00Z`).lte('recommended_at', `${latestDate}T23:59:59Z`);
     }
 
     const { data: trades, error: tradesErr } = await query;
@@ -69,58 +89,6 @@ export async function GET(req: Request) {
     let buyTrades = enrichedTrades.filter(t => t.trade_type === 'BUY' || t.direction === 'buy');
     let sellTrades = enrichedTrades.filter(t => t.trade_type === 'SELL' || t.direction === 'sell');
 
-    // Construct rich, realistic Buy & Sell Opportunities if trades table is empty
-    if (buyTrades.length === 0 || sellTrades.length === 0) {
-      const { data: activeComps } = await supabase
-        .from('companies')
-        .select('id, symbol, name_ar, name_en, sector')
-        .eq('status', 'active')
-        .limit(30);
-
-      if (activeComps && activeComps.length > 0) {
-        // Top BUY Opportunities
-        buyTrades = activeComps.slice(0, 6).map((c: any, i: number) => {
-          const basePrices = [47.50, 126.15, 32.40, 21.80, 52.00, 121.70];
-          const entry = basePrices[i % basePrices.length];
-          return {
-            id: `buy-${c.id}`,
-            symbol: c.symbol,
-            company: c,
-            trade_type: 'BUY',
-            direction: 'buy',
-            entry_price: entry,
-            rebound_support_price: Number((entry * 0.975).toFixed(2)),
-            target_price_1: Number((entry * 1.055).toFixed(2)),
-            target_price_2: Number((entry * 1.095).toFixed(2)),
-            stop_loss: Number((entry * 0.945).toFixed(2)),
-            ml_probability: 0.85 - i * 0.02,
-            confidence_score: 88 - i * 2,
-            timeframe: '1-3 أسابيع',
-            rationale_ar: `السهم يرتكز على مستوى دعم قوي عند ${(entry * 0.975).toFixed(2)} ج.م مع مؤشرات ارتداد إيجابية ونسب تجميع بالحجم.`
-          };
-        });
-
-        // Top SELL & Caution Opportunities
-        sellTrades = activeComps.slice(6, 12).map((c: any, i: number) => {
-          const basePrices = [18.20, 9.40, 64.00, 14.10, 8.50, 31.00];
-          const entry = basePrices[i % basePrices.length];
-          return {
-            id: `sell-${c.id}`,
-            symbol: c.symbol,
-            company: c,
-            trade_type: 'SELL',
-            direction: 'sell',
-            entry_price: entry,
-            stop_loss: Number((entry * 1.03).toFixed(2)),
-            ml_probability: 0.78,
-            confidence_score: 75,
-            timeframe: 'تخفيف عاجل',
-            action_recommendation_ar: `السهم في مسار هابط مع كسر متوسط 50 يوماً؛ يُوصى بالتخفيف والخروج فوراً عند أي ارتداد مؤقت لمنطقة ${(entry * 1.01).toFixed(2)} ج.م لحين استقرار القاع.`
-          };
-        });
-      }
-    }
-
     // Fetch market overview stats
     const { data: priceData } = await supabase
       .from('market_prices')
@@ -154,7 +122,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      report_date: todayStr,
+      report_date: selectedDateStr,
+      available_dates: availableDates,
       market_overview: {
         egx30_value: egx30Value,
         egx30_change: egx30Change,

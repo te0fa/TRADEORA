@@ -8,13 +8,19 @@ export default function DailyReportPage() {
   const locale = useLocale();
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
     async function loadReport() {
+      setLoading(true);
       try {
-        const res = await fetch('/api/daily-report');
+        const url = selectedDate ? `/api/daily-report?date=${selectedDate}` : '/api/daily-report';
+        const res = await fetch(url);
         const data = await res.json();
         setReportData(data);
+        if (!selectedDate && data.report_date) {
+          setSelectedDate(data.report_date);
+        }
       } catch (e) {
         console.error('Failed to load daily report:', e);
       } finally {
@@ -22,9 +28,9 @@ export default function DailyReportPage() {
       }
     }
     loadReport();
-  }, []);
+  }, [selectedDate]);
 
-  if (loading) {
+  if (loading && !reportData) {
     return (
       <div className="w-full py-32 flex flex-col items-center justify-center gap-4">
         <div className="w-12 h-12 border-4 border-white/10 border-t-accent-blue rounded-full animate-spin" />
@@ -43,5 +49,12 @@ export default function DailyReportPage() {
     );
   }
 
-  return <DailyReportView data={reportData} />;
+  return (
+    <DailyReportView
+      data={reportData}
+      selectedDate={selectedDate}
+      onDateChange={(newDate) => setSelectedDate(newDate)}
+      isLoadingDate={loading}
+    />
+  );
 }
