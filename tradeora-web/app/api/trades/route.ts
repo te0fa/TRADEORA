@@ -104,11 +104,13 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // 3. Fetch all closed trades to compute statistics
+    // 3. Fetch closed trades to compute statistics — v2 only, exclude contaminated history
     const { data: allClosed, error: statsError } = await supabase
       .from('recommended_trades')
-      .select('pnl_percent, status')
-      .eq('status', 'closed');
+      .select('pnl_percent, status, exit_reason')
+      .eq('status', 'closed')
+      .neq('exit_reason', 'pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE);
 
     if (statsError) {
       throw statsError;
