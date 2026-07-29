@@ -18,12 +18,12 @@ export async function GET(req: NextRequest) {
 
     // 1. Fetch trades with company details
     // Exclude contaminated pre-launch signals from performance metrics
-    const LAUNCH_DATE = '2026-07-29T22:00:00+00:00'; // post-reset v2 launch
+    const LAUNCH_DATE = '2026-07-29T22:42:00+00:00'; // post-reset v2 launch
     let query = supabase
       .from('recommended_trades')
       .select('*, companies(name_ar, name_en, sector)')
-      .neq('exit_reason', 'pre_launch_reset')        // exclude contaminated history
-      .gte('recommended_at', LAUNCH_DATE)             // only show v2 signals
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset') // preserve NULL exit_reasons for active signals
+      .gte('recommended_at', LAUNCH_DATE)                         // only show v2 signals
       .order('recommended_at', { ascending: false });
 
     if (symbol) {
@@ -109,15 +109,28 @@ export async function GET(req: NextRequest) {
       .from('recommended_trades')
       .select('pnl_percent, status, exit_reason')
       .eq('status', 'closed')
-      .neq('exit_reason', 'pre_launch_reset')
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
       .gte('recommended_at', LAUNCH_DATE);
 
     if (statsError) {
       throw statsError;
     }
 
-    const totalTrades = (processedTrades || []).length;
-    const activeTrades = (processedTrades || []).filter((t: any) => t.status === 'active' || t.status === 'tp1_hit').length;
+    const { count: v2TotalCount } = await supabase
+      .from('recommended_trades')
+      .select('*', { count: 'exact', head: true })
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE);
+
+    const { count: v2ActiveCount } = await supabase
+      .from('recommended_trades')
+      .select('*', { count: 'exact', head: true })
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE)
+      .in('status', ['active', 'tp1_hit']);
+
+    const totalTrades = v2TotalCount ?? (processedTrades || []).length;
+    const activeTrades = v2ActiveCount ?? (processedTrades || []).filter((t: any) => t.status === 'active' || t.status === 'tp1_hit').length;
     
     // Statistics for active live tracking
     const closedCount = allClosed?.length || 0;
