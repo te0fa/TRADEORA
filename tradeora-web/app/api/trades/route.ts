@@ -17,9 +17,13 @@ export async function GET(req: NextRequest) {
     const symbol = searchParams.get('symbol');
 
     // 1. Fetch trades with company details
+    // Exclude contaminated pre-launch signals from performance metrics
+    const LAUNCH_DATE = '2026-07-29T22:00:00+00:00'; // post-reset v2 launch
     let query = supabase
       .from('recommended_trades')
       .select('*, companies(name_ar, name_en, sector)')
+      .neq('exit_reason', 'pre_launch_reset')        // exclude contaminated history
+      .gte('recommended_at', LAUNCH_DATE)             // only show v2 signals
       .order('recommended_at', { ascending: false });
 
     if (symbol) {
@@ -27,6 +31,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { data: trades, error: fetchError } = await query.limit(limit);
+
 
     if (fetchError) {
       throw fetchError;
