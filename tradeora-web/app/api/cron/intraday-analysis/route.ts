@@ -5,12 +5,14 @@ export const dynamic = 'force-dynamic';
 // Allow up to 60 seconds for this cron to complete
 export const maxDuration = 60;
 
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  return createClient(url, key);
+}
 
 export async function GET(req: NextRequest) {
+  const sb = getSupabase();
   // ✅ Security: validate CRON_SECRET header
   const authHeader = req.headers.get('Authorization');
   const expectedSecret = process.env.CRON_SECRET;

@@ -1,6 +1,9 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY || 're_placeholder_key_for_build';
+  return new Resend(apiKey);
+}
 
 export async function sendTradeAlert(
   to:     string,
@@ -47,7 +50,7 @@ export async function sendTradeAlert(
     `,
   };
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: `TRADEORA <${process.env.FROM_EMAIL}>`,
     to,
     subject: subjects[type],
