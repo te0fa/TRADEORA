@@ -1,0 +1,102 @@
+{
+  "timeframe": "15m",
+  "version": "2.0",
+  "trained_at": "2026-07-29T23:27:16.058627+00:00",
+  "macd_version": "standard (MACD - Signal)",
+  "data_sources": [
+    "tradingview_15m"
+  ],
+  "flat_candles_excluded": true,
+  "label_parameters": {
+    "horizon_candles": 16,
+    "buy_threshold": 0.01,
+    "sell_threshold": -0.0075
+  },
+  "features": [
+    "rsi",
+    "macd_hist",
+    "macd_raw",
+    "dist_ema20",
+    "dist_ema50",
+    "atr_pct",
+    "vol_ratio",
+    "price_pos",
+    "bb_width",
+    "bb_pos",
+    "stoch_rsi",
+    "vol_spike",
+    "dist_ath",
+    "day_of_week",
+    "market_regime"
+  ],
+  "training_samples": 64324,
+  "class_distribution": {
+    "buy_pct": 48.31,
+    "sell_pct": 51.69
+  },
+  "test_accuracy": 0.5763,
+  "test_precision": 0.5632,
+  "test_recall": 0.5407,
+  "feature_importance_ranking": [
+    {
+      "feature": "price_pos",
+      "importance": 0.1098
+    },
+    {
+      "feature": "day_of_week",
+      "importance": 0.0976
+    },
+    {
+      "feature": "dist_ema50",
+      "importance": 0.0878
+    },
+    {
+      "feature": "dist_ath",
+      "importance": 0.0787
+    },
+    {
+      "feature": "macd_hist",
+      "importance": 0.0744
+    },
+    {
+      "feature": "atr_pct",
+      "importance": 0.0693
+    },
+    {
+      "feature": "macd_raw",
+      "importance": 0.0682
+    },
+    {
+      "feature": "bb_width",
+      "importance": 0.0674
+    },
+    {
+      "feature": "dist_ema20",
+      "importance": 0.0635
+    },
+    {
+      "feature": "stoch_rsi",
+      "importance": 0.0624
+    },
+    {
+      "feature": "market_regime",
+      "importance": 0.0616
+    },
+    {
+      "feature": "rsi",
+      "importance": 0.0579
+    },
+    {
+      "feature": "bb_pos",
+      "importance": 0.0485
+    },
+    {
+      "feature": "vol_ratio",
+      "importance": 0.0349
+    },
+    {
+      "feature": "vol_spike",
+      "importance": 0.0181
+    }
+  ]
+}

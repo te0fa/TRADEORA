@@ -84,17 +84,19 @@ def get_canonical_candles(sb,
         sources = CANONICAL_SOURCES_DAILY
         table   = 'market_prices'
         date_col = 'price_date'
+        close_col = 'close_price'
         max_bars  = max(limit * 2, MAX_DAILY_BARS)
     else:
         sources = CANONICAL_SOURCES_INTRADAY
         table   = 'intraday_snapshots'
         date_col = 'snapshot_time'
+        close_col = 'price'
         max_bars  = limit * 3
     
     # جلب البيانات
     res = sb.table(table).select(
         f"{date_col}, open_price, high_price, "
-        f"low_price, close_price, volume, source"
+        f"low_price, {close_col}, volume, source"
     ).eq('company_id', company_id) \
      .in_('source', sources) \
      .order(date_col, desc=False) \
@@ -106,10 +108,10 @@ def get_canonical_candles(sb,
         logger.debug(f"[{symbol}] No canonical data found")
         return []
     
-    # Deduplication: أفضل مصدر لكل يوم/وقت
+    # Deduplication: أفضل مصدر لكل طابع زمني/يوم
     day_map = {}
     for row in rows:
-        key = row[date_col][:10]  # اليوم فقط
+        key = row[date_col] if interval != '1d' else row[date_col][:10]
         if key not in day_map:
             day_map[key] = row
         else:
@@ -140,7 +142,7 @@ def get_canonical_candles(sb,
     for row in sorted_rows:
         h = float(row.get('high_price')  or 0)
         l = float(row.get('low_price')   or 0)
-        c = float(row.get('close_price') or 0)
+        c = float(row.get(close_col) or row.get('close_price') or row.get('price') or 0)
         o = float(row.get('open_price')  or c)
         v = int(row.get('volume') or 0)
         
@@ -150,7 +152,7 @@ def get_canonical_candles(sb,
         if c > h * 1.5:     continue  # خطأ فادح
         
         candles.append({
-            'date':   row[date_col][:10],
+            'date':   row[date_col],
             'open':   o if o > 0 else c,
             'high':   h if h > 0 else c,
             'low':    l if l > 0 else c,
