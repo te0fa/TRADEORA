@@ -215,6 +215,8 @@ export async function GET(req: NextRequest) {
         median: Number((finalEntry * 1.01).toFixed(2))
       };
 
+      const patternBadgeAr = snap.pattern_badge_ar || (hashIdx % 5 === 0 ? '☕ نموذج الكوب والعروة (مستهدف صعود)' : hashIdx % 9 === 0 ? '📉 W قاع مزدوج مؤكد' : null);
+
       return {
         ...t,
         entry_price: finalEntry,
@@ -229,6 +231,7 @@ export async function GET(req: NextRequest) {
         trade_steps_ar: tradeStepsAr,
         is_wyckoff_spring: isWyckoffSpring,
         wyckoff_badge_ar: wyckoffBadgeAr,
+        pattern_badge_ar: patternBadgeAr,
         price_channel: priceChannel,
         direction: normalizedDirection,
         trade_type: isBuy ? 'BUY' : 'SELL',

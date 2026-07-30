@@ -51,6 +51,7 @@ export interface ActiveTrade {
   trade_steps_ar?: any[];
   is_wyckoff_spring?: boolean;
   wyckoff_badge_ar?: string;
+  pattern_badge_ar?: string;
   price_channel?: any;
 }
 
@@ -499,6 +500,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           {t.is_wyckoff_spring && (
                             <span className="text-[10px] font-extrabold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/40 flex items-center gap-1 shadow-sm animate-pulse">
                               {t.wyckoff_badge_ar || '🏛️ تجميع وايكوف مؤسسي (Spring)'}
+                            </span>
+                          )}
+
+                          {/* Classical Chart Pattern Badge (Cup & Handle / Double Bottom / Bull Flag) */}
+                          {t.pattern_badge_ar && (
+                            <span className="text-[10px] font-extrabold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-lg border border-purple-500/40 flex items-center gap-1 shadow-sm">
+                              {t.pattern_badge_ar}
                             </span>
                           )}
                         </div>
