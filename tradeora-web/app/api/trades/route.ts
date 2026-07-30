@@ -92,21 +92,6 @@ export async function GET(req: NextRequest) {
       const isBuy = !isSellSignal;
       const normalizedDirection = isBuy ? 'buy' : 'sell';
 
-      let finalTp1 = Number(t.tp1 || (isBuy ? entry * 1.05 : entry * 0.95));
-      let finalTp2 = Number(t.tp2 || (isBuy ? entry * 1.10 : entry * 0.90));
-      let finalSl = Number(t.sl || (isBuy ? entry * 0.95 : entry * 1.05));
-
-      if (!isBuy && finalTp1 >= entry) {
-        finalTp1 = Number((entry * 0.94).toFixed(2));
-        finalTp2 = Number((entry * 0.88).toFixed(2));
-        finalSl = Number((entry * 1.06).toFixed(2));
-      }
-
-      const companyNameStr = t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol;
-      const defaultRationale = isBuy
-        ? `توصية شراء لسهم ${companyNameStr} (${t.symbol}) بناءً على ثبات السعر أعلى الدعم عند ${finalSl} ج.م، مع إشارة إيجابية لمؤشر RSI وزخم السيولة التجميعي. المستهدف الأول ${finalTp1} ج.م والمستهدف الثاني ${finalTp2} ج.م.`
-        : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${entry} ج.م، مع مستهدف هبوط ${finalTp1} ج.م ووقف خسارة خروج ${finalSl} ج.م.`;
-
       const snap = t.features_snapshot || {};
       let orderType = 'MARKET';
       let finalEntry = entry > 0 ? entry : safeCurrentPrice;
@@ -140,6 +125,11 @@ export async function GET(req: NextRequest) {
         finalTp2 = Number((finalEntry * 0.88).toFixed(2));
         finalSl = Number((finalEntry * 1.06).toFixed(2));
       }
+
+      const companyNameStr = t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol;
+      const defaultRationale = isBuy
+        ? `توصية شراء لسهم ${companyNameStr} (${t.symbol}) بناءً على ثبات السعر أعلى الدعم عند ${finalSl} ج.م، مع إشارة إيجابية لمؤشر RSI وزخم السيولة التجميعي. المستهدف الأول ${finalTp1} ج.م والمستهدف الثاني ${finalTp2} ج.م.`
+        : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${finalEntry} ج.م، مع مستهدف هبوط ${finalTp1} ج.م ووقف خسارة خروج ${finalSl} ج.م.`;
 
       const triggerCondAr = snap.trigger_condition_ar || (
         orderType === 'BREAKOUT_TRIGGER'

@@ -359,7 +359,20 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                   {isAr ? 'لا توجد صفقات تطابق خيارات الفلترة المحددة' : 'No matching trades found'}
                 </p>
                 <p className="text-xs text-zinc-400 max-w-sm">
-                  {isAr ? 'جرب تغيير أو إزالة بعض الفلاتر لعرض الصفقات المتاحة بالسوق.' : 'Try clearing some filters to view available signals.            filteredTrades.map((t) => {
+                  {isAr ? 'جرب تغيير أو إزالة بعض الفلاتر لعرض الصفقات المتاحة بالسوق.' : 'Try clearing some filters to view available signals.'}
+                </p>
+              </div>
+
+              <button
+                onClick={handleResetFilters}
+                className="mt-2 px-5 py-2.5 rounded-xl bg-accent-blue/20 text-accent-blue border border-accent-blue/40 hover:bg-accent-blue/30 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{isAr ? 'إعادة ضبط جميع الفلاتر' : 'Reset All Filters'}</span>
+              </button>
+            </div>
+          ) : (
+            filteredTrades.map((t) => {
               const isBuy = (t.trade_type || 'BUY').toUpperCase() === 'BUY';
               let entry = Number(t.entry_price || 0);
               const current = Number(t.current_price || entry);
@@ -610,26 +623,6 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           : isPositive
                           ? `${isAr ? 'ربح' : 'Gain'} +${pnlPct.toFixed(1)}% (باقي ${distToTP1.toFixed(1)}% للهدف)`
                           : `${isAr ? 'تراجع' : 'Loss'} -${Math.abs(pnlPct).toFixed(1)}% (الوقف عند ${sl.toFixed(2)} ج.م)`}
-                      </span>
-                    </div>
-
-                    <div className="relative w-full h-3 bg-zinc-800 rounded-full overflow-hidden border border-white/10">
-                      <div 
-                        className={`h-full transition-all duration-500 rounded-full ${
-                          isLimitPending
-                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
-                            : isBreakoutPending
-                            ? 'bg-gradient-to-r from-purple-500 to-indigo-400'
-                            : isZeroChange
-                            ? 'bg-zinc-600'
-                            : isPositive 
-                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400' 
-                            : 'bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400'
-                        }`}
-                        style={{ width: `${Math.max(0, Math.min(100, pointerPos))}%` }}
-                      />
-                    </div>
-                  </div>'تراجع' : 'Loss'} ${pnlPct.toFixed(1)}% (الوقف عند ${sl.toFixed(2)} ج.م)`}
                       </span>
                     </div>
 
