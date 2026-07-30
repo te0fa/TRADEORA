@@ -433,8 +433,11 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
               // Progress Scale & Pointer Position Math
               let pointerPos = 0;
               if (isLimitPending || isBreakoutPending) {
-                // Distance remaining to trigger entry
-                pointerPos = Math.max(10, Math.min(100, (1 - distToEntry / 5) * 100));
+                // Calculate progress towards pending entry execution based on standard 4% pending offset gap
+                const maxGap = 4.0;
+                const remaining = Math.min(maxGap, distToEntry);
+                const progressDone = Math.max(0, maxGap - remaining);
+                pointerPos = Math.max(15, Math.min(100, Math.round((progressDone / maxGap) * 100)));
               } else if (isBuy) {
                 if (isZeroChange) {
                   pointerPos = 0; // Starts clean at 0% when price hasn't moved!
