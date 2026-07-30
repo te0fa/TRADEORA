@@ -734,7 +734,16 @@ function buildIntradayChunk(chunk: any[]): any {
     if (yahooCandles.length > 0) {
       return aggregateIntradayCandles(yahooCandles, interval);
     } else {
-      return prioritizedDbPrices.map(d => ({ ...d, time: d.price_date }));
+      return prioritizedDbPrices.map(d => {
+        let tVal: string | number = d.price_date;
+        if (d.price_date && typeof d.price_date === 'string' && d.price_date.length === 10) {
+          const dt = new Date(`${d.price_date}T10:00:00+02:00`);
+          if (!isNaN(dt.getTime())) {
+            tVal = Math.floor(dt.getTime() / 1000);
+          }
+        }
+        return { ...d, time: tVal };
+      });
     }
   }, [interval, prioritizedDbPrices, dbIntradayCandles, yahooCandles]);
 
