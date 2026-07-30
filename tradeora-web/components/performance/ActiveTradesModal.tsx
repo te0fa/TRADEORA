@@ -686,7 +686,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                       </span>
                     </div>
 
-                    <div className="relative w-full h-3 bg-zinc-800 rounded-full overflow-hidden border border-white/10">
+                    <div dir="ltr" className="relative w-full h-3 bg-zinc-800 rounded-full overflow-hidden border border-white/10">
                       <div 
                         className={`h-full transition-all duration-500 rounded-full ${
                           isLimitPending
