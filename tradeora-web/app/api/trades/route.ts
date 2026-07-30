@@ -109,25 +109,43 @@ export async function GET(req: NextRequest) {
 
       const snap = t.features_snapshot || {};
       let orderType = 'MARKET';
+      let finalEntry = entry > 0 ? entry : safeCurrentPrice;
+
       if (snap.order_type) {
         orderType = snap.order_type;
       } else {
-        const ep = Number(t.entry_price || safeCurrentPrice);
-        const diffPct = safeCurrentPrice > 0 ? ((ep - safeCurrentPrice) / safeCurrentPrice) * 100 : 0;
-        if (diffPct < -0.3) orderType = 'LIMIT';
-        else if (diffPct > 0.3) orderType = 'BREAKOUT_TRIGGER';
-        else {
-          if (hashIdx % 4 === 1) orderType = 'LIMIT';
-          else if (hashIdx % 4 === 2) orderType = 'BREAKOUT_TRIGGER';
-          else orderType = 'MARKET';
+        if (hashIdx % 4 === 1) {
+          orderType = 'LIMIT';
+          // For Limit BUY: Entry is support pullback level (e.g. 2% below current market price)
+          finalEntry = Number((safeCurrentPrice * (isBuy ? 0.98 : 1.02)).toFixed(2));
+        } else if (hashIdx % 4 === 2) {
+          orderType = 'BREAKOUT_TRIGGER';
+          // For Breakout BUY: Entry is resistance trigger level (e.g. 1.5% above current market price)
+          finalEntry = Number((safeCurrentPrice * (isBuy ? 1.015 : 0.985)).toFixed(2));
+        } else {
+          orderType = 'MARKET';
+          finalEntry = safeCurrentPrice;
         }
+      }
+
+      let finalTp1 = Number(t.tp1 || (isBuy ? finalEntry * 1.05 : finalEntry * 0.95));
+      let finalTp2 = Number(t.tp2 || (isBuy ? finalEntry * 1.10 : finalEntry * 0.90));
+      let finalSl = Number(t.sl || (isBuy ? finalEntry * 0.95 : finalEntry * 1.05));
+
+      if (isBuy && finalSl >= finalEntry) {
+        finalSl = Number((finalEntry * 0.95).toFixed(2));
+      }
+      if (!isBuy && finalTp1 >= finalEntry) {
+        finalTp1 = Number((finalEntry * 0.94).toFixed(2));
+        finalTp2 = Number((finalEntry * 0.88).toFixed(2));
+        finalSl = Number((finalEntry * 1.06).toFixed(2));
       }
 
       const triggerCondAr = snap.trigger_condition_ar || (
         orderType === 'BREAKOUT_TRIGGER'
-          ? (isBuy ? `دخول مشروط باختراق مستوى المقاومة ${(Number(entry || 1) * 1.01).toFixed(2)} ج.م وبحجم تداول تجميعي` : `بيع مشروط بكسر مستوى الدعم ${(Number(entry || 1) * 0.99).toFixed(2)} ج.م`)
+          ? (isBuy ? `دخول مشروط باختراق مستوى المقاومة ${finalEntry.toFixed(2)} ج.م وبحجم تداول تجميعي` : `بيع مشروط بكسر مستوى الدعم ${finalEntry.toFixed(2)} ج.م`)
           : orderType === 'LIMIT'
-          ? (isBuy ? `أمر حد معلق: ارتداد متوقع من مستوى الدعم ${(t.rebound_support_price || Number(entry || 1) * 0.98).toFixed(2)} ج.م` : `أمر بيع معلق عند مستوى المقاومة ${(Number(entry || 1) * 1.02).toFixed(2)} ج.م`)
+          ? (isBuy ? `أمر حد معلق: ارتداد متوقع من مستوى الدعم ${finalEntry.toFixed(2)} ج.م` : `أمر بيع معلق عند مستوى المقاومة ${finalEntry.toFixed(2)} ج.م`)
           : null
       );
       const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
@@ -152,6 +170,7 @@ export async function GET(req: NextRequest) {
 
       return {
         ...t,
+        entry_price: finalEntry,
         tp1: finalTp1,
         tp2: finalTp2,
         sl: finalSl,
