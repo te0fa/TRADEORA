@@ -22,11 +22,13 @@ interface TradeItem {
   dividend_yield?: number;
   rebound_support_price?: number;
   action_recommendation_ar?: string;
+  is_shariah_compliant?: boolean;
   company?: {
     symbol: string;
     name_ar?: string;
     name_en?: string;
     sector?: string;
+    is_shariah_compliant?: boolean;
   };
 }
 
@@ -56,6 +58,7 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
   const { report_date, available_dates = [], market_overview, buy_opportunities, sell_caution_opportunities } = data;
 
   const [reportScope, setReportScope] = useState<'TOP_PICKS' | 'ALL_MARKET'>('TOP_PICKS');
+  const [shariahOnly, setShariahOnly] = useState<boolean>(false);
   const [selectedSector, setSelectedSector] = useState<string>('all');
 
   // Available sectors list for filtering
@@ -67,24 +70,30 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
     return ['all', ...Array.from(sSet)];
   }, [buy_opportunities, sell_caution_opportunities]);
 
-  // Filtered lists by scope and sector
+  // Filtered lists by scope, shariah, and sector
   const filteredBuy = useMemo(() => {
     let list = buy_opportunities;
+    if (shariahOnly) {
+      list = list.filter(item => (item as any).is_shariah_compliant || item.company?.is_shariah_compliant);
+    }
     if (reportScope === 'TOP_PICKS') {
       list = list.slice(0, 10);
     }
     if (selectedSector === 'all') return list;
     return list.filter(item => item.company?.sector === selectedSector);
-  }, [buy_opportunities, reportScope, selectedSector]);
+  }, [buy_opportunities, shariahOnly, reportScope, selectedSector]);
 
   const filteredSell = useMemo(() => {
     let list = sell_caution_opportunities;
+    if (shariahOnly) {
+      list = list.filter(item => (item as any).is_shariah_compliant || item.company?.is_shariah_compliant);
+    }
     if (reportScope === 'TOP_PICKS') {
       list = list.slice(0, 10);
     }
     if (selectedSector === 'all') return list;
     return list.filter(item => item.company?.sector === selectedSector);
-  }, [sell_caution_opportunities, reportScope, selectedSector]);
+  }, [sell_caution_opportunities, shariahOnly, reportScope, selectedSector]);
 
   const handlePrintPDF = () => {
     window.print();
@@ -195,27 +204,41 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
         )}
       </div>
 
-      {/* Sector Filter Dropdown (Hidden on Print) */}
-      <div className="flex flex-wrap items-center gap-3 bg-slate-900/60 p-4 rounded-2xl border border-white/5 print:hidden">
-        <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-          <Filter className="w-4 h-4 text-cyan-400" />
-          <span>{isAr ? 'تصفية الفرص حسب القطاع:' : 'Filter Opportunities by Sector:'}</span>
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {allSectors.map((sec) => (
-            <button
-              key={sec}
-              onClick={() => setSelectedSector(sec)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                selectedSector === sec
-                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-md'
-                  : 'bg-white/5 text-slate-300 border-white/10 hover:border-cyan-500/40'
-              }`}
-            >
-              {sec === 'all' ? (isAr ? '🌐 كل القطاعات' : 'All Sectors') : sec}
-            </button>
-          ))}
+      {/* Sector Filter Dropdown & Shariah Toggle (Hidden on Print) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-2xl border border-white/5 print:hidden">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <Filter className="w-4 h-4 text-cyan-400" />
+            <span>{isAr ? 'تصفية الفرص حسب القطاع:' : 'Filter Opportunities by Sector:'}</span>
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {allSectors.map((sec) => (
+              <button
+                key={sec}
+                onClick={() => setSelectedSector(sec)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  selectedSector === sec
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-md'
+                    : 'bg-white/5 text-slate-300 border-white/10 hover:border-cyan-500/40'
+                }`}
+              >
+                {sec === 'all' ? (isAr ? '🌐 كل القطاعات' : 'All Sectors') : sec}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Shariah Filter Toggle */}
+        <button
+          onClick={() => setShariahOnly(!shariahOnly)}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+            shariahOnly
+              ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-extrabold shadow-md'
+              : 'bg-white/5 text-slate-300 border-white/10 hover:border-emerald-500/40'
+          }`}
+        >
+          <span>🕌 {isAr ? 'أسهم الشريعة فقط (EGX33)' : 'Shariah Only (EGX33)'}</span>
+        </button>
       </div>
 
       {/* Risk Management & Execution Strategy Guide Banner */}

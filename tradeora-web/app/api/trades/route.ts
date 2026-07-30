@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const LAUNCH_DATE = '2026-07-29T22:42:00+00:00'; // post-reset v2 launch
     let query = supabase
       .from('recommended_trades')
-      .select('*, companies(name_ar, name_en, sector)')
+      .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
       .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset') // preserve NULL exit_reasons for active signals
       .gte('recommended_at', LAUNCH_DATE)                         // only show v2 signals
       .order('recommended_at', { ascending: false });
@@ -85,8 +85,27 @@ export async function GET(req: NextRequest) {
         : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${t.entry_price} ج.م، مع مستهدف هبوط ${t.tp1} ج.م ووقف خسارة ${t.sl} ج.م.`;
 
       const snap = t.features_snapshot || {};
-      const orderType = snap.order_type || 'MARKET';
-      const triggerCondAr = snap.trigger_condition_ar || null;
+      const rsi = snap.rsi_14 !== undefined ? Number(snap.rsi_14) : 55;
+      const regime = snap.market_regime;
+      const isBreakout = rsi >= 65 || regime === 1 || snap.macd_crossover === true;
+      const isLimit = rsi <= 52 || snap.macd_crossunder === true || (t.rebound_support_price && t.entry_price && t.rebound_support_price < t.entry_price);
+
+      let orderType = 'MARKET';
+      if (snap.order_type) {
+        orderType = snap.order_type;
+      } else if (isBreakout) {
+        orderType = 'BREAKOUT_TRIGGER';
+      } else if (isLimit) {
+        orderType = 'LIMIT';
+      }
+
+      const triggerCondAr = snap.trigger_condition_ar || (
+        orderType === 'BREAKOUT_TRIGGER'
+          ? `دخول مشروط باختراق مستوى المقاومة ${(Number(t.entry_price || 1) * 1.01).toFixed(2)} ج.م وبحجم تداول تجميعي`
+          : orderType === 'LIMIT'
+          ? `أمر معلق بسعر محدد: ارتداد متوقع من مستوى الدعم ${(t.rebound_support_price || Number(t.entry_price || 1) * 0.98).toFixed(2)} ج.م`
+          : null
+      );
       const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
 
       const tf = t.timeframe || '1d';
@@ -114,6 +133,7 @@ export async function GET(req: NextRequest) {
         direction: (t.direction || 'buy').toLowerCase(),
         company_name: companyNameStr,
         sector: t.companies ? t.companies.sector : null,
+        is_shariah_compliant: t.companies ? (t.companies.is_shariah_compliant ?? false) : false,
         current_price: currentPrice,
         confidence_warning: requiresWarning,
         fra_disclaimer: FRA_DISCLAIMER_AR,

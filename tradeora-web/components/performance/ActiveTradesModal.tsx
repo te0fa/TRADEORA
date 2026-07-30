@@ -34,6 +34,7 @@ export interface ActiveTrade {
   order_type?: 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER' | string;
   trigger_condition_ar?: string;
   is_top_pick?: boolean;
+  is_shariah_compliant?: boolean;
 }
 
 interface ActiveTradesModalProps {
@@ -47,29 +48,35 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
   const isAr = locale === 'ar';
 
   const [viewScope, setViewScope] = useState<'TOP_PICKS' | 'ALL_MARKET'>('TOP_PICKS');
+  const [shariahOnly, setShariahOnly] = useState(false);
   const [dirFilter, setDirFilter] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
   const [strategyFilter, setStrategyFilter] = useState<'ALL' | 'DAY_TRADING' | 'SWING_POSITION'>('ALL');
 
-  // Extract unique sectors list
+  // Active Scoped Trades (Top 15 vs Full 178 Market Trades)
+  const scopedTrades = useMemo(() => {
+    if (viewScope === 'TOP_PICKS') {
+      return trades.filter((t, idx) => (t.is_top_pick !== undefined ? t.is_top_pick : idx < 15));
+    }
+    return trades;
+  }, [trades, viewScope]);
+
+  // Extract unique sectors list from scoped trades
   const sectorsList = useMemo(() => {
     const sectors = new Set<string>();
-    trades.forEach(t => {
+    scopedTrades.forEach(t => {
       if (t.sector) sectors.add(t.sector);
     });
     return Array.from(sectors);
-  }, [trades]);
+  }, [scopedTrades]);
 
   // Filtered trades
   const filteredTrades = useMemo(() => {
-    return trades.filter((t, idx) => {
-      // 0. Premier Top Pick Scope Filter
-      if (viewScope === 'TOP_PICKS') {
-        const isTop = t.is_top_pick !== undefined ? t.is_top_pick : idx < 15;
-        if (!isTop) return false;
-      }
+    return scopedTrades.filter((t) => {
+      // 0. Shariah Compliance Filter
+      if (shariahOnly && !t.is_shariah_compliant) return false;
 
       // 1. Direction Filter
       const isBuy = (t.trade_type || 'BUY').toUpperCase() === 'BUY';
@@ -105,7 +112,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
       return true;
     });
-  }, [trades, viewScope, dirFilter, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
+  }, [scopedTrades, shariahOnly, dirFilter, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -123,7 +130,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
               <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
                 <span>{isAr ? 'الصفقات التفاعلية المفتوحة بالمنصة' : 'Active Live Platform Signals'}</span>
                 <span className="text-xs font-mono font-bold bg-accent-blue/20 text-accent-blue border border-accent-blue/30 px-2.5 py-0.5 rounded-full">
-                  {filteredTrades.length} / {trades.length}
+                  {filteredTrades.length} / {scopedTrades.length}
                 </span>
               </h2>
               <p className="text-xs text-zinc-400 mt-0.5">
@@ -184,7 +191,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 dirFilter === 'ALL' ? 'bg-white/15 text-white shadow' : 'text-zinc-400 hover:text-white'
               }`}
             >
-              {isAr ? 'الكل' : 'All'} ({trades.length})
+              {isAr ? 'الكل' : 'All'} ({scopedTrades.length})
             </button>
             <button
               onClick={() => setDirFilter('BUY')}
@@ -238,6 +245,25 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+          </div>
+
+          {/* Shariah Compliance Filter Toggle Button */}
+          <div className="sm:col-span-12 flex items-center justify-between border-t border-white/5 pt-2 mt-1">
+            <button
+              onClick={() => setShariahOnly(!shariahOnly)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                shariahOnly
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-extrabold shadow-md shadow-emerald-500/10'
+                  : 'bg-white/5 text-zinc-300 border-white/10 hover:border-emerald-500/30'
+              }`}
+            >
+              <span>🕌 {isAr ? 'عرض أسهم الشريعة الإسلامية فقط (EGX33 Shariah)' : 'Shariah Compliant Stocks Only (EGX33)'}</span>
+            </button>
+            {shariahOnly && (
+              <span className="text-[11px] text-emerald-400 font-medium">
+                {isAr ? 'مفلتر طبقاً لمعايير المؤشر الشرعي للبورصة المصرية EGX33' : 'Filtered according to EGX33 Shariah Index'}
+              </span>
+            )}
           </div>
 
         </div>
