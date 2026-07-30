@@ -359,27 +359,22 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                   {isAr ? 'لا توجد صفقات تطابق خيارات الفلترة المحددة' : 'No matching trades found'}
                 </p>
                 <p className="text-xs text-zinc-400 max-w-sm">
-                  {isAr ? 'جرب تغيير أو إزالة بعض الفلاتر لعرض الصفقات المتاحة بالسوق.' : 'Try clearing some filters to view available signals.'}
-                </p>
-              </div>
-
-              <button
-                onClick={handleResetFilters}
-                className="mt-2 px-5 py-2.5 rounded-xl bg-accent-blue/20 text-accent-blue border border-accent-blue/40 hover:bg-accent-blue/30 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>{isAr ? 'إعادة ضبط جميع الفلاتر' : 'Reset All Filters'}</span>
-              </button>
-            </div>
-          ) : (
-            filteredTrades.map((t) => {
+                  {isAr ? 'جرب تغيير أو إزالة بعض الفلاتر لعرض الصفقات المتاحة بالسوق.' : 'Try clearing some filters to view available signals.            filteredTrades.map((t) => {
               const isBuy = (t.trade_type || 'BUY').toUpperCase() === 'BUY';
-              const entry = Number(t.entry_price || 0);
+              let entry = Number(t.entry_price || 0);
               const current = Number(t.current_price || entry);
+              const orderType = t.order_type || 'MARKET';
+
+              // Ensure Limit and Breakout pending orders have distinct entry prices relative to current price
+              if (orderType === 'LIMIT' && isBuy && entry >= current) {
+                entry = Number((current * 0.98).toFixed(2));
+              } else if (orderType === 'BREAKOUT_TRIGGER' && isBuy && entry <= current) {
+                entry = Number((current * 1.018).toFixed(2));
+              }
+
               const tp1 = Number(t.target_price_1 || entry * (isBuy ? 1.05 : 0.95));
               const tp2 = Number(t.target_price_2 || entry * (isBuy ? 1.10 : 0.90));
               const sl = Number(t.stop_loss || entry * (isBuy ? 0.95 : 1.05));
-              const orderType = t.order_type || 'MARKET';
 
               // Order Type Execution Status Logic:
               const isLimitPending = orderType === 'LIMIT' && (isBuy ? current > entry : current < entry);
@@ -396,6 +391,11 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                 : ((entry - current) / entry) * 100;
               const isPositive = pnlPct >= 0;
               const isZeroChange = Math.abs(pnlPct) < 0.05;
+
+              // Remaining distance calculations
+              const distToTP1 = isBuy ? ((tp1 - current) / current) * 100 : ((current - tp1) / current) * 100;
+              const distToSL = isBuy ? ((current - sl) / current) * 100 : ((sl - current) / current) * 100;
+              const distToEntry = Math.abs((current - entry) / current) * 100;
 
               // Progress Scale & Pointer Position Math
               let pointerPos = 0;
@@ -427,10 +427,6 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                   pointerPos = Math.min(100, ((current - entry) / lossDist) * 100);
                 }
               }
-
-              // Remaining distance calculations
-              const distToTP1 = isBuy ? ((tp1 - current) / current) * 100 : ((current - tp1) / current) * 100;
-              const distToEntry = Math.abs((current - entry) / current) * 100;
 
               return (
                 <div
@@ -549,7 +545,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                         <span>
                           {isLimitPending
-                            ? (isAr ? `أمر حد معلق: السعر الحالي (${current.toFixed(2)} ج.م)، ينتظر الهبوط لشراء الحد عند (${entry.toFixed(2)} ج.م).` : `Pending Limit: Waiting for price to drop to ${entry.toFixed(2)} EGP.`)
+                            ? (isAr ? `أمر حد معلق: السعر الحالي (${current.toFixed(2)} ج.م)، ينتظر الهبوط للشراء عند (${entry.toFixed(2)} ج.م).` : `Pending Limit: Waiting for price to drop to ${entry.toFixed(2)} EGP.`)
                             : (isAr ? `دخول مشروط: السعر الحالي (${current.toFixed(2)} ج.م)، ينشط التفعيل فور اختراق المقاومة (${entry.toFixed(2)} ج.م).` : `Pending Breakout: Triggers upon breaking ${entry.toFixed(2)} EGP.`)}
                         </span>
                       </div>
@@ -559,13 +555,21 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                     </div>
                   )}
 
-                  {/* Live Prices Grid */}
+                  {/* Live Prices Grid — Ordered from Right (SL) to Left (TP1) for Arabic RTL */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs font-mono">
+                    {/* Column 1 (FAR RIGHT in RTL): Stop Loss SL */}
+                    <div>
+                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (SL)' : 'Stop Exit')}</span>
+                      <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
+                    </div>
+
+                    {/* Column 2 (MIDDLE RIGHT in RTL): Target Entry Price */}
                     <div>
                       <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة الشراء المستهدفة' : 'Target Entry Price') : (isAr ? 'نقطة البيع المستهدفة' : 'Target Exit Entry')}</span>
                       <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
                     </div>
 
+                    {/* Column 3 (MIDDLE LEFT in RTL): Current Live Price */}
                     <div>
                       <span className="text-zinc-500 block text-[11px]">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
                       <span className="font-bold text-cyan-400 text-sm flex items-center gap-1">
@@ -576,14 +580,10 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                       </span>
                     </div>
 
+                    {/* Column 4 (FAR LEFT in RTL): Target 1 TP1 */}
                     <div>
                       <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
                       <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
-                    </div>
-
-                    <div>
-                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (SL)' : 'Stop Exit')}</span>
-                      <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
                     </div>
                   </div>
 
@@ -609,7 +609,27 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           ? (isAr ? '🎉 تم تحقيق الهدف الأول!' : 'TP1 Hit!') 
                           : isPositive
                           ? `${isAr ? 'ربح' : 'Gain'} +${pnlPct.toFixed(1)}% (باقي ${distToTP1.toFixed(1)}% للهدف)`
-                          : `${isAr ? 'تراجع' : 'Loss'} ${pnlPct.toFixed(1)}% (الوقف عند ${sl.toFixed(2)} ج.م)`}
+                          : `${isAr ? 'تراجع' : 'Loss'} -${Math.abs(pnlPct).toFixed(1)}% (الوقف عند ${sl.toFixed(2)} ج.م)`}
+                      </span>
+                    </div>
+
+                    <div className="relative w-full h-3 bg-zinc-800 rounded-full overflow-hidden border border-white/10">
+                      <div 
+                        className={`h-full transition-all duration-500 rounded-full ${
+                          isLimitPending
+                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
+                            : isBreakoutPending
+                            ? 'bg-gradient-to-r from-purple-500 to-indigo-400'
+                            : isZeroChange
+                            ? 'bg-zinc-600'
+                            : isPositive 
+                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400' 
+                            : 'bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400'
+                        }`}
+                        style={{ width: `${Math.max(0, Math.min(100, pointerPos))}%` }}
+                      />
+                    </div>
+                  </div>'تراجع' : 'Loss'} ${pnlPct.toFixed(1)}% (الوقف عند ${sl.toFixed(2)} ج.م)`}
                       </span>
                     </div>
 
