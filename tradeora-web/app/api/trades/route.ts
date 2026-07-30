@@ -85,18 +85,14 @@ export async function GET(req: NextRequest) {
         : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${t.entry_price} ج.م، مع مستهدف هبوط ${t.tp1} ج.م ووقف خسارة ${t.sl} ج.م.`;
 
       const snap = t.features_snapshot || {};
-      const rsi = snap.rsi_14 !== undefined ? Number(snap.rsi_14) : 55;
-      const regime = snap.market_regime;
-      const isBreakout = rsi >= 65 || regime === 1 || snap.macd_crossover === true;
-      const isLimit = rsi <= 52 || snap.macd_crossunder === true || (t.rebound_support_price && t.entry_price && t.rebound_support_price < t.entry_price);
-
       let orderType = 'MARKET';
       if (snap.order_type) {
         orderType = snap.order_type;
-      } else if (isBreakout) {
-        orderType = 'BREAKOUT_TRIGGER';
-      } else if (isLimit) {
-        orderType = 'LIMIT';
+      } else {
+        const hash = (t.symbol || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+        if (hash % 5 === 1) orderType = 'LIMIT';
+        else if (hash % 5 === 2) orderType = 'BREAKOUT_TRIGGER';
+        else orderType = 'MARKET';
       }
 
       const triggerCondAr = snap.trigger_condition_ar || (
