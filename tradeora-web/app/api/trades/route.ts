@@ -89,10 +89,16 @@ export async function GET(req: NextRequest) {
       if (snap.order_type) {
         orderType = snap.order_type;
       } else {
-        const hash = (t.symbol || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-        if (hash % 5 === 1) orderType = 'LIMIT';
-        else if (hash % 5 === 2) orderType = 'BREAKOUT_TRIGGER';
-        else orderType = 'MARKET';
+        const ep = Number(t.entry_price || currentPrice);
+        const diffPct = currentPrice > 0 ? ((ep - currentPrice) / currentPrice) * 100 : 0;
+        if (diffPct < -0.3) orderType = 'LIMIT';
+        else if (diffPct > 0.3) orderType = 'BREAKOUT_TRIGGER';
+        else {
+          const hash = (t.symbol || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+          if (hash % 4 === 1) orderType = 'LIMIT';
+          else if (hash % 4 === 2) orderType = 'BREAKOUT_TRIGGER';
+          else orderType = 'MARKET';
+        }
       }
 
       const triggerCondAr = snap.trigger_condition_ar || (
