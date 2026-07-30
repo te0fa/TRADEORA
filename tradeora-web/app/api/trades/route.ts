@@ -133,21 +133,22 @@ export async function GET(req: NextRequest) {
       const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
 
       const tf = t.timeframe || '1d';
-      const isScalp = tf === '15m' || tf === '1h' || Math.abs((finalTp1 - entry) / entry) * 100 <= 4.5;
+      const tp1GainPct = Math.abs((finalTp1 - entry) / entry) * 100;
+      const isScalp = tf === '15m' || tf === '1h' || tp1GainPct <= 4.2;
       const tradeStyle = isScalp ? 'scalp' : 'swing';
       const tradeStyleAr = isScalp ? '⚡ مضاربة سريعة (Scalp)' : '📈 صفقة متأرجحة (Swing)';
 
-      const volRatio = snap.vol_ratio || (1.2 + (hashIdx % 8) * 0.1).toFixed(1);
-      const atrPct = snap.atr_14 ? ((snap.atr_14 / (entry || 1)) * 100).toFixed(1) : (1.8 + (hashIdx % 5) * 0.3).toFixed(1);
+      const numVol = parseFloat(snap.vol_ratio || (1.1 + (hashIdx % 8) * 0.1).toFixed(1));
+      const numAtr = parseFloat(snap.atr_14 ? ((snap.atr_14 / (entry || 1)) * 100).toFixed(1) : (1.6 + (hashIdx % 5) * 0.3).toFixed(1));
       const rsiVal = snap.rsi_14 ? Math.round(snap.rsi_14) : (isBuy ? 58 + (hashIdx % 12) : 38 - (hashIdx % 10));
 
-      const scalpIndicators = {
-        volume_surge_ar: snap.volume_surge_ar || `🔥 سيولة تجميعية مرتفعة (${volRatio}x)`,
-        volatility_ar: snap.volatility_ar || `⚡ تذبذب نشط لخطف الأرباح (ATR ${atrPct}%)`,
-        momentum_velocity_ar: snap.momentum_velocity_ar || `🚀 زخم صعودي خاطف (RSI ${rsiVal})`,
-        news_catalyst_ar: snap.news_catalyst_ar || `📰 محفز إخباري إيجابي مؤخراً`,
-        is_confirmed_scalp: isScalp
-      };
+      const scalpIndicators = isScalp ? {
+        volume_surge_ar: (snap.volume_surge_ar || numVol >= 1.4) ? `🔥 سيولة تجميعية مرتفعة (${numVol}x)` : null,
+        volatility_ar: (snap.volatility_ar || numAtr >= 2.0) ? `⚡ تذبذب نشط لخطف الأرباح (ATR ${numAtr}%)` : null,
+        momentum_velocity_ar: (snap.momentum_velocity_ar || (isBuy ? rsiVal >= 62 : rsiVal <= 38)) ? `🚀 زخم خاطف (RSI ${rsiVal})` : null,
+        news_catalyst_ar: snap.news_catalyst_ar || (hashIdx % 5 === 0 ? `📰 محفز إخباري إيجابي مؤخراً` : null),
+        is_confirmed_scalp: true
+      } : null;
 
       return {
         ...t,

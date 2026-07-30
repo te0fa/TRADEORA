@@ -460,8 +460,8 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           </span>
                         )}
 
-                        {/* Rich Scalp Support Indicators Badges */}
-                        {t.scalp_indicators && (
+                        {/* Rich Scalp Support Indicators Badges - ONLY for true confirmed Scalp trades */}
+                        {t.scalp_indicators && t.scalp_indicators.is_confirmed_scalp && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                             {t.scalp_indicators.volume_surge_ar && (
                               <span className="text-[10px] font-extrabold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/30">
