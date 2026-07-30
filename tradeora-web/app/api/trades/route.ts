@@ -173,16 +173,20 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Sort trades by confidence descending to identify Top Picks (Top 15 Premier Picks)
-    processedTrades.sort((a: any, b: any) => (parseFloat(b.ml_probability || 0) - parseFloat(a.ml_probability || 0)));
-    processedTrades.forEach((t: any, idx: number) => {
+    // Separate BUY trades and SELL signals
+    const buyTrades = processedTrades.filter((t: any) => t.direction === 'buy');
+    const sellTrades = processedTrades.filter((t: any) => t.direction === 'sell');
+
+    // Sort BUY trades by confidence descending to identify Top 15 Premier Picks
+    buyTrades.sort((a: any, b: any) => (parseFloat(b.ml_probability || 0) - parseFloat(a.ml_probability || 0)));
+    buyTrades.forEach((t: any, idx: number) => {
       t.is_top_pick = idx < 15;
     });
 
-    // 3. Fetch closed trades to compute statistics — v2 only, exclude contaminated history
+    // 3. Fetch closed BUY trades to compute platform statistics exclusively for BUY signals
     const { data: allClosed, error: statsError } = await supabase
       .from('recommended_trades')
-      .select('pnl_percent, status, exit_reason')
+      .select('pnl_percent, status, exit_reason, direction')
       .eq('status', 'closed')
       .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
       .gte('recommended_at', LAUNCH_DATE);
@@ -191,36 +195,27 @@ export async function GET(req: NextRequest) {
       throw statsError;
     }
 
-    const { count: v2TotalCount } = await supabase
-      .from('recommended_trades')
-      .select('*', { count: 'exact', head: true })
-      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
-      .gte('recommended_at', LAUNCH_DATE);
+    // Filter closed trades exclusively for BUY direction
+    const closedBuyTrades = (allClosed || []).filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy');
 
-    const { count: v2ActiveCount } = await supabase
-      .from('recommended_trades')
-      .select('*', { count: 'exact', head: true })
-      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
-      .gte('recommended_at', LAUNCH_DATE)
-      .in('status', ['active', 'tp1_hit']);
-
-    const totalTrades = v2TotalCount ?? (processedTrades || []).length;
-    const activeTrades = v2ActiveCount ?? (processedTrades || []).filter((t: any) => t.status === 'active' || t.status === 'tp1_hit').length;
+    const totalBuyCount = buyTrades.length;
+    const activeBuyCount = buyTrades.length;
     
-    // Statistics for active live tracking
-    const closedCount = allClosed?.length || 0;
-    const winningTrades = allClosed?.filter((t: any) => (t.pnl_percent || 0) > 0) || [];
-    const losingTrades = allClosed?.filter((t: any) => (t.pnl_percent || 0) < 0) || [];
+    // Statistics for active live tracking (Scoped to BUY signals)
+    const closedCount = closedBuyTrades.length;
+    const winningTrades = closedBuyTrades.filter((t: any) => (t.pnl_percent || 0) > 0);
+    const losingTrades = closedBuyTrades.filter((t: any) => (t.pnl_percent || 0) < 0);
     
     const winRate = closedCount > 0 ? (winningTrades.length / closedCount) * 100 : 0;
-    const totalPnl = allClosed?.reduce((sum: number, t: any) => sum + parseFloat(t.pnl_percent || 0), 0) || 0;
+    const totalPnl = closedBuyTrades.reduce((sum: number, t: any) => sum + parseFloat(t.pnl_percent || 0), 0);
     const avgPnl = closedCount > 0 ? totalPnl / closedCount : 0;
 
     return NextResponse.json({
-      trades: processedTrades,
+      trades: buyTrades,
+      sell_signals: sellTrades,
       stats: {
-        total_trades: totalTrades,
-        active_trades: activeTrades,
+        total_trades: totalBuyCount,
+        active_trades: activeBuyCount,
         closed_trades: closedCount,
         winning_trades: winningTrades.length,
         losing_trades: losingTrades.length,

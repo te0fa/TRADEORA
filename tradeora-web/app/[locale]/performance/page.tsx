@@ -64,7 +64,8 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
 
   // Platform states
-  const [platformTrades, setPlatformTrades] = useState<RecommendedTrade[]>([]);
+  const [platformTrades, setPlatformTrades] = useState<any[]>([]);
+  const [platformSellSignals, setPlatformSellSignals] = useState<any[]>([]);
   const [platformStats, setPlatformStats] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -80,7 +81,7 @@ export default function PerformancePage() {
         symbol: t.symbol,
         company_name: t.company_name,
         sector: t.sector,
-        trade_type: ((t.direction || 'buy').toLowerCase() === 'buy' ? 'BUY' : 'SELL') as 'BUY' | 'SELL',
+        trade_type: 'BUY' as 'BUY',
         entry_price: Number(t.entry_price),
         current_price: Number(t.current_price || t.entry_price),
         target_price_1: Number(t.tp1),
@@ -93,9 +94,34 @@ export default function PerformancePage() {
         order_type: t.order_type || 'MARKET',
         trigger_condition_ar: t.trigger_condition_ar,
         is_top_pick: t.is_top_pick ?? false,
-        is_shariah_compliant: t.is_shariah_compliant ?? false
+        is_shariah_compliant: t.is_shariah_compliant ?? false,
+        scalp_indicators: t.scalp_indicators
       }));
   }, [platformTrades]);
+
+  const sellSignalsForModal = useMemo(() => {
+    return platformSellSignals.map((t: any) => ({
+      id: t.id,
+      symbol: t.symbol,
+      company_name: t.company_name,
+      sector: t.sector,
+      trade_type: 'SELL' as 'SELL',
+      entry_price: Number(t.entry_price),
+      current_price: Number(t.current_price || t.entry_price),
+      target_price_1: Number(t.tp1),
+      target_price_2: Number(t.tp2),
+      stop_loss: Number(t.sl),
+      ml_probability: t.ml_probability ? parseFloat(t.ml_probability) : undefined,
+      timeframe: t.timeframe || '1d',
+      rationale_ar: t.explanation_ar,
+      expected_target_date: t.expected_target_date,
+      order_type: t.order_type || 'MARKET',
+      trigger_condition_ar: t.trigger_condition_ar,
+      is_top_pick: false,
+      is_shariah_compliant: t.is_shariah_compliant ?? false,
+      scalp_indicators: t.scalp_indicators
+    }));
+  }, [platformSellSignals]);
 
   useEffect(() => {
     setLoading(true);
@@ -105,6 +131,7 @@ export default function PerformancePage() {
     ])
       .then(([platData, persData]) => {
         setPlatformTrades(platData.trades || []);
+        setPlatformSellSignals(platData.sell_signals || []);
         setPlatformStats(platData.stats || null);
         
         if (persData.success) {
@@ -623,6 +650,7 @@ export default function PerformancePage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         trades={activeTradesForModal}
+        sellSignals={sellSignalsForModal}
       />
     </div>
   );

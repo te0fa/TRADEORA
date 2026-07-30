@@ -53,27 +53,33 @@ interface ActiveTradesModalProps {
   isOpen: boolean;
   onClose: () => void;
   trades: ActiveTrade[];
+  sellSignals?: ActiveTrade[];
 }
 
-export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModalProps) {
+export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }: ActiveTradesModalProps) {
   const locale = useLocale();
   const isAr = locale === 'ar';
 
+  const [signalMode, setSignalMode] = useState<'BUY' | 'SELL'>('BUY');
   const [viewScope, setViewScope] = useState<'TOP_PICKS' | 'ALL_MARKET'>('TOP_PICKS');
   const [shariahOnly, setShariahOnly] = useState(false);
-  const [dirFilter, setDirFilter] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
   const [strategyFilter, setStrategyFilter] = useState<'ALL' | 'DAY_TRADING' | 'SWING_POSITION'>('ALL');
 
-  // Active Scoped Trades (Top 15 vs Full Market Trades)
+  // Base list depending on signal mode tab
+  const baseTradesList = useMemo(() => {
+    return signalMode === 'BUY' ? trades : sellSignals;
+  }, [signalMode, trades, sellSignals]);
+
+  // Active Scoped Trades (Top 15 vs Full Market Trades for BUY signals)
   const scopedTrades = useMemo(() => {
-    if (viewScope === 'TOP_PICKS') {
-      return trades.filter((t, idx) => (t.is_top_pick !== undefined ? t.is_top_pick : idx < 15));
+    if (signalMode === 'BUY' && viewScope === 'TOP_PICKS') {
+      return baseTradesList.filter((t, idx) => (t.is_top_pick !== undefined ? t.is_top_pick : idx < 15));
     }
-    return trades;
-  }, [trades, viewScope]);
+    return baseTradesList;
+  }, [baseTradesList, signalMode, viewScope]);
 
   // Extract unique sectors list from scoped trades
   const sectorsList = useMemo(() => {
@@ -86,7 +92,6 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
   // Reset all filters helper
   const handleResetFilters = () => {
-    setDirFilter('ALL');
     setSearchQuery('');
     setSelectedSector('ALL');
     setOrderTypeFilter('ALL');
@@ -100,18 +105,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
       // 0. Shariah Compliance Filter
       if (shariahOnly && !t.is_shariah_compliant) return false;
 
-      // 1. Direction Filter
-      const isBuy = (t.trade_type || 'BUY').toUpperCase() === 'BUY';
-      if (dirFilter === 'BUY' && !isBuy) return false;
-      if (dirFilter === 'SELL' && isBuy) return false;
-
-      // 2. Order Type Filter
+      // 1. Order Type Filter
       if (orderTypeFilter !== 'ALL') {
         const type = t.order_type || 'MARKET';
         if (type !== orderTypeFilter) return false;
       }
 
-      // 3. Strategy Horizon Filter (Day Trading 2-3% vs Swing/Position)
+      // 2. Strategy Horizon Filter (Day Trading 2-3% vs Swing/Position)
       const entry = Number(t.entry_price || 1);
       const tp1 = Number(t.target_price_1 || entry * 1.05);
       const tp1Gain = Math.abs((tp1 - entry) / entry) * 100;
@@ -120,10 +120,10 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
       if (strategyFilter === 'DAY_TRADING' && !isDayTrading) return false;
       if (strategyFilter === 'SWING_POSITION' && isDayTrading) return false;
 
-      // 4. Sector Filter
+      // 3. Sector Filter
       if (selectedSector !== 'ALL' && t.sector !== selectedSector) return false;
 
-      // 5. Search Query
+      // 4. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const symMatches = t.symbol.toLowerCase().includes(q);
@@ -134,7 +134,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
       return true;
     });
-  }, [scopedTrades, shariahOnly, dirFilter, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
+  }, [scopedTrades, shariahOnly, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -143,7 +143,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
       <div className="glass-card w-full max-w-6xl h-[94vh] rounded-3xl p-4 sm:p-6 flex flex-col gap-4 overflow-hidden border border-white/10 shadow-2xl bg-surface-dark/95">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-accent-blue/15 border border-accent-blue/30 text-accent-blue shadow-lg shadow-accent-blue/10">
               <Target className="w-5 h-5 animate-pulse" />
@@ -158,46 +158,84 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Premier Tier Scope Toggle Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-2 bg-gradient-to-r from-amber-500/15 via-accent-blue/15 to-purple-500/15 border border-amber-500/30 rounded-2xl gap-2 shrink-0">
+          {/* Dedicated Mode Tabs: BUY Signals vs SELL Warnings */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewScope('TOP_PICKS')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
-                viewScope === 'TOP_PICKS'
-                  ? 'bg-amber-400 text-black shadow-lg font-black'
-                  : 'text-zinc-300 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <span>👑 {isAr ? 'صفقات النخبة الذهبية (الأعلى ثقة ودقة)' : 'Premier Top Picks'}</span>
-            </button>
+            <div className="flex items-center gap-1.5 p-1 bg-black/50 border border-white/10 rounded-2xl">
+              <button
+                onClick={() => { setSignalMode('BUY'); setViewScope('TOP_PICKS'); }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  signalMode === 'BUY'
+                    ? 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/40 shadow-lg font-black'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>🟢 {isAr ? `فرص الشراء والتجميع (${trades.length})` : `BUY Signals (${trades.length})`}</span>
+              </button>
+
+              <button
+                onClick={() => { setSignalMode('SELL'); setViewScope('ALL_MARKET'); }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  signalMode === 'SELL'
+                    ? 'bg-rose-500/25 text-rose-400 border border-rose-500/40 shadow-lg font-black'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <span>🔻 {isAr ? `تنبيهات البيع والتخفيف (${sellSignals.length})` : `SELL Warnings (${sellSignals.length})`}</span>
+              </button>
+            </div>
 
             <button
-              onClick={() => setViewScope('ALL_MARKET')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
-                viewScope === 'ALL_MARKET'
-                  ? 'bg-accent-blue text-white shadow-lg font-black'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/10'
-              }`}
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
-              <span>🌐 {isAr ? `عرض كنز صفقات السوق الكامل (${trades.length} سهم)` : `Full Market Database (${trades.length})`}</span>
+              <X className="w-5 h-5" />
             </button>
           </div>
-
-          <span className="text-[11px] text-amber-200/90 font-medium px-2">
-            {viewScope === 'TOP_PICKS' 
-              ? (isAr ? '✨ يعرض حالياً أقوى 15 صفقة مختارة بدقة' : 'Showing top 15 premier picks')
-              : (isAr ? '🌐 يعرض كافة الفرص المتاحة بالسوق' : 'Showing full market database')}
-          </span>
         </div>
+
+        {/* Premier Tier Scope Toggle Bar for BUY signals */}
+        {signalMode === 'BUY' ? (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-2 bg-gradient-to-r from-amber-500/15 via-accent-blue/15 to-purple-500/15 border border-amber-500/30 rounded-2xl gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewScope('TOP_PICKS')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
+                  viewScope === 'TOP_PICKS'
+                    ? 'bg-amber-400 text-black shadow-lg font-black'
+                    : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <span>👑 {isAr ? 'صفقات النخبة الذهبية (الأعلى ثقة ودقة)' : 'Premier Top Picks'}</span>
+              </button>
+
+              <button
+                onClick={() => setViewScope('ALL_MARKET')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
+                  viewScope === 'ALL_MARKET'
+                    ? 'bg-accent-blue text-white shadow-lg font-black'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <span>🌐 {isAr ? `عرض كنز صفقات السوق الكامل (${trades.length} سهم)` : `Full Market Database (${trades.length})`}</span>
+              </button>
+            </div>
+
+            <span className="text-[11px] text-amber-200/90 font-medium px-2">
+              {viewScope === 'TOP_PICKS' 
+                ? (isAr ? '✨ يعرض حالياً أقوى 15 صفقة شراء مختارة بدقة' : 'Showing top 15 premier buy picks')
+                : (isAr ? '🌐 يعرض كافة فرص الشراء المتاحة بالسوق' : 'Showing full market buy database')}
+            </span>
+          </div>
+        ) : (
+          <div className="p-2.5 bg-rose-500/10 border border-rose-500/25 rounded-2xl text-xs text-rose-200 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>
+              {isAr 
+                ? '🔻 قسم تنبيهات البيع وتخفيف المراكز: خاص بملكي الأسهم لتجنيب الأرباح وحماية المحفظة. لا تدرج هذه التنبيهات ضمن تقييم أداء المنصة.'
+                : 'SELL Warnings Tab: Risk management signals for stock holders. Excluded from platform win rate.'}
+            </span>
+          </div>
+        )}
 
         {/* Ultra-Compact Controls Toolbar */}
         <div className="flex flex-col gap-2 bg-white/[0.02] p-2.5 rounded-2xl border border-white/5 shrink-0 text-xs">
@@ -238,38 +276,8 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
             </button>
           </div>
 
-          {/* Row 2: Direction Filter & Order Types & Strategy Horizon */}
+          {/* Row 2: Order Types & Strategy Horizon */}
           <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/5">
-            {/* Direction Tabs */}
-            <div className="flex p-0.5 bg-black/40 border border-white/10 rounded-xl">
-              <button
-                onClick={() => setDirFilter('ALL')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  dirFilter === 'ALL' ? 'bg-white/15 text-white shadow' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                {isAr ? 'الكل' : 'All'}
-              </button>
-              <button
-                onClick={() => setDirFilter('BUY')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                  dirFilter === 'BUY' ? 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 shadow' : 'text-zinc-400 hover:text-emerald-400'
-                }`}
-              >
-                <TrendingUp className="w-3 h-3" />
-                <span>{isAr ? 'شراء وتجميع' : 'BUY'}</span>
-              </button>
-              <button
-                onClick={() => setDirFilter('SELL')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                  dirFilter === 'SELL' ? 'bg-rose-500/25 text-rose-400 border border-rose-500/30 shadow' : 'text-zinc-400 hover:text-rose-400'
-                }`}
-              >
-                <TrendingDown className="w-3 h-3" />
-                <span>{isAr ? 'بيع وتخفيف مراكز' : 'SELL'}</span>
-              </button>
-            </div>
-
             {/* Order Types */}
             <div className="flex p-0.5 bg-black/40 border border-white/10 rounded-xl">
               <button
@@ -374,11 +382,9 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
               const orderType = t.order_type || 'MARKET';
 
               // Order Type Execution Status Logic:
-              // For LIMIT order: Pending fill if current > entry (for Buy) or current < entry (for Sell)
               const isLimitPending = orderType === 'LIMIT' && (isBuy ? current > entry : current < entry);
               const isLimitFilled = orderType === 'LIMIT' && (isBuy ? current <= entry : current >= entry);
 
-              // For BREAKOUT_TRIGGER order: Pending breakout if current < entry (for Buy) or current > entry (for Sell)
               const isBreakoutPending = orderType === 'BREAKOUT_TRIGGER' && (isBuy ? current < entry : current > entry);
               const isBreakoutTriggered = orderType === 'BREAKOUT_TRIGGER' && (isBuy ? current >= entry : current <= entry);
 
@@ -483,7 +489,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* Execution Status Badge (Accurate BUY vs SELL Colors) */}
+                      {/* Execution Status Badge */}
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${
                         isLimitPending
                           ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse'
@@ -531,8 +537,8 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                         <span>
                           {isLimitPending
-                            ? (isAr ? `أمر حد معلق: السهم يننتظر الوصول لـ (${entry.toFixed(2)} ج.م).` : `Pending Limit: Waiting for entry ${entry.toFixed(2)} EGP.`)
-                            : (isAr ? `دخول مشروط: ينشط التفعيل عند اختراق (${entry.toFixed(2)} ج.م) والتأكيد.` : `Pending Breakout: Triggers upon breaking ${entry.toFixed(2)} EGP.`)}
+                            ? (isAr ? `أمر حد معلق: ينتظر السعر الوصول إلى (${entry.toFixed(2)} ج.م).` : `Pending Limit: Waiting for entry ${entry.toFixed(2)} EGP.`)
+                            : (isAr ? `دخول مشروط: ينشط التفعيل فور اختراق (${entry.toFixed(2)} ج.م) والتأكيد.` : `Pending Breakout: Triggers upon breaking ${entry.toFixed(2)} EGP.`)}
                         </span>
                       </div>
                       <span className="text-[11px] text-amber-300 font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
