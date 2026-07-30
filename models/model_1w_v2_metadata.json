@@ -1,0 +1,10 @@
+{
+  "model_version": "1w_v2.0",
+  "timeframe": "1w",
+  "trained_at": "2026-07-30T00:05:23.714326+00:00",
+  "samples": 16343,
+  "accuracy": 0.5596768270290121,
+  "precision_buy": 0.5658284023668639,
+  "recall_buy": 0.5555555555555556,
+  "class_balance_buy_pct": 47.07825980542128
+}
