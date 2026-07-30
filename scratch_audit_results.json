@@ -1,0 +1,12 @@
+{
+  "total_symbol_days": 110451,
+  "multi_source_days": 4030,
+  "provider_mismatches_count": 879,
+  "price_mismatches_count": 148,
+  "provider_mismatch_pct": 0.8,
+  "price_mismatch_pct": 0.13,
+  "max_diff_pct": 3285614.1843,
+  "mean_diff_pct": 14833.1178,
+  "median_diff_pct": 0.0,
+  "p95_diff_pct": 3.3871
+}

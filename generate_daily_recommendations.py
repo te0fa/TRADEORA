@@ -7,9 +7,9 @@ import pandas as pd
 import pandas_ta as ta
 import joblib
 from dotenv import load_dotenv
-from supabase import create_client, Client
 from pathlib import Path
 from scripts.split_detector import detect_price_anomaly, check_entry_price_validity
+from services.wyckoff_engine import get_wyckoff_confluence_score, detect_wyckoff_spring, calculate_price_channels
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -401,6 +401,11 @@ def generate_daily_recommendations():
         except Exception:
             pass
 
+        # 4. Wyckoff Accumulation & Price Channel Confluence Boost
+        wyckoff_info = get_wyckoff_confluence_score(df_sym)
+        wyckoff_boost = wyckoff_info.get('total_boost', 0.0)
+        prob += wyckoff_boost
+
         prob = min(max(prob, 0.0), 0.99) # Clip between 0 and 0.99
 
         # ATR Validation
@@ -432,7 +437,16 @@ def generate_daily_recommendations():
                     continue
 
             fra_disclaimer = "تنويه الهيئة العامة للرقابة المالية: مستويات الدعم والمقاومة وأهداف الصفقة هي لأغراض الدراسة والتعليم فقط وليست توصية بالبيع أو الشراء."
-            explanation_ar = f"توصية شراء ودخول مؤكدة بدرجة ثقة {round(prob * 100, 1)}%. منطقة الارتداد المتوقعة عند {rebound_zone} ج.م مع أهداف عند {tp1_price} ج.م و {tp2_price} ج.م ووقف خسارة {sl_price} ج.م."
+            
+            spring_data = wyckoff_info.get('spring', {})
+            is_wyckoff_spring = spring_data.get('is_spring', False)
+            wyckoff_badge_ar = spring_data.get('badge_ar') if is_wyckoff_spring else None
+
+            explanation_ar = f"توصية شراء ودخول مؤكدة بدرجة ثقة {round(prob * 100, 1)}%. " + (
+                f"تأكيد تجميع مؤسسي بنمط (Wyckoff Spring) عند الدعم {spring_data.get('support_level')} ج.م. " if is_wyckoff_spring else ""
+            ) + f"منطقة الارتداد المتوقعة عند {rebound_zone} ج.م مع أهداف عند {tp1_price} ج.م و {tp2_price} ج.م ووقف خسارة {sl_price} ج.م."
+
+            channel_data = wyckoff_info.get('channel', {})
 
             features_snap = {
                 'model_version': MODEL_VERSION,
@@ -445,6 +459,10 @@ def generate_daily_recommendations():
                 'macd_hist_prev': macd_res['hist_prev'],
                 'macd_crossover': macd_res['crossover'],
                 'macd_crossunder': macd_res['crossunder'],
+                'is_wyckoff_spring': is_wyckoff_spring,
+                'wyckoff_badge_ar': wyckoff_badge_ar,
+                'wyckoff_boost': wyckoff_boost,
+                'price_channel': channel_data if channel_data.get('channel_valid') else None
             }
 
             if cid in active_ids:

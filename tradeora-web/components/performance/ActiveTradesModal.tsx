@@ -49,6 +49,9 @@ export interface ActiveTrade {
   };
   dynamic_exit_alerts?: any;
   trade_steps_ar?: any[];
+  is_wyckoff_spring?: boolean;
+  wyckoff_badge_ar?: string;
+  price_channel?: any;
 }
 
 interface ActiveTradesModalProps {
@@ -489,6 +492,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           {t.is_shariah_compliant && (
                             <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30 flex items-center gap-1 shadow-sm">
                               🕌 {isAr ? 'أسهم الشريعة (EGX33)' : 'Shariah EGX33'}
+                            </span>
+                          )}
+
+                          {/* Wyckoff Spring Institutional Badge */}
+                          {t.is_wyckoff_spring && (
+                            <span className="text-[10px] font-extrabold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/40 flex items-center gap-1 shadow-sm animate-pulse">
+                              {t.wyckoff_badge_ar || '🏛️ تجميع وايكوف مؤسسي (Spring)'}
                             </span>
                           )}
                         </div>

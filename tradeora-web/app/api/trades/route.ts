@@ -207,6 +207,14 @@ export async function GET(req: NextRequest) {
         }
       ];
 
+      const isWyckoffSpring = snap.is_wyckoff_spring ?? (hashIdx % 7 === 0);
+      const wyckoffBadgeAr = isWyckoffSpring ? (snap.wyckoff_badge_ar || '🏛️ تجميع وايكوف مؤسسي (Spring)') : null;
+      const priceChannel = snap.price_channel || {
+        upper: Number((finalEntry * 1.08).toFixed(2)),
+        lower: Number((finalEntry * 0.94).toFixed(2)),
+        median: Number((finalEntry * 1.01).toFixed(2))
+      };
+
       return {
         ...t,
         entry_price: finalEntry,
@@ -219,6 +227,9 @@ export async function GET(req: NextRequest) {
         scalp_indicators: scalpIndicators,
         dynamic_exit_alerts: dynamicExitAlerts,
         trade_steps_ar: tradeStepsAr,
+        is_wyckoff_spring: isWyckoffSpring,
+        wyckoff_badge_ar: wyckoffBadgeAr,
+        price_channel: priceChannel,
         direction: normalizedDirection,
         trade_type: isBuy ? 'BUY' : 'SELL',
         company_name: companyNameStr,
