@@ -117,13 +117,15 @@ export async function GET(req: NextRequest) {
       let finalTp2 = Number(t.tp2 || (isBuy ? finalEntry * 1.10 : finalEntry * 0.90));
       let finalSl = Number(t.sl || (isBuy ? finalEntry * 0.95 : finalEntry * 1.05));
 
-      if (isBuy && finalSl >= finalEntry) {
-        finalSl = Number((finalEntry * 0.95).toFixed(2));
-      }
-      if (!isBuy && finalTp1 >= finalEntry) {
-        finalTp1 = Number((finalEntry * 0.94).toFixed(2));
-        finalTp2 = Number((finalEntry * 0.88).toFixed(2));
-        finalSl = Number((finalEntry * 1.06).toFixed(2));
+      if (isBuy) {
+        if (finalSl >= finalEntry) finalSl = Number((finalEntry * 0.95).toFixed(2));
+        if (finalTp1 <= finalEntry) finalTp1 = Number((finalEntry * 1.05).toFixed(2));
+        if (finalTp2 <= finalTp1) finalTp2 = Number((finalEntry * 1.10).toFixed(2));
+      } else {
+        // SELL Direction: Target TP1/TP2 are downside (lower), Stop Exit SL is upside (higher)
+        if (finalSl <= finalEntry) finalSl = Number((finalEntry * 1.05).toFixed(2));
+        if (finalTp1 >= finalEntry) finalTp1 = Number((finalEntry * 0.95).toFixed(2));
+        if (finalTp2 >= finalTp1) finalTp2 = Number((finalEntry * 0.90).toFixed(2));
       }
 
       const companyNameStr = t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol;
