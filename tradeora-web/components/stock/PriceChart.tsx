@@ -337,6 +337,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const [showRSI, setShowRSI] = useState(true);
   const [showMACD, setShowMACD] = useState(false);
   const [showVol, setShowVol] = useState(true);
+  const [showWyckoff, setShowWyckoff] = useState(true);
 
   // Crosshair sync
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
@@ -2433,6 +2434,7 @@ function buildIntradayChunk(chunk: any[]): any {
       {chartViewMode !== 'tradingview' && <div className="flex flex-wrap gap-2">
 
         {[
+          { key: '🏛️ وايكوف والقنوات', active: showWyckoff, toggle: () => setShowWyckoff(!showWyckoff), color: '#F59E0B' },
           { key: 'SMA', active: showSMA, toggle: () => setShowSMA(!showSMA), color: '#10B981' },
           { key: 'BB', active: showBB, toggle: () => setShowBB(!showBB), color: '#6366F1' },
           { key: 'RSI', active: showRSI, toggle: () => setShowRSI(!showRSI), color: '#A78BFA' },
@@ -2487,6 +2489,7 @@ function buildIntradayChunk(chunk: any[]): any {
                 showSMA={showSMA}
                 showBB={showBB}
                 showVol={showVol}
+                showWyckoff={showWyckoff}
                 interval={interval}
                 srLevels={chartSRLevels}
 
