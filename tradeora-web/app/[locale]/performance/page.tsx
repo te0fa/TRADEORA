@@ -95,7 +95,9 @@ export default function PerformancePage() {
         trigger_condition_ar: t.trigger_condition_ar,
         is_top_pick: t.is_top_pick ?? false,
         is_shariah_compliant: t.is_shariah_compliant ?? false,
-        scalp_indicators: t.scalp_indicators
+        scalp_indicators: t.scalp_indicators,
+        dynamic_exit_alerts: t.dynamic_exit_alerts,
+        trade_steps_ar: t.trade_steps_ar
       }));
   }, [platformTrades]);
 
@@ -119,7 +121,9 @@ export default function PerformancePage() {
       trigger_condition_ar: t.trigger_condition_ar,
       is_top_pick: false,
       is_shariah_compliant: t.is_shariah_compliant ?? false,
-      scalp_indicators: t.scalp_indicators
+      scalp_indicators: t.scalp_indicators,
+      dynamic_exit_alerts: t.dynamic_exit_alerts,
+      trade_steps_ar: t.trade_steps_ar
     }));
   }, [platformSellSignals]);
 

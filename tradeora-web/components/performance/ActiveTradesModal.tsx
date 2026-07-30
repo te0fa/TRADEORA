@@ -47,6 +47,8 @@ export interface ActiveTrade {
     news_catalyst_ar?: string;
     is_confirmed_scalp?: boolean;
   };
+  dynamic_exit_alerts?: any;
+  trade_steps_ar?: any[];
 }
 
 interface ActiveTradesModalProps {
@@ -719,6 +721,49 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                     <p className="text-xs text-zinc-300 leading-relaxed bg-white/[0.02] p-3 rounded-xl border border-white/5">
                       💡 <span className="font-semibold text-accent-blue">{isAr ? 'الرؤية والتحليل:' : 'Rationale:'}</span> {t.rationale_ar}
                     </p>
+                  )}
+
+                  {/* Dynamic Indicator Exit Alert Banners */}
+                  {t.dynamic_exit_alerts && (
+                    <div className="space-y-1.5">
+                      {t.dynamic_exit_alerts.is_rsi_exhausted && (
+                        <div className="text-xs text-amber-300 bg-amber-500/15 p-2.5 rounded-xl border border-amber-500/30 flex items-center gap-2 font-bold animate-pulse">
+                          <span>{t.dynamic_exit_alerts.rsi_exhaustion_msg_ar}</span>
+                        </div>
+                      )}
+                      {t.dynamic_exit_alerts.is_macd_dead_cross && (
+                        <div className="text-xs text-purple-300 bg-purple-500/15 p-2.5 rounded-xl border border-purple-500/30 flex items-center gap-2 font-bold">
+                          <span>{t.dynamic_exit_alerts.macd_dead_cross_msg_ar}</span>
+                        </div>
+                      )}
+                      {t.dynamic_exit_alerts.is_bollinger_upper_touch && (
+                        <div className="text-xs text-cyan-300 bg-cyan-500/15 p-2.5 rounded-xl border border-cyan-500/30 flex items-center gap-2 font-bold">
+                          <span>{t.dynamic_exit_alerts.bollinger_upper_touch_msg_ar}</span>
+                        </div>
+                      )}
+                      {t.dynamic_exit_alerts.is_dead_money_stagnant && (
+                        <div className="text-xs text-zinc-300 bg-white/5 p-2.5 rounded-xl border border-white/10 flex items-center gap-2 font-bold">
+                          <span>{t.dynamic_exit_alerts.dead_money_stagnant_msg_ar}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Step-by-Step Trade Lifecycle Execution Guide */}
+                  {t.trade_steps_ar && t.trade_steps_ar.length > 0 && (
+                    <div className="bg-white/[0.015] p-3 rounded-xl border border-white/5 space-y-2">
+                      <span className="text-[11px] font-bold text-amber-400 block border-b border-white/5 pb-1">
+                        📋 {isAr ? 'دليل تنفيذ ومتابعة الصفقة خطوة بخطوة:' : 'Step-by-Step Execution Guide:'}
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                        {t.trade_steps_ar.map((s: any) => (
+                          <div key={s.step_number} className="bg-white/[0.02] p-2.5 rounded-lg border border-white/5 space-y-0.5">
+                            <span className="font-bold text-accent-blue block text-[10.5px]">{s.title}</span>
+                            <span className="text-zinc-400 leading-relaxed block text-[10.5px]">{s.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                 </div>
