@@ -91,7 +91,9 @@ export default function PerformancePage() {
         rationale_ar: t.explanation_ar,
         expected_target_date: t.expected_target_date,
         order_type: t.order_type || 'MARKET',
-        trigger_condition_ar: t.trigger_condition_ar
+        trigger_condition_ar: t.trigger_condition_ar,
+        is_top_pick: t.is_top_pick ?? false,
+        is_shariah_compliant: t.is_shariah_compliant ?? false
       }));
   }, [platformTrades]);
 

@@ -353,6 +353,36 @@ def track_recommended_trades():
             # Select SL trigger logic based on timeframe (Scenario B: Close trigger for 1d and 1h)
             use_close_trigger = timeframe in ['1d', '1h', 'D']
 
+            # Order type execution check for Limit & Breakout orders
+            snap = trade.get("features_snapshot") or {}
+            order_type = snap.get("order_type") or trade.get("order_type") or "MARKET"
+
+            # For LIMIT Buy Order: if price hits TP1 before touching entry price -> Cancel order (not filled)
+            if order_type == "LIMIT" and direction == "buy" and not trade.get("is_filled", False):
+                if curr_low <= entry_price:
+                    trade["is_filled"] = True
+                elif curr_high >= tp1:
+                    closed = True
+                    exit_price = curr_close
+                    exit_reason = "cancelled_not_filled"
+                    pnl_percent = 0.0
+                    close_date = curr_date
+                    logger.info(f"🚫 Limit order for {symbol} jumped to TP1 before touching entry price {entry_price}. Cancelled un-filled.")
+                    break
+
+            # For BREAKOUT Buy Order: if price hits SL before breaking resistance -> Cancel order (not triggered)
+            elif order_type == "BREAKOUT_TRIGGER" and direction == "buy" and not trade.get("is_triggered", False):
+                if curr_high >= entry_price:
+                    trade["is_triggered"] = True
+                elif curr_low <= sl:
+                    closed = True
+                    exit_price = curr_close
+                    exit_reason = "cancelled_not_triggered"
+                    pnl_percent = 0.0
+                    close_date = curr_date
+                    logger.info(f"🚫 Breakout order for {symbol} hit SL before breaking resistance {entry_price}. Cancelled un-triggered.")
+                    break
+
             if direction == "buy":
                 effective_sl = entry_price if (tp1_hit and trailing_stop_to_entry) else sl
                 sl_breached = (curr_close <= effective_sl) if use_close_trigger else (curr_low <= effective_sl)
