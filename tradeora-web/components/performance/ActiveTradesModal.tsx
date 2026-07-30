@@ -40,6 +40,13 @@ export interface ActiveTrade {
   trigger_condition_ar?: string;
   is_top_pick?: boolean;
   is_shariah_compliant?: boolean;
+  scalp_indicators?: {
+    volume_surge_ar?: string;
+    volatility_ar?: string;
+    momentum_velocity_ar?: string;
+    news_catalyst_ar?: string;
+    is_confirmed_scalp?: boolean;
+  };
 }
 
 interface ActiveTradesModalProps {
@@ -250,7 +257,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 }`}
               >
                 <TrendingUp className="w-3 h-3" />
-                <span>{isAr ? 'شراء' : 'BUY'}</span>
+                <span>{isAr ? 'شراء وتجميع' : 'BUY'}</span>
               </button>
               <button
                 onClick={() => setDirFilter('SELL')}
@@ -259,7 +266,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 }`}
               >
                 <TrendingDown className="w-3 h-3" />
-                <span>{isAr ? 'بيع' : 'SELL'}</span>
+                <span>{isAr ? 'بيع وتخفيف مراكز' : 'SELL'}</span>
               </button>
             </div>
 
@@ -280,7 +287,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 }`}
               >
                 <Zap className="w-3 h-3" />
-                <span>{isAr ? 'شراء بسعر السوق' : 'Market'}</span>
+                <span>{isAr ? 'تنفيذ بسعر السوق' : 'Market'}</span>
               </button>
               <button
                 onClick={() => setOrderTypeFilter('LIMIT')}
@@ -361,19 +368,19 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
               const isBuy = (t.trade_type || 'BUY').toUpperCase() === 'BUY';
               const entry = Number(t.entry_price || 0);
               const current = Number(t.current_price || entry);
-              const tp1 = Number(t.target_price_1 || entry * 1.05);
-              const tp2 = Number(t.target_price_2 || entry * 1.10);
-              const sl = Number(t.stop_loss || entry * 0.95);
+              const tp1 = Number(t.target_price_1 || entry * (isBuy ? 1.05 : 0.95));
+              const tp2 = Number(t.target_price_2 || entry * (isBuy ? 1.10 : 0.90));
+              const sl = Number(t.stop_loss || entry * (isBuy ? 0.95 : 1.05));
               const orderType = t.order_type || 'MARKET';
 
               // Order Type Execution Status Logic:
-              // For LIMIT order: Pending fill if current > entry (for Buy)
-              const isLimitPending = orderType === 'LIMIT' && isBuy && current > entry;
-              const isLimitFilled = orderType === 'LIMIT' && isBuy && current <= entry;
+              // For LIMIT order: Pending fill if current > entry (for Buy) or current < entry (for Sell)
+              const isLimitPending = orderType === 'LIMIT' && (isBuy ? current > entry : current < entry);
+              const isLimitFilled = orderType === 'LIMIT' && (isBuy ? current <= entry : current >= entry);
 
-              // For BREAKOUT_TRIGGER order: Pending breakout if current < entry (for Buy)
-              const isBreakoutPending = orderType === 'BREAKOUT_TRIGGER' && isBuy && current < entry;
-              const isBreakoutTriggered = orderType === 'BREAKOUT_TRIGGER' && isBuy && current >= entry;
+              // For BREAKOUT_TRIGGER order: Pending breakout if current < entry (for Buy) or current > entry (for Sell)
+              const isBreakoutPending = orderType === 'BREAKOUT_TRIGGER' && (isBuy ? current < entry : current > entry);
+              const isBreakoutTriggered = orderType === 'BREAKOUT_TRIGGER' && (isBuy ? current >= entry : current <= entry);
 
               const isPendingExecution = isLimitPending || isBreakoutPending;
 
@@ -383,14 +390,12 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                 : ((entry - current) / entry) * 100;
               const isPositive = pnlPct >= 0;
 
-              // Calculate progress scale:
-              let pointerPos = 40; // Default entry position
+              // Calculate progress scale
+              let pointerPos = 40;
               if (isLimitPending) {
-                // Limit Order Pending: Scale shows distance from current down to entry
                 const distToEntryPct = Math.abs((current - entry) / current) * 100;
                 pointerPos = Math.max(10, Math.min(90, 100 - distToEntryPct * 10));
               } else if (isBreakoutPending) {
-                // Breakout Order Pending: Scale shows distance from current up to entry
                 const distToTriggerPct = Math.abs((entry - current) / current) * 100;
                 pointerPos = Math.max(10, Math.min(90, distToTriggerPct * 10));
               } else if (isBuy) {
@@ -421,7 +426,11 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                   {/* Top Bar: Symbol, Name, Badges & Shariah Badge */}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="font-mono font-black text-lg text-accent-blue bg-accent-blue/15 border border-accent-blue/30 px-3.5 py-1 rounded-xl">
+                      <span className={`font-mono font-black text-lg px-3.5 py-1 rounded-xl border ${
+                        isBuy
+                          ? 'text-accent-blue bg-accent-blue/15 border-accent-blue/30'
+                          : 'text-rose-400 bg-rose-500/15 border-rose-500/30'
+                      }`}>
                         {t.symbol}
                       </span>
                       
@@ -444,32 +453,58 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                             {t.sector}
                           </span>
                         )}
+
+                        {/* Rich Scalp Support Indicators Badges */}
+                        {t.scalp_indicators && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            {t.scalp_indicators.volume_surge_ar && (
+                              <span className="text-[10px] font-extrabold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/30">
+                                {t.scalp_indicators.volume_surge_ar}
+                              </span>
+                            )}
+                            {t.scalp_indicators.volatility_ar && (
+                              <span className="text-[10px] font-extrabold text-cyan-300 bg-cyan-500/15 px-2 py-0.5 rounded-md border border-cyan-500/30">
+                                {t.scalp_indicators.volatility_ar}
+                              </span>
+                            )}
+                            {t.scalp_indicators.momentum_velocity_ar && (
+                              <span className="text-[10px] font-extrabold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-md border border-purple-500/30">
+                                {t.scalp_indicators.momentum_velocity_ar}
+                              </span>
+                            )}
+                            {t.scalp_indicators.news_catalyst_ar && (
+                              <span className="text-[10px] font-extrabold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                                {t.scalp_indicators.news_catalyst_ar}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {/* Execution Status Badge */}
+                      {/* Execution Status Badge (Accurate BUY vs SELL Colors) */}
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1 ${
                         isLimitPending
                           ? 'bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse'
-                          : isLimitFilled
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                           : isBreakoutPending
                           ? 'bg-purple-500/15 text-purple-400 border-purple-500/30 animate-pulse'
-                          : isBreakoutTriggered
+                          : isBuy
                           ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                       }`}>
                         {isLimitPending ? (
                           <>⏳ {isAr ? 'أمر حد معلق (بانتظار الهبوط لسعر الشراء)' : 'Pending Limit Fill'}</>
                         ) : isLimitFilled ? (
-                          <>✅ {isAr ? `تم الشراء بسعر الحد المحدد (${entry.toFixed(2)} ج.م)` : 'Limit Order Filled'}</>
+                          <>✅ {isAr ? `تم التنفيذ بسعر الحد (${entry.toFixed(2)} ج.م)` : 'Limit Order Filled'}</>
                         ) : isBreakoutPending ? (
                           <>🎯 {isAr ? 'دخول مشروط (بانتظار اختراق المقاومة)' : 'Pending Breakout'}</>
                         ) : isBreakoutTriggered ? (
-                          <>✅ {isAr ? `تم اختراق المقاومة (${entry.toFixed(2)} ج.م) وتأكيد الشراء` : 'Breakout Triggered'}</>
+                          <>✅ {isAr ? `تم الاختراق والتأكيد عند ${entry.toFixed(2)} ج.م` : 'Breakout Triggered'}</>
+                        ) : isBuy ? (
+                          <>⚡ {isAr ? 'شراء فوري بسعر السوق الحالي' : 'Market BUY Active'}</>
                         ) : (
-                          <>⚡ {isAr ? 'شراء فوري بسعر السوق الحالي' : 'Market Signal Active'}</>
+                          <>🔻 {isAr ? 'بيع وتخفيف مراكز بسعر السوق' : 'Market SELL Active'}</>
                         )}
                       </span>
 
@@ -496,8 +531,8 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                         <span>
                           {isLimitPending
-                            ? (isAr ? `أمر حد معلق: السهم يرتفع حالياً أعلى سعر الشراء المطلوب (${entry.toFixed(2)} ج.م). ينتظر الهبوط للتجميع.` : `Pending Limit: Waiting for price to drop to entry ${entry.toFixed(2)} EGP.`)
-                            : (isAr ? `دخول مشروط: ينشط الشراء فقط عند اختراق المقاومة (${entry.toFixed(2)} ج.م) والتأكيد.` : `Pending Breakout: Triggers upon breaking resistance ${entry.toFixed(2)} EGP.`)}
+                            ? (isAr ? `أمر حد معلق: السهم يننتظر الوصول لـ (${entry.toFixed(2)} ج.م).` : `Pending Limit: Waiting for entry ${entry.toFixed(2)} EGP.`)
+                            : (isAr ? `دخول مشروط: ينشط التفعيل عند اختراق (${entry.toFixed(2)} ج.م) والتأكيد.` : `Pending Breakout: Triggers upon breaking ${entry.toFixed(2)} EGP.`)}
                         </span>
                       </div>
                       <span className="text-[11px] text-amber-300 font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
@@ -509,7 +544,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                   {/* Live Prices Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs font-mono">
                     <div>
-                      <span className="text-zinc-500 block text-[11px]">{isAr ? 'نقطة الشراء المستهدفة' : 'Target Entry Price'}</span>
+                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة الشراء المستهدفة' : 'Target Entry Price') : (isAr ? 'نقطة البيع المستهدفة' : 'Target Exit Entry')}</span>
                       <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
                     </div>
 
@@ -524,13 +559,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
                     </div>
 
                     <div>
-                      <span className="text-zinc-500 block text-[11px]">{isAr ? 'الهدف الأول (TP1)' : 'Target 1'}</span>
-                      <span className="font-bold text-emerald-400 text-sm">{tp1.toFixed(2)} ج.م</span>
+                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
+                      <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
                     </div>
 
                     <div>
-                      <span className="text-zinc-500 block text-[11px]">{isAr ? 'وقف الخسارة (SL)' : 'Stop Loss'}</span>
-                      <span className="font-bold text-rose-400 text-sm">{sl.toFixed(2)} ج.م</span>
+                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (SL)' : 'Stop Exit')}</span>
+                      <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
                     </div>
                   </div>
 
