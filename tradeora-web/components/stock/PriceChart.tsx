@@ -45,6 +45,8 @@ import { StockNewsTab } from '@/components/stock/StockNewsTab';
 import { TechnicalBreakdownTable } from '@/components/stock/TechnicalBreakdownTable';
 import { PriceAlertModal } from '@/components/stock/PriceAlertModal';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
+import { TradingViewAdvancedChart } from '@/components/stock/TradingViewAdvancedChart';
+
 
 interface PriceChartProps {
   symbol: string;
@@ -54,6 +56,7 @@ interface PriceChartProps {
   locale: string;
   fundamentals?: any;
   priceRecord?: PriceRecord | null;
+  liveTick?: import('@/app/[locale]/stock/[symbol]/page').LiveStockTick | null;
 }
 
 type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1M';
@@ -314,12 +317,19 @@ function buildAggregatedCandle(chunk: PriceRecord[], dateStr: string): PriceReco
 
 
 
-export function PriceChart({ symbol, companyId, historicalPrices, locale, fundamentals, priceRecord }: PriceChartProps) {
+export function PriceChart({ symbol, companyId, historicalPrices, locale, fundamentals, priceRecord, liveTick }: PriceChartProps) {
   const tTA = useTranslations('technicalAnalysis');
   const tGlobal = useTranslations();
 
   const [interval, setIntervalVal] = useState<Interval>('1d');
   const [dbCandlesCount, setDbCandlesCount] = useState(0);
+
+  // Active chart view mode (tradingview vs tradeora_ai)
+  const [chartViewMode, setChartViewMode] = useState<'tradingview' | 'tradeora_ai'>('tradingview');
+
+  // liveStockPrice now comes from the shared page-level poll (single source of truth)
+  const liveStockPrice = liveTick ?? null;
+
 
   // Indicator toggles
   const [showSMA, setShowSMA] = useState(true);
@@ -349,7 +359,8 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const [isIntradayLoading, setIsIntradayLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const intradayHasNoData = dbIntradayCandles.length < 10 && yahooCandles.length < 10;
+  const intradayHasNoData = dbIntradayCandles.length === 0 && yahooCandles.length === 0;
+
 
 
 
@@ -566,20 +577,29 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         const { candles: fetchedDbCandles } = await dbRes.json();
         const formattedDb = (fetchedDbCandles || []).map(formatCandle);
         
-        if (formattedDb.length >= 10) {
+        const lastDbTime = formattedDb.length > 0 ? (formattedDb[formattedDb.length - 1].time || 0) : 0;
+        const nowSec = Math.floor(Date.now() / 1000);
+        // DB intraday is considered fresh if latest candle is within last 48 hours
+        const isDbFresh = lastDbTime > 0 && (nowSec - lastDbTime) < 48 * 3600;
+
+        if (formattedDb.length >= 10 && isDbFresh) {
           setDbIntradayCandles(formattedDb);
           setDbCandlesCount(formattedDb.length);
           setYahooCandles([]);
         } else {
-          // Fallback to Yahoo candles ONLY if TV snapshots < 10
+          // Fallback to Yahoo candles if DB has no data or is stale (> 48h old)
           setDbIntradayCandles([]);
           const { candles: yfCandles, events: yfEvents } = await fetchYahooCandles(symbol, interval);
           const formattedYahoo = yfCandles.map(formatCandle);
-          
-          const livePrice = Number(priceRecord?.close_price || 0);
+
+          // Use live price (from WebSocket tick) as reference, fallback to priceRecord
+          const livePrice = Number(
+            (window as any).__liveTickPrice || liveStockPrice?.close || priceRecord?.close_price || 0
+          );
           if (formattedYahoo.length > 0 && livePrice > 0) {
             const yfLastClose = Number(formattedYahoo[formattedYahoo.length - 1]?.close_price || 0);
-            if (yfLastClose > 0 && Math.abs(yfLastClose - livePrice) / livePrice > 0.03) {
+            // Widen safeguard to 15% to avoid false discards (EGX stocks can gap)
+            if (yfLastClose > 0 && Math.abs(yfLastClose - livePrice) / livePrice > 0.15) {
               console.warn(`[Chart Safeguard] Discarding Yahoo Finance chart for ${symbol}: YF=${yfLastClose}, Live=${livePrice}`);
               setYahooCandles([]);
             } else {
@@ -588,7 +608,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
           } else {
             setYahooCandles(formattedYahoo);
           }
-          
+
           if (yfEvents && yfEvents.dividends) {
             const now = Date.now() / 1000;
             const upcoming = Object.values(yfEvents.dividends).filter((d: any) => d.date >= now && d.date <= now + 30 * 24 * 60 * 60);
@@ -631,17 +651,79 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     return Object.values(dailyMap);
   }, [dbPrices]);
 
+// Intraday aggregation helper
+function aggregateIntradayCandles(candles: any[], interval: string): any[] {
+  if (!candles || candles.length === 0) return [];
+  if (interval === '15m' || interval === '1m' || interval === '5m') return candles;
+
+  let groupMinutes = 30;
+  if (interval === '30m') groupMinutes = 30;
+  else if (interval === '1h') groupMinutes = 60;
+  else if (interval === '4h') groupMinutes = 240;
+
+  const aggregated: any[] = [];
+  let currentGroup: any[] = [];
+  let groupStartTime: number | null = null;
+
+  candles.forEach((c) => {
+    const timeSec = typeof c.time === 'number' ? c.time : Math.floor(new Date(c.time).getTime() / 1000);
+    const bucket = Math.floor(timeSec / (groupMinutes * 60)) * (groupMinutes * 60);
+
+    if (groupStartTime === null || bucket !== groupStartTime) {
+      if (currentGroup.length > 0) {
+        aggregated.push(buildIntradayChunk(currentGroup));
+      }
+      groupStartTime = bucket;
+      currentGroup = [c];
+    } else {
+      currentGroup.push(c);
+    }
+  });
+
+  if (currentGroup.length > 0) {
+    aggregated.push(buildIntradayChunk(currentGroup));
+  }
+
+  return aggregated;
+}
+
+function buildIntradayChunk(chunk: any[]): any {
+  const first = chunk[0];
+  const last = chunk[chunk.length - 1];
+  let high = parseFloat(first.high_price ?? first.high ?? first.close_price ?? first.close ?? 0);
+  let low = parseFloat(first.low_price ?? first.low ?? first.close_price ?? first.close ?? 0);
+  let volume = 0;
+
+  chunk.forEach((c) => {
+    const h = parseFloat(c.high_price ?? c.high ?? c.close_price ?? c.close ?? 0);
+    const l = parseFloat(c.low_price ?? c.low ?? c.close_price ?? c.close ?? 0);
+    if (h > high) high = h;
+    if (l > 0 && (low === 0 || l < low)) low = l;
+    volume += parseInt(c.volume ?? 0, 10);
+  });
+
+  return {
+    ...last,
+    time: last.time,
+    open_price: parseFloat(first.open_price ?? first.open ?? first.close_price ?? first.close ?? 0),
+    high_price: high,
+    low_price: low > 0 ? low : high,
+    close_price: parseFloat(last.close_price ?? last.close ?? 0),
+    volume: volume
+  };
+}
+
   // Selected active prices (Smart Fallback & Synthesis)
   const activePrices = useMemo(() => {
-    if (dbIntradayCandles.length >= 10) {
-      return dbIntradayCandles;
+    if (dbIntradayCandles.length > 0) {
+      return aggregateIntradayCandles(dbIntradayCandles, interval);
     }
 
     if (interval === '1w') {
       const data = aggregateWeekly(prioritizedDbPrices);
       return data.map(d => ({ ...d, time: d.price_date }));
     }
-    if (interval === '1m') {
+    if (interval === '1M') {
       const data = aggregateMonthly(prioritizedDbPrices);
       return data.map(d => ({ ...d, time: d.price_date }));
     }
@@ -649,12 +731,13 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       return prioritizedDbPrices.map(d => ({ ...d, time: d.price_date }));
     }
 
-    if (yahooCandles.length >= 10) {
-      return yahooCandles;
+    if (yahooCandles.length > 0) {
+      return aggregateIntradayCandles(yahooCandles, interval);
     } else {
       return prioritizedDbPrices.map(d => ({ ...d, time: d.price_date }));
     }
   }, [interval, prioritizedDbPrices, dbIntradayCandles, yahooCandles]);
+
 
   // Sanitize and sort active prices for TradingView Lightweight Charts
   const finalActivePrices = useMemo(() => {
@@ -698,28 +781,51 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       return tA - tB;
     });
 
-    // 100% Price Alignment Safeguard: Snap last candle if deviation < 2%
-    const liveHeaderPrice = Number(priceRecord?.close_price || 0);
-    if (cleaned.length > 0 && liveHeaderPrice > 0) {
+    // Merge live tick into last candle or append today's live candle
+    const livePriceVal = liveStockPrice?.close ?? Number(priceRecord?.close_price || 0);
+    if (cleaned.length > 0 && livePriceVal > 0) {
+      const todayStr = new Date().toISOString().split('T')[0];
       const lastCandle = cleaned[cleaned.length - 1];
-      const ratio = Math.abs(lastCandle.close - liveHeaderPrice) / liveHeaderPrice;
-      
-      if (ratio < 0.02) {
-        lastCandle.close = liveHeaderPrice;
-        lastCandle.close_price = liveHeaderPrice;
-        lastCandle.high = Math.max(lastCandle.high, liveHeaderPrice);
-        lastCandle.high_price = Math.max(lastCandle.high_price, liveHeaderPrice);
-        lastCandle.low = Math.min(lastCandle.low > 0 ? lastCandle.low : liveHeaderPrice, liveHeaderPrice);
-        lastCandle.low_price = Math.min(lastCandle.low_price > 0 ? lastCandle.low_price : liveHeaderPrice, liveHeaderPrice);
-      } else {
-        // Don't modify any candle
-        // Just log the mismatch for monitoring
-        console.warn(`[Chart] ${symbol}: Price mismatch ${(ratio * 100).toFixed(1)}% — source issue detected`);
+      const lastDate = typeof lastCandle.time === 'string' ? lastCandle.time.split('T')[0] : '';
+
+      if (lastDate === todayStr) {
+        lastCandle.close = livePriceVal;
+        lastCandle.close_price = livePriceVal;
+        if (liveStockPrice?.open) {
+          lastCandle.open = liveStockPrice.open;
+          lastCandle.open_price = liveStockPrice.open;
+        }
+        if (liveStockPrice?.high) {
+          lastCandle.high = Math.max(lastCandle.high, liveStockPrice.high);
+          lastCandle.high_price = Math.max(lastCandle.high_price, liveStockPrice.high);
+        }
+        if (liveStockPrice?.low) {
+          lastCandle.low = Math.min(lastCandle.low > 0 ? lastCandle.low : liveStockPrice.low, liveStockPrice.low);
+          lastCandle.low_price = Math.min(lastCandle.low_price > 0 ? lastCandle.low_price : liveStockPrice.low, liveStockPrice.low);
+        }
+        if (liveStockPrice?.volume) {
+          lastCandle.volume = liveStockPrice.volume;
+        }
+      } else if (liveStockPrice) {
+        cleaned.push({
+          time: todayStr,
+          price_date: todayStr,
+          open: liveStockPrice.open || livePriceVal,
+          open_price: liveStockPrice.open || livePriceVal,
+          high: liveStockPrice.high || livePriceVal,
+          high_price: liveStockPrice.high || livePriceVal,
+          low: liveStockPrice.low || livePriceVal,
+          low_price: liveStockPrice.low || livePriceVal,
+          close: livePriceVal,
+          close_price: livePriceVal,
+          volume: liveStockPrice.volume || 0
+        });
       }
     }
 
     return cleaned;
-  }, [activePrices, priceRecord?.close_price]);
+  }, [activePrices, priceRecord?.close_price, liveStockPrice, symbol]);
+
 
   const activePriceSource = useMemo(() => {
     if (dbIntradayCandles.length >= 10) return 'tradingview';
@@ -749,19 +855,39 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     }
   }, [interval, isIntradayLoading, dbIntradayCandles.length, yahooCandles.length, locale]);
 
+  // Max high across all loaded historical prices
+  const maxHistoricalPrice = useMemo(() => {
+    let max = 0;
+    const checkArray = (arr: PriceRecord[]) => {
+      if (!arr) return;
+      arr.forEach(p => {
+        const h = Number(p.high_price || p.close_price || 0);
+        if (h > max) max = h;
+      });
+    };
+    if (historicalPrices?.length) checkArray(historicalPrices);
+    if (dbPrices?.length) checkArray(dbPrices);
+    if (finalActivePrices?.length) checkArray(finalActivePrices);
+    if (priceRecord?.high_price) {
+      const h = Number(priceRecord.high_price);
+      if (h > max) max = h;
+    }
+    return max;
+  }, [historicalPrices, dbPrices, finalActivePrices, priceRecord?.high_price]);
 
-  // 52-Week High (max high in active daily price history)
+  // 52-Week High (max high in active daily price history over last 252 bars)
   const high52W = useMemo(() => {
-    if (finalActivePrices.length === 0) return 0;
-    const highs = finalActivePrices.map(p => Number(p.high_price || p.close_price || 0));
-    return Math.max(...highs);
-  }, [finalActivePrices]);
+    const dailySet = dbPrices.length > 0 ? dbPrices : historicalPrices;
+    if (!dailySet || dailySet.length === 0) return maxHistoricalPrice;
+    const last52W = dailySet.slice(-252);
+    const highs = last52W.map(p => Number(p.high_price || p.close_price || 0));
+    return Math.max(...highs, 0);
+  }, [dbPrices, historicalPrices, maxHistoricalPrice]);
 
-  // Absolute All-Time High peak (or 1.15x 52W High fallback)
+  // Absolute All-Time High peak (dynamically guaranteed to be >= all historical highs & 52W high)
   const allTimeHigh = useMemo(() => {
-    if (high52W <= 0) return 0;
-    // Known major ATH benchmarks
     const athMap: Record<string, number> = {
+      'AMOC': 9.85,
       'ABUK': 108.50,
       'AALR': 285.00,
       'SWDY': 98.50,
@@ -770,15 +896,17 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       'HRHO': 28.90,
       'MFPC': 88.00,
       'ORAS': 310.00,
-      'EAST': 38.50,
+      'EAST': 49.80,
       'SKPC': 42.00
     };
-    return athMap[symbol.toUpperCase()] || parseFloat((high52W * 1.14).toFixed(2));
-  }, [symbol, high52W]);
+    const hardcoded = athMap[symbol.toUpperCase()] || 0;
+    return Math.max(maxHistoricalPrice, high52W, hardcoded);
+  }, [symbol, maxHistoricalPrice, high52W]);
+
 
   const currentPrice = useMemo(() =>
-    finalActivePrices.at(-1)?.close_price ?? 0
-  , [finalActivePrices]);
+    liveStockPrice?.close ?? finalActivePrices.at(-1)?.close_price ?? 0
+  , [liveStockPrice, finalActivePrices]);
 
   const isNearATH = allTimeHigh > 0 && currentPrice >= allTimeHigh * 0.99;
 
@@ -803,7 +931,26 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     macd: macdRaw[i]?.macd ?? null,
     macdSignal: macdRaw[i]?.signal ?? null,
     macdHistogram: macdRaw[i]?.histogram ?? null,
-  })), [activePrices, sma20Raw, sma50Raw, sma200Raw, bbRaw, rsiRaw, macdRaw]);
+  })), [finalActivePrices, sma20Raw, sma50Raw, sma200Raw, bbRaw, rsiRaw, macdRaw]);
+
+  const activeData = useMemo(() => {
+    return allChartData[allChartData.length - 1] ?? null;
+  }, [allChartData]);
+
+  const displayOHLCV = hoveredOHLCV ?? (liveStockPrice ? {
+    open: liveStockPrice.open ?? liveStockPrice.close,
+    high: liveStockPrice.high ?? liveStockPrice.close,
+    low: liveStockPrice.low ?? liveStockPrice.close,
+    close: liveStockPrice.close,
+    volume: liveStockPrice.volume ?? 0,
+  } : activeData ? {
+    open: activeData.open_price ?? activeData.close_price ?? 0,
+    high: activeData.high_price ?? activeData.close_price ?? 0,
+    low: activeData.low_price ?? activeData.close_price ?? 0,
+    close: activeData.close_price ?? 0,
+    volume: activeData.volume ?? 0,
+  } : null);
+
 
   // Support & Resistance levels calculated client-side
   const srLevelsRaw = useMemo(() => {
@@ -836,34 +983,46 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     const nearbyLevels = allLevels.filter(l => Math.abs(l.price - currentPrice) <= maxDist);
     
     // Re-classify based strictly on location relative to current price
-    const filteredResistances: any[] = nearbyLevels.filter(l => l.price > currentPrice);
+    const rawResistances = levels.resistances.map(l => l.price);
+    const maxResistancePrice = rawResistances.length > 0 ? Math.max(...rawResistances) : 0;
+
+    // Effective ATH is the exact historical peak (or highest candle high)
+    const effectiveATH = allTimeHigh > 0 ? allTimeHigh : Math.max(maxResistancePrice, currentPrice);
+
+    const filteredResistances: any[] = nearbyLevels.filter(l => l.price > currentPrice && l.price < effectiveATH);
     const filteredSupports: any[] = nearbyLevels.filter(l => l.price < currentPrice);
     
-    // Add 52-Week High level (أعلى سعر خلال آخر عام)
-    if (high52W > currentPrice && Math.abs(high52W - allTimeHigh) / allTimeHigh > 0.03) {
-      filteredResistances.unshift({
+    // Add 52-Week High level (if distinctly below ATH and above currentPrice)
+    if (high52W > currentPrice && high52W < effectiveATH) {
+      filteredResistances.push({
         price: high52W,
         strength: 97,
         label: locale === 'ar' ? '📈 أعلى سعر 52 أسبوع' : '📈 52-Week High',
         isATH: false,
+        is52WHigh: true,
         isProjected: false
       });
     }
 
     // Add All-Time High level (🏆 سعر تاريخي مطلق)
-    if (allTimeHigh > currentPrice) {
-      filteredResistances.unshift({
-        price: allTimeHigh,
+    if (effectiveATH > currentPrice) {
+      filteredResistances.push({
+        price: effectiveATH,
         strength: 99,
         label: locale === 'ar' ? '🏆 سعر تاريخي مطلق (ATH)' : '🏆 All-Time High (ATH)',
         isATH: true,
+        is52WHigh: false,
         isProjected: false
       });
     }
 
+
+    // Sort resistances descending so highest level (ATH) is at index 0 (Top)
+    filteredResistances.sort((a, b) => b.price - a.price);
+
     const finalResistances = filteredResistances.slice(0, 4);
     return { supports: filteredSupports, resistances: finalResistances };
-  }, [activePrices, interval, currentPrice, allTimeHigh, high52W, isNearATH, locale]);
+  }, [activePrices, interval, currentPrice, allTimeHigh, high52W, isNearATH, locale, finalActivePrices]);
 
   // Build S/R entries list
   const buildEntries = useCallback((
@@ -913,33 +1072,43 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     return [...res, ...sup];
   }, [srLevelsRaw, buildEntries]);
 
-  // Bug Fix: Clear chart refs and set default toggles when interval or stock symbol changes
+  const srInitializedRef = useRef<string>('');
+
+  // Bug Fix: Clear chart refs and set default toggles only when symbol or interval changes
   useEffect(() => {
     chartRef.current?.clearSRLines();
     setVisibleSRLines(new Set());
+    srInitializedRef.current = '';
   }, [symbol, interval]);
 
-  // Initialize visible set with all computed levels by default
+  // Initialize visible set with all computed levels ONCE per symbol/interval
   useEffect(() => {
-    if (topLevels.length > 0) {
+    const key = `${symbol}_${interval}`;
+    if (topLevels.length > 0 && srInitializedRef.current !== key) {
       setVisibleSRLines(new Set(topLevels.map(l => l.price)));
+      srInitializedRef.current = key;
     }
-  }, [topLevels]);
+  }, [topLevels, symbol, interval]);
 
-  // Sync visible levels on chart
+  // Sync visible levels on chart - delay to ensure chart canvas is mounted
   useEffect(() => {
-    if (!chartRef.current) return;
-    chartRef.current.clearSRLines();
-    topLevels.forEach(level => {
-      if (visibleSRLines.has(level.price)) {
-        chartRef.current?.toggleSRLine(
-          level.price,
-          level.isResistance,
-          level.isATH ?? false,
-          level.isProjected ?? false
-        );
-      }
-    });
+    const draw = () => {
+      if (!chartRef.current) return;
+      chartRef.current.clearSRLines();
+      topLevels.forEach(level => {
+        if (visibleSRLines.has(level.price)) {
+          chartRef.current?.toggleSRLine(
+            level.price,
+            level.isResistance,
+            level.isATH ?? false,
+            level.isProjected ?? false
+          );
+        }
+      });
+    };
+    // Small delay so the chart canvas finishes mounting before drawing price lines
+    const t = setTimeout(draw, 300);
+    return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleSRLines, topLevels]);
 
@@ -955,17 +1124,7 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
     });
   }, []);
 
-  const activeData = useMemo(() => {
-    return allChartData[allChartData.length - 1] ?? null;
-  }, [allChartData]);
 
-  const displayOHLCV = hoveredOHLCV ?? (activeData ? {
-    open: activeData.open_price ?? activeData.close_price ?? 0,
-    high: activeData.high_price ?? activeData.close_price ?? 0,
-    low: activeData.low_price ?? activeData.close_price ?? 0,
-    close: activeData.close_price ?? 0,
-    volume: activeData.volume ?? 0,
-  } : null);
 
   const latestClose = (priceRecord?.close_price != null && !isNaN(Number(priceRecord.close_price)))
     ? Number(priceRecord.close_price)
@@ -1089,6 +1248,19 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const srLevels = useMemo(() =>
     detectSRLevels(analysisCandles, currentPrice, 0.015, 5, weeklySRLevels)
   , [analysisCandles, currentPrice, weeklySRLevels]);
+
+  const chartSRLevels = useMemo(() => {
+    return topLevels.map(l => ({
+      price: l.price,
+      type: l.isResistance ? ('resistance' as const) : ('support' as const),
+      isResistance: l.isResistance,
+      strength: l.strength,
+      distance: l.distPct ?? ((l.price - currentPrice) / (currentPrice || 1)) * 100,
+      isStrong: Boolean(l.strength > 1 || l.isATH || l.is52WHigh)
+    }));
+  }, [topLevels, currentPrice]);
+
+
 
   const distToStrongLevel = useMemo(() => {
     const strongLevels = srLevels.filter(l => l.isStrong);
@@ -2119,14 +2291,26 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         <div className="flex flex-col gap-1">
           <div className="flex items-baseline gap-3 flex-wrap">
             <span className="text-3xl font-extrabold text-text-primary tracking-tight">
-              {Number(latestClose ?? 0).toFixed(3)}
+              {Number(liveStockPrice?.close ?? latestClose ?? 0).toFixed(3)}
               <span className="text-sm font-bold text-text-secondary ml-1.5">
                 {locale === 'ar' ? 'ج.م' : 'EGP'}
               </span>
             </span>
-            <span className={`text-sm font-extrabold px-2 py-0.5 rounded-lg ${isUp ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-              {isUp ? '+' : ''}{Number(priceChange.diff ?? 0).toFixed(3)} ({isUp ? '+' : ''}{Number(priceChange.pct ?? 0).toFixed(2)}%) {isUp ? '↑' : '↓'}
-            </span>
+            {(() => {
+              const diff = liveStockPrice ? liveStockPrice.changeAbs : Number(priceChange.diff ?? 0);
+              const pct = liveStockPrice ? liveStockPrice.changePct : Number(priceChange.pct ?? 0);
+              const isPositive = diff >= 0;
+              return (
+                <span className={`text-sm font-extrabold px-2 py-0.5 rounded-lg ${isPositive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                  {isPositive ? '+' : ''}{Number(diff).toFixed(3)} ({isPositive ? '+' : ''}{Number(pct).toFixed(2)}%) {isPositive ? '↑' : '↓'}
+                </span>
+              );
+            })()}
+            {liveStockPrice && (
+              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono font-bold border border-cyan-500/30">
+                ⚡ لايف (TradingView)
+              </span>
+            )}
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 ${
               marketRegime === 1
                 ? 'bg-green-500/20 text-green-400 border border-green-500/20'
@@ -2149,8 +2333,8 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
               <span>{locale === 'ar' ? 'أ:' : 'O:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.open ?? 0).toFixed(3)}</span></span>
               <span>{locale === 'ar' ? 'ع:' : 'H:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.high ?? 0).toFixed(3)}</span></span>
               <span>{locale === 'ar' ? 'ص:' : 'L:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.low ?? 0).toFixed(3)}</span></span>
-              <span>{locale === 'ar' ? 'ق:' : 'C:'} <span className="text-text-primary font-mono">{Number(displayOHLCV.close ?? 0).toFixed(3)}</span></span>
-              <span>{locale === 'ar' ? 'حجم:' : 'Vol:'} <span className="text-text-primary font-mono">{formatVolume(displayOHLCV.volume)}</span></span>
+              <span>{locale === 'ar' ? 'ق:' : 'C:'} <span className="text-text-primary font-mono">{Number(liveStockPrice?.close ?? displayOHLCV.close ?? 0).toFixed(3)}</span></span>
+              <span>{locale === 'ar' ? 'حجم:' : 'Vol:'} <span className="text-text-primary font-mono">{formatVolume(liveStockPrice?.volume ?? displayOHLCV.volume)}</span></span>
             </div>
           )}
         </div>
@@ -2177,11 +2361,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
           <span>
             {locale === 'ar' ? 'آخر تحديث: ' : 'Updated: '}
             <span className="font-mono text-text-primary">
-              {lastUpdated.toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {liveStockPrice ? liveStockPrice.updatedAt : lastUpdated.toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </span>
         </div>
       </div>
+
 
       {/* Floating Toast Notification */}
       {toastMessage && (
@@ -2203,8 +2388,41 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
         />
       )}
 
-      {/* ── Indicator Toggles ── */}
-      <div className="flex flex-wrap gap-2">
+      {/* ── Chart Mode Switcher ── */}
+      <div className="flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-xl border border-white/10 w-fit">
+        <button
+          onClick={() => setChartViewMode('tradingview')}
+          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+            chartViewMode === 'tradingview'
+              ? 'bg-cyan-500 text-slate-950 shadow-lg font-extrabold'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <span>📈</span>
+          <span>{locale === 'ar' ? 'رسم TradingView المباشر (تفاعلي 100%)' : 'TradingView Live Chart (100% Real-Time)'}</span>
+        </button>
+        <button
+          onClick={() => setChartViewMode('tradeora_ai')}
+          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+            chartViewMode === 'tradeora_ai'
+              ? 'bg-cyan-500 text-slate-950 shadow-lg font-extrabold'
+              : 'text-slate-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <span>📊</span>
+          <span>{locale === 'ar' ? 'تحليل Tradeora الذكي (مؤشرات ودعوم)' : 'Tradeora AI Analytics Chart'}</span>
+        </button>
+      </div>
+
+      {chartViewMode === 'tradingview' && (
+        <div className="w-full">
+          <TradingViewAdvancedChart symbol={symbol} locale={locale} height={580} />
+        </div>
+      )}
+
+      {/* ── Indicator Toggles — only in Tradeora AI mode ── */}
+      {chartViewMode !== 'tradingview' && <div className="flex flex-wrap gap-2">
+
         {[
           { key: 'SMA', active: showSMA, toggle: () => setShowSMA(!showSMA), color: '#10B981' },
           { key: 'BB', active: showBB, toggle: () => setShowBB(!showBB), color: '#6366F1' },
@@ -2222,10 +2440,10 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
             {key}
           </button>
         ))}
-      </div>
+      </div>}
 
-      {/* ── Main Chart Grid ── */}
-      {isIntradayLoading ? (
+      {/* ── Main Chart Grid — only in Tradeora AI mode ── */}
+      {chartViewMode !== 'tradingview' && (isIntradayLoading ? (
         <ChartSkeleton />
       ) : allChartData.length > 0 ? (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
@@ -2261,7 +2479,8 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
                 showBB={showBB}
                 showVol={showVol}
                 interval={interval}
-                srLevels={srLevels}
+                srLevels={chartSRLevels}
+
                 onCrosshairMove={handleCrosshairMove}
               />
               {intradayHasNoData && ['15m', '30m', '1h', '4h'].includes(interval) && (
@@ -3583,7 +3802,8 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
           <span className="text-2xl mb-2">📊</span>
           <span className="text-sm font-semibold">{tGlobal('stockDetail.noDataAvailable')}</span>
         </div>
-      )}
+      ))}
     </div>
   );
 }
+

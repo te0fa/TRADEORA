@@ -74,14 +74,13 @@ def load_intraday_model(timeframe: str):
     logger.info(f"Loaded Intraday Model v2 for {timeframe}.")
     return m, s
 
-def scan_and_generate_intraday(force: bool = False):
+def scan_and_generate_intraday(force: bool = False, specified_tf: Optional[str] = None):
     logger.info("=== Starting Intraday Trade Recommendation Scanner ===")
 
     if not force and not is_market_open():
         logger.info("Market is currently closed (EGX Session: Sun-Thu 10:00 - 14:30 Cairo time). Use --force to override.")
         return
 
-    # Determine which timeframes to evaluate based on Cairo local time
     try:
         cairo_tz = zoneinfo.ZoneInfo("Africa/Cairo")
     except Exception:
@@ -90,18 +89,22 @@ def scan_and_generate_intraday(force: bool = False):
     curr_min = now_cairo.minute
     curr_hour = now_cairo.hour
 
-    # Timeframe execution selection:
-    # 15m: Runs every 15 minutes (00, 15, 30, 45)
-    # 1h:  Runs on top of the hour (:00)
-    # 4h:  Runs at session start (10:00) and late session (14:00)
-    active_tfs = ['15m']
-    if force or curr_min == 0:
-        active_tfs.append('1h')
-    if force or (curr_hour in [10, 14] and curr_min == 0):
-        active_tfs.append('4h')
-
-    if specified_tf and specified_tf != 'all':
-        active_tfs = [specified_tf]
+    # Determine which timeframes to evaluate based on Cairo local time or specified_tf
+    if specified_tf:
+        if specified_tf == 'all':
+            active_tfs = ['15m', '1h', '4h']
+        else:
+            active_tfs = [specified_tf]
+    else:
+        # Timeframe execution selection:
+        # 15m: Runs every 15 minutes (00, 15, 30, 45)
+        # 1h:  Runs on top of the hour (:00)
+        # 4h:  Runs at session start (10:00) and late session (14:00)
+        active_tfs = ['15m']
+        if force or curr_min == 0:
+            active_tfs.append('1h')
+        if force or (curr_hour in [10, 14] and curr_min == 0):
+            active_tfs.append('4h')
 
     logger.info(f"Evaluating timeframes for this run: {active_tfs} (Cairo Time: {now_cairo.strftime('%H:%M')})")
 
@@ -158,12 +161,15 @@ def scan_and_generate_intraday(force: bool = False):
                 entry_price = float(latest_candle['close'])
 
                 # Price anomaly check (splits / spikes)
-                historical_closes = [c['close'] for c in candles[:-1]]
-                if historical_closes and detect_price_anomaly(entry_price, historical_closes):
+                all_closes = [float(c['close']) for c in candles]
+                dates_list = [str(c.get('time', '')) for c in candles]
+                anomaly_res = detect_price_anomaly(all_closes, dates_list, symbol)
+                if anomaly_res.get('has_anomaly'):
                     logger.warning(f"[{symbol}] Price anomaly detected ({entry_price}). Skipping signal.")
                     continue
 
-                if not check_entry_price_validity(entry_price):
+                val_res = check_entry_price_validity(entry_price, entry_price, symbol)
+                if not val_res.get('is_valid'):
                     logger.warning(f"[{symbol}] Invalid entry price ({entry_price}). Skipping signal.")
                     continue
 

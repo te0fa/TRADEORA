@@ -39,18 +39,30 @@ export async function GET(req: NextRequest) {
   const isIntraday = interval !== '1d';
   const table      = isIntraday ? 'intraday_snapshots' : 'market_prices';
   const dateCol    = isIntraday ? 'snapshot_time'      : 'price_date';
+  const exactSource = `tradingview_${interval}`;
   const sources    = isIntraday
-                     ? CANONICAL_SOURCES_INTRADAY
+                     ? [exactSource, ...CANONICAL_SOURCES_INTRADAY.filter(s => s !== exactSource)]
                      : CANONICAL_SOURCES_DAILY;
+
+  // For intraday: only fetch last 90 days to avoid stale snapshots from months ago
+  const sinceDate = isIntraday
+    ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    : undefined;
   
-  const { data, error } = await sb
+  // For intraday_snapshots the close column is called "price" not "close_price"
+  const selectCols = isIntraday
+    ? `${dateCol}, open_price, high_price, low_price, price, volume, source`
+    : `${dateCol}, open_price, high_price, low_price, close_price, volume, source`;
+
+  let query = sb
     .from(table)
-    .select(`${dateCol}, open_price, high_price,
-             low_price, close_price, volume, source`)
+    .select(selectCols)
     .eq('company_id', companyId)
     .in('source', sources)
-    .order(dateCol, { ascending: true })
-    .limit(limit * 2);
+    .order(dateCol, { ascending: false })
+    .limit(isIntraday ? limit * 6 : limit * 2);
+
+  const { data, error } = await query;
   
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -58,41 +70,51 @@ export async function GET(req: NextRequest) {
   
   // Deduplication
   const dayMap = new Map<string, any>();
-  for (const row of (data ?? [])) {
-    const rawDate = (row as any)[dateCol] as string;
-    const key = rawDate ? rawDate.slice(0, 10) : '';
+  for (const row of ((data as any[]) ?? [])) {
+    const rawDate = row[dateCol] as string;
+    if (!rawDate) continue;
+    const key = isIntraday
+      ? (rawDate.length >= 16 ? rawDate.slice(0, 16) : rawDate)
+      : rawDate.slice(0, 10);
     if (!dayMap.has(key)) {
       dayMap.set(key, row);
     } else {
       const currPri = sources.indexOf(dayMap.get(key).source);
-      const newPri  = sources.indexOf(row.source);
-      if (newPri < currPri) dayMap.set(key, row);
+      const newPri  = sources.indexOf((row as any).source);
+      if (newPri >= 0 && (currPri < 0 || newPri < currPri)) dayMap.set(key, row);
     }
   }
   
+  // Normalize: intraday uses "price" as close; daily uses "close_price"
+  const getClose = (row: any) => isIntraday
+    ? parseFloat(row.price ?? row.close_price ?? 0)
+    : parseFloat(row.close_price ?? row.price ?? 0);
+
   // Clean candles
   const candles = Array.from(dayMap.values())
     .sort((a, b) => String((a as any)[dateCol]).localeCompare(String((b as any)[dateCol])))
     .filter(row => {
-      const c = parseFloat(row.close_price ?? 0);
+      const c = getClose(row);
       const h = parseFloat(row.high_price  ?? 0);
       const l = parseFloat(row.low_price   ?? 0);
-      return c > 0 && !(h === l && l === c) && h >= l;
+      return c > 0 && h >= l;
     })
     .slice(-limit)
     .map(row => {
       const rDate = String((row as any)[dateCol] || '');
+      const closeVal = getClose(row);
       return {
         time:   Math.floor(new Date(rDate).getTime() / 1000),
-        date:   rDate.slice(0, 10),
-        open:   parseFloat(row.open_price  ?? row.close_price),
-        high:   parseFloat(row.high_price  ?? row.close_price),
-        low:    parseFloat(row.low_price   ?? row.close_price),
-        close:  parseFloat(row.close_price),
+        date:   isIntraday ? (rDate.length >= 16 ? rDate.slice(0, 16) : rDate) : rDate.slice(0, 10),
+        open:   parseFloat(row.open_price  ?? closeVal),
+        high:   parseFloat(row.high_price  ?? closeVal),
+        low:    parseFloat(row.low_price   ?? closeVal),
+        close:  closeVal,
         volume: parseInt(row.volume ?? 0),
         source: row.source,
       };
     });
+
   
   const sources_used = [...new Set(candles.map(c => c.source))];
   

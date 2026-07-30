@@ -93,13 +93,13 @@ def get_canonical_candles(sb,
         close_col = 'price'
         max_bars  = limit * 3
     
-    # جلب البيانات
+    # جلب البيانات (ترتيب تنازلي لأخذ أحدث البيانات أولاً)
     res = sb.table(table).select(
         f"{date_col}, open_price, high_price, "
         f"low_price, {close_col}, volume, source"
     ).eq('company_id', company_id) \
      .in_('source', sources) \
-     .order(date_col, desc=False) \
+     .order(date_col, desc=True) \
      .limit(max_bars).execute()
     
     rows = res.data or []

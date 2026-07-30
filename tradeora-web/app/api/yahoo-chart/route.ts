@@ -10,12 +10,15 @@ export async function GET(request: NextRequest) {
   }
 
   const rangeMap = {
-    '15m': '5d',
-    '30m': '5d',
+    '1m':  '1d',
+    '5m':  '5d',
+    '15m': '1mo',
+    '30m': '1mo',
     '1h':  '60d',
     '4h':  '60d',
     '1d':  'max'
   };
+
 
   const range = rangeMap[interval as keyof typeof rangeMap] || 'max';
   const queryInterval = (interval === '4h' || interval === '1h') ? '60m' : interval;

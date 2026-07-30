@@ -5,7 +5,10 @@ import { Cairo, Inter } from 'next/font/google';
 import { Navbar } from '@/components/layout/Navbar';
 import { DisclaimerModal } from '@/components/layout/DisclaimerModal';
 
+import Script from 'next/script';
+
 const cairo = Cairo({
+
   subsets: ['arabic'],
   weight: ['300', '400', '600', '700', '800', '900'],
   variable: '--font-cairo',
@@ -61,13 +64,14 @@ export default async function LocaleLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/logo-icon.png" />
-        <script dangerouslySetInnerHTML={{ __html: `
+        <Script id="sw-register" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
               navigator.serviceWorker.register('/sw.js');
             });
           }
-        `}} />
+        `}</Script>
+
       </head>
       <body className={`bg-bg-dark text-text-primary min-h-full flex flex-col ${locale === 'ar' ? 'font-cairo' : 'font-inter'} antialiased`}>
         <NextIntlClientProvider messages={messages}>

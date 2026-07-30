@@ -8,12 +8,14 @@ import { QualityDot } from '../ui/QualityDot';
 import { Badge } from '../ui/Badge';
 import { Bookmark, BookmarkCheck, TrendingUp } from 'lucide-react';
 import { PriceFreshnessIndicator } from './PriceFreshnessIndicator';
+import type { LiveStockTick } from '@/app/[locale]/stock/[symbol]/page';
 
 interface StockHeaderProps {
   company: CompanyWithPrice;
+  liveTick?: LiveStockTick | null;
 }
 
-export function StockHeader({ company }: StockHeaderProps) {
+export function StockHeader({ company, liveTick }: StockHeaderProps) {
   const t = useTranslations('stockDetail');
   const tGlobal = useTranslations();
   const locale = useLocale();
@@ -24,8 +26,12 @@ export function StockHeader({ company }: StockHeaderProps) {
 
   const [isWatchlisted, setIsWatchlisted] = useState(false);
 
+  // livePrice is now provided by the parent page (single poll for entire page)
+  const livePrice = liveTick ?? null;
+
   // Synchronize watchlist status from localStorage
   useEffect(() => {
+
     try {
       const stored = localStorage.getItem('tradeora_watchlist');
       const watchlist = stored ? JSON.parse(stored) : [];
@@ -183,29 +189,38 @@ export function StockHeader({ company }: StockHeaderProps) {
 
       <div className="flex items-center gap-4 sm:gap-6 self-start md:self-center">
         {/* Price display tag */}
-        {company.priceRecord ? (
+        {company.priceRecord || livePrice ? (
             <div className="flex items-center gap-3 flex-wrap">
               <PriceTag
-                price={company.priceRecord.close_price}
-                change={company.priceRecord.change_value}
-                changePercent={company.priceRecord.change_percent}
+                price={livePrice ? livePrice.close : (company.priceRecord?.close_price ?? 0)}
+                change={livePrice ? livePrice.changeAbs : (company.priceRecord?.change_value ?? 0)}
+                changePercent={livePrice ? livePrice.changePct : (company.priceRecord?.change_percent ?? 0)}
                 locale={locale}
                 isLastResort={company.isLastResort}
                 size="lg"
               />
               <PriceFreshnessIndicator
-                lastUpdatedAt={company.priceRecord.fetched_at || (company.priceRecord as any).updated_at || company.priceRecord.price_date}
+                lastUpdatedAt={livePrice ? livePrice.updatedAt : (company.priceRecord?.fetched_at || (company.priceRecord as any)?.updated_at || company.priceRecord?.price_date)}
                 className="self-end mb-0.5"
               />
               
               <div className="flex flex-col gap-1.5 items-end">
-                <QualityDot flag={company.priceRecord.data_quality_flag} showText={true} />
-                {getMarketStatusLabel()}
+                <QualityDot flag={company.priceRecord?.data_quality_flag ?? null} showText={true} />
+
+                {livePrice ? (
+                  <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 flex items-center gap-1 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                    ⚡ {locale === 'ar' ? 'تحديث لحظي (TradingView)' : 'Live Just Now (TradingView)'}
+                  </span>
+                ) : (
+                  getMarketStatusLabel()
+                )}
               </div>
             </div>
         ) : (
           <span className="text-sm text-text-secondary">{t('noDataAvailable')}</span>
         )}
+
 
         <div className="w-[1px] h-10 bg-white/10" />
 

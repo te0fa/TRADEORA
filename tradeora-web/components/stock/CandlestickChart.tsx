@@ -65,6 +65,11 @@ const CandlestickChartInner = (
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const priceLineRefs = useRef<Map<number, IPriceLine>>(new Map());
+  const hasFittedRef = useRef(false);
+
+  useEffect(() => {
+    hasFittedRef.current = false;
+  }, [interval]);
 
   // Expose imperative S/R line controls using unique keys
   useImperativeHandle(ref, () => ({
@@ -120,8 +125,9 @@ const CandlestickChartInner = (
     }
   }));
 
+  // 1. Create Chart Instance (only on interval change or mount)
   useEffect(() => {
-    if (!containerRef.current || data.length === 0) return;
+    if (!containerRef.current) return;
 
     const isIntraday = interval === '1m' || interval === '5m' || interval === '15m' || interval === '30m' || interval === '1h' || interval === '4h';
 
@@ -170,9 +176,9 @@ const CandlestickChartInner = (
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.05)',
-        timeVisible: isIntraday, // Show hours/minutes only for intraday intervals
+        timeVisible: isIntraday,
         secondsVisible: false,
-        barSpacing: 8,          // Natural candlestick spacing
+        barSpacing: 8,
         minBarSpacing: 1.5,
       },
     } as any);
@@ -190,120 +196,9 @@ const CandlestickChartInner = (
       wickUpColor: '#10B981',
       wickDownColor: '#EF4444',
     });
-
-    const isValidNum = (v: any): v is number => typeof v === 'number' && !isNaN(v) && isFinite(v);
-    const getClose = (d: any) => d.close_price ?? d.close;
-    const getOpen  = (d: any) => d.open_price  ?? d.open  ?? getClose(d);
-    const getHigh  = (d: any) => d.high_price  ?? d.high  ?? getClose(d);
-    const getLow   = (d: any) => d.low_price   ?? d.low   ?? getClose(d);
-
     candlestickSeriesRef.current = candleSeries;
 
-    candleSeries.setData(
-      data
-        .filter((d) => d && d.time !== undefined && d.time !== null && isValidNum(getClose(d)))
-        .map((d) => ({
-          time: d.time as Time,
-          open: isValidNum(getOpen(d)) ? getOpen(d) : getClose(d),
-          high: isValidNum(getHigh(d)) ? getHigh(d) : getClose(d),
-          low: isValidNum(getLow(d)) ? getLow(d) : getClose(d),
-          close: getClose(d),
-        }))
-    );
-
-    // 2. Volume Histogram
-    let volumeSeries: any = null;
-    if (showVol) {
-      volumeSeries = chart.addSeries(HistogramSeries, {
-        color: '#10B981',
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'volume',
-      });
-      chart.priceScale('volume').applyOptions({
-        scaleMargins: { top: 0.82, bottom: 0 },
-      });
-      volumeSeries.setData(
-        data
-          .filter((d) => d && d.time !== undefined && d.time !== null && isValidNum(getClose(d)))
-          .map((d) => ({
-            time: d.time as Time,
-            value: isValidNum(d.volume) ? d.volume : 0,
-            color: getClose(d) >= (isValidNum(getOpen(d)) ? getOpen(d) : getClose(d))
-              ? 'rgba(16, 185, 129, 0.35)'
-              : 'rgba(239, 68, 68, 0.35)',
-          }))
-      );
-    }
-
-    // 3. SMA Lines
-    if (showSMA) {
-      if (!showBB) {
-        const s20 = chart.addSeries(LineSeries, { color: 'rgba(16,185,129,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-        s20.setData(
-          data.filter(d => isValidNum(d.sma20)).map(d => ({
-            time: d.time as Time,
-            value: d.sma20 as number,
-          }))
-        );
-      }
-      const s50 = chart.addSeries(LineSeries, { color: 'rgba(59,130,246,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-      s50.setData(
-        data.filter(d => isValidNum(d.sma50)).map(d => ({
-          time: d.time as Time,
-          value: d.sma50 as number,
-        }))
-      );
-      const s200 = chart.addSeries(LineSeries, { color: 'rgba(245,158,11,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-      s200.setData(
-        data.filter(d => isValidNum(d.sma200)).map(d => ({
-          time: d.time as Time,
-          value: d.sma200 as number,
-        }))
-      );
-    }
-
-    // 4. Bollinger Bands
-    if (showBB) {
-      const bbColor = 'rgba(99,102,241,0.5)';
-      const bbUp = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
-      bbUp.setData(data.filter(d => isValidNum(d.bbUpper)).map(d => ({ time: d.time as Time, value: d.bbUpper as number })));
-      const bbMid = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-      bbMid.setData(data.filter(d => isValidNum(d.bbMiddle)).map(d => ({ time: d.time as Time, value: d.bbMiddle as number })));
-      const bbLow = chart.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
-      bbLow.setData(data.filter(d => isValidNum(d.bbLower)).map(d => ({ time: d.time as Time, value: d.bbLower as number })));
-    }
-
-    // Draw Support & Resistance Levels (Part 6)
-    if (srLevels && srLevels.length > 0) {
-      srLevels.slice(0, 4).forEach((level) => {
-        if (!isValidNum(level.price)) return;
-        const line = chart.addSeries(LineSeries, {
-          color: level.isStrong
-            ? (level.type === 'support' ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.95)')
-            : (level.type === 'support' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'),
-          lineWidth: level.isStrong ? 3 : 1,
-          lineStyle: level.isStrong ? LineStyle.Solid : LineStyle.Dashed,
-          priceLineVisible: false,
-          lastValueVisible: false,
-        });
-
-        const validData = data.filter(d => d && d.time !== undefined && d.time !== null);
-        const firstTime = validData[0]?.time as Time;
-        const lastTime  = validData[validData.length - 1]?.time as Time;
-
-        if (firstTime && lastTime) {
-          line.setData([
-            { time: firstTime, value: level.price },
-            { time: lastTime,  value: level.price },
-          ]);
-        }
-      });
-    }
-
-    // Scroll and fit chart
-    chart.timeScale().fitContent();
-
-    // 5. Crosshair subscription (emit OHLCV for the header panel)
+    // Crosshair subscription
     chart.subscribeCrosshairMove((param) => {
       if (!onCrosshairMove) return;
       if (!param.time) { onCrosshairMove(null); return; }
@@ -347,7 +242,7 @@ const CandlestickChartInner = (
       onCrosshairMove(dateStr);
     });
 
-    // Hide only lightweight charts attribution link/logo if any
+    // Hide attribution
     const style = document.createElement('style');
     style.textContent = `
       .tv-lightweight-charts a[href*="tradingview"] {
@@ -357,7 +252,7 @@ const CandlestickChartInner = (
     `;
     containerRef.current.appendChild(style);
 
-    // إنشاء طبقة لوجو فوق الشارت
+    // Watermark overlay
     const logoOverlay = document.createElement('div');
     logoOverlay.style.cssText = `
       position: absolute;
@@ -370,7 +265,6 @@ const CandlestickChartInner = (
       align-items: center;
       gap: 6px;
     `;
-
     const logoImg = document.createElement('img');
     logoImg.src = '/logo.png';
     logoImg.style.cssText = `
@@ -379,13 +273,11 @@ const CandlestickChartInner = (
       object-fit: contain;
       filter: brightness(0.9);
     `;
-
     logoOverlay.appendChild(logoImg);
     containerRef.current.style.position = 'relative';
     containerRef.current.appendChild(logoOverlay);
 
     return () => {
-      // Clear all lines on unmount
       priceLineRefs.current.forEach((line) => {
         candlestickSeriesRef.current?.removePriceLine(line);
       });
@@ -396,7 +288,155 @@ const CandlestickChartInner = (
       chartRef.current = null;
       candlestickSeriesRef.current = null;
     };
-  }, [data, showSMA, showBB, showVol, interval, onCrosshairMove]);
+  }, [interval, onCrosshairMove]);
+
+  // 2. Update Chart Series Data in-place (preserves scroll position and price lines)
+  const indicatorSeriesRef = useRef<any[]>([]);
+
+  useEffect(() => {
+    if (!chartRef.current || !candlestickSeriesRef.current || data.length === 0) return;
+
+    const isIntraday = interval === '1m' || interval === '5m' || interval === '15m' || interval === '30m' || interval === '1h' || interval === '4h';
+    const isValidNum = (v: any): v is number => typeof v === 'number' && !isNaN(v) && isFinite(v);
+    const getClose = (d: any) => d.close_price ?? d.close;
+    const getOpen  = (d: any) => d.open_price  ?? d.open  ?? getClose(d);
+    const getHigh  = (d: any) => d.high_price  ?? d.high  ?? getClose(d);
+    const getLow   = (d: any) => d.low_price   ?? d.low   ?? getClose(d);
+
+    const normalizeTime = (timeVal: any, isIntraday: boolean): Time | null => {
+      if (timeVal === undefined || timeVal === null) return null;
+      try {
+        if (typeof timeVal === 'number') {
+          if (isNaN(timeVal) || !isFinite(timeVal)) return null;
+          const sec = timeVal > 1e11 ? Math.floor(timeVal / 1000) : timeVal;
+          if (isIntraday) return sec as Time;
+          const d = new Date(sec * 1000);
+          if (isNaN(d.getTime())) return null;
+          return d.toISOString().split('T')[0] as Time;
+        }
+        if (typeof timeVal === 'string') {
+          if (!timeVal || timeVal.trim() === '') return null;
+          if (!isIntraday) {
+            return timeVal.split('T')[0] as Time;
+          }
+          const parsed = new Date(timeVal).getTime();
+          if (isNaN(parsed)) return null;
+          return Math.floor(parsed / 1000) as Time;
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    };
+
+    const sanitizeSeriesData = <T extends { time: any }>(items: T[]): T[] => {
+      if (!items || items.length === 0) return [];
+      const map = new Map<string | number, T>();
+      for (const item of items) {
+        if (!item || item.time === undefined || item.time === null) continue;
+        const normTime = normalizeTime(item.time, isIntraday);
+        if (!normTime) continue;
+        map.set(normTime as any, { ...item, time: normTime });
+      }
+      const sorted = Array.from(map.values()).sort((a, b) => {
+        const tA = typeof a.time === 'number' ? a.time : new Date(a.time as any).getTime();
+        const tB = typeof b.time === 'number' ? b.time : new Date(b.time as any).getTime();
+        const valA = isNaN(tA) ? 0 : tA;
+        const valB = isNaN(tB) ? 0 : tB;
+        return valA - valB;
+      });
+
+      const finalClean: T[] = [];
+      let prevKey: string | number | null = null;
+      for (const it of sorted) {
+        if (it.time !== prevKey) {
+          finalClean.push(it);
+          prevKey = it.time;
+        }
+      }
+      return finalClean;
+    };
+
+    // Update Candles
+    const candleData = sanitizeSeriesData(
+      data
+        .filter((d) => d && d.time !== undefined && d.time !== null && isValidNum(getClose(d)))
+        .map((d) => ({
+          time: d.time as Time,
+          open: isValidNum(getOpen(d)) ? getOpen(d) : getClose(d),
+          high: isValidNum(getHigh(d)) ? getHigh(d) : getClose(d),
+          low: isValidNum(getLow(d)) ? getLow(d) : getClose(d),
+          close: getClose(d),
+        }))
+    );
+    candlestickSeriesRef.current.setData(candleData);
+
+    // Clean previous indicators
+    indicatorSeriesRef.current.forEach((s) => {
+      try { chartRef.current?.removeSeries(s); } catch {}
+    });
+    indicatorSeriesRef.current = [];
+
+    // Volume Histogram
+    if (showVol) {
+      const volumeSeries = chartRef.current.addSeries(HistogramSeries, {
+        color: '#10B981',
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+      });
+      chartRef.current.priceScale('volume').applyOptions({
+        scaleMargins: { top: 0.82, bottom: 0 },
+      });
+      const volData = sanitizeSeriesData(
+        data
+          .filter((d) => d && d.time !== undefined && d.time !== null && isValidNum(getClose(d)))
+          .map((d) => ({
+            time: d.time as Time,
+            value: isValidNum(d.volume) ? d.volume : 0,
+            color: getClose(d) >= (isValidNum(getOpen(d)) ? getOpen(d) : getClose(d))
+              ? 'rgba(16, 185, 129, 0.35)'
+              : 'rgba(239, 68, 68, 0.35)',
+          }))
+      );
+      volumeSeries.setData(volData);
+      indicatorSeriesRef.current.push(volumeSeries);
+    }
+
+    // SMA Lines
+    if (showSMA) {
+      if (!showBB) {
+        const s20 = chartRef.current.addSeries(LineSeries, { color: 'rgba(16,185,129,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+        s20.setData(sanitizeSeriesData(data.filter(d => isValidNum(d.sma20)).map(d => ({ time: d.time as Time, value: d.sma20 as number }))));
+        indicatorSeriesRef.current.push(s20);
+      }
+      const s50 = chartRef.current.addSeries(LineSeries, { color: 'rgba(59,130,246,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+      s50.setData(sanitizeSeriesData(data.filter(d => isValidNum(d.sma50)).map(d => ({ time: d.time as Time, value: d.sma50 as number }))));
+      indicatorSeriesRef.current.push(s50);
+
+      const s200 = chartRef.current.addSeries(LineSeries, { color: 'rgba(245,158,11,0.8)', lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+      s200.setData(sanitizeSeriesData(data.filter(d => isValidNum(d.sma200)).map(d => ({ time: d.time as Time, value: d.sma200 as number }))));
+      indicatorSeriesRef.current.push(s200);
+    }
+
+    // Bollinger Bands
+    if (showBB) {
+      const bbColor = 'rgba(99,102,241,0.5)';
+      const bbUp = chartRef.current.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
+      bbUp.setData(sanitizeSeriesData(data.filter(d => isValidNum(d.bbUpper)).map(d => ({ time: d.time as Time, value: d.bbUpper as number }))));
+      const bbMid = chartRef.current.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+      bbMid.setData(sanitizeSeriesData(data.filter(d => isValidNum(d.bbMiddle)).map(d => ({ time: d.time as Time, value: d.bbMiddle as number }))));
+      const bbLow = chartRef.current.addSeries(LineSeries, { color: bbColor, lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false });
+      bbLow.setData(sanitizeSeriesData(data.filter(d => isValidNum(d.bbLower)).map(d => ({ time: d.time as Time, value: d.bbLower as number }))));
+      indicatorSeriesRef.current.push(bbUp, bbMid, bbLow);
+    }
+
+    // Scroll and fit chart ONLY ON INITIAL MOUNT / INTERVAL CHANGE
+    if (!hasFittedRef.current) {
+      chartRef.current.timeScale().fitContent();
+      hasFittedRef.current = true;
+    }
+  }, [data, showSMA, showBB, showVol, interval]);
+
 
   // Resize observer
   useEffect(() => {
@@ -409,6 +449,9 @@ const CandlestickChartInner = (
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+
+
 
   return (
     <div className="relative w-full rounded-xl overflow-hidden border border-white/5 bg-[#0B0F19]">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useStockDetail } from '@/hooks/useStockDetail';
 import { StockHeader } from '@/components/stock/StockHeader';
@@ -22,6 +22,17 @@ interface StockDetailPageProps {
   }>;
 }
 
+export interface LiveStockTick {
+  close: number;
+  changePct: number;
+  changeAbs: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  updatedAt: string;
+}
+
 export default function StockDetailPage({ params }: StockDetailPageProps) {
   const { symbol, locale } = React.use(params);
   const t = useTranslations('stockDetail');
@@ -30,10 +41,119 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   
   const { company, intradayData, historicalPrices, loading, error, refetch } = useStockDetail(symbol);
 
+  // ── Shared real-time live price (TradingView WebSocket + REST fallback) ──
+  const [liveTick, setLiveTick] = useState<LiveStockTick | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let ws: WebSocket | null = null;
+
+    const formatMessage = (func: string, args: any[]) => {
+      const content = JSON.stringify({ m: func, p: args });
+      return `~m~${content.length}~m~${content}`;
+    };
+
+    const tvSymbol = `EGX:${symbol.toUpperCase()}`;
+
+    try {
+      ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket');
+      const quoteSession = 'qs_' + Math.random().toString(36).substring(2, 12);
+
+      ws.onopen = () => {
+        if (!active || !ws) return;
+        ws.send(formatMessage('set_auth_token', ['unauthorized_user_token']));
+        ws.send(formatMessage('quote_create_session', [quoteSession]));
+        ws.send(formatMessage('quote_set_fields', [
+          quoteSession,
+          'ch', 'chp', 'lp', 'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume'
+        ]));
+        ws.send(formatMessage('quote_add_symbols', [quoteSession, tvSymbol]));
+      };
+
+      ws.onmessage = (event) => {
+        if (!active) return;
+        const str = String(event.data);
+
+        // Ping-pong handler
+        if (str.includes('~h~')) {
+          const parts = str.split('~h~');
+          for (let i = 1; i < parts.length; i++) {
+            const pingId = parts[i].split('~m~')[0];
+            if (pingId && ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(`~m~${pingId.length + 4}~m~~h~${pingId}`);
+            }
+          }
+        }
+
+        // Parse qsd tick packets
+        const packets = str.split(/~m~\d+~m~/).filter(Boolean);
+        for (const packet of packets) {
+          try {
+            const parsed = JSON.parse(packet);
+            if (parsed.m === 'qsd' && parsed.p && parsed.p[1]) {
+              const v = parsed.p[1].v;
+              if (v) {
+                setLiveTick((prev) => {
+                  const close = v.lp != null ? v.lp : (prev?.close ?? 0);
+                  const changePct = v.chp != null ? v.chp : (prev?.changePct ?? 0);
+                  const changeAbs = v.ch != null ? v.ch : (prev?.changeAbs ?? 0);
+                  const open = v.open_price != null ? v.open_price : (prev?.open ?? close);
+                  const high = v.high_price != null ? v.high_price : (prev?.high ?? close);
+                  const low = v.low_price != null ? v.low_price : (prev?.low ?? close);
+                  const volume = v.volume != null ? v.volume : (prev?.volume ?? 0);
+                  const updatedAt = new Date().toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                  });
+
+                  return { close, changePct, changeAbs, open, high, low, volume, updatedAt };
+                });
+              }
+            }
+          } catch { /* skip non-JSON */ }
+        }
+      };
+    } catch (e) {
+      console.error('TradingView WS connection error:', e);
+    }
+
+    // ── REST Poll Fallback ──
+    const pollREST = async () => {
+      try {
+        const res = await fetch(`/api/stock-live?symbol=${encodeURIComponent(symbol)}`, { cache: 'no-store' });
+        if (res.ok && active) {
+          const data = await res.json();
+          if (data?.close != null) {
+            setLiveTick((prev) => ({
+              close: data.close,
+              changePct: data.changePct,
+              changeAbs: data.changeAbs,
+              open: data.open ?? prev?.open ?? data.close,
+              high: data.high ?? prev?.high ?? data.close,
+              low: data.low ?? prev?.low ?? data.close,
+              volume: data.volume ?? prev?.volume ?? 0,
+              updatedAt: data.updatedAt
+            }));
+          }
+        }
+      } catch { /* silent */ }
+    };
+
+    pollREST();
+    const pollId = setInterval(pollREST, 1000);
+
+    return () => {
+      active = false;
+      clearInterval(pollId);
+      if (ws) ws.close();
+    };
+  }, [symbol, locale]);
+
+
   const [sortKey, setSortKey] = useState<string>('price_date');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
+
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -142,7 +262,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       className="w-full pb-20 flex flex-col gap-8"
     >
       <motion.div variants={itemVariants}>
-        <StockHeader company={company} />
+        <StockHeader company={company} liveTick={liveTick} />
       </motion.div>
 
       <motion.div variants={itemVariants}>
@@ -154,6 +274,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           locale={locale} 
           fundamentals={company.fundamentals}
           priceRecord={company.priceRecord}
+          liveTick={liveTick}
         />
       </motion.div>
 
