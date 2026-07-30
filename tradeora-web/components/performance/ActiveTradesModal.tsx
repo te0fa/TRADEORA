@@ -591,34 +591,70 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
 
                   {/* Live Prices Grid — Ordered from Right (SL) to Left (TP1) for Arabic RTL */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs font-mono">
-                    {/* Column 1 (FAR RIGHT in RTL): Stop Loss SL / Invalidation Level */}
-                    <div>
-                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (إلغاء هبوط SL)' : 'Stop Exit Invalidation')}</span>
-                      <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
-                    </div>
+                    {isBreakoutPending ? (
+                      <>
+                        {/* Col 1 (Far Right in RTL): Stop Loss SL */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (إلغاء هبوط SL)' : 'Stop Exit Invalidation')}</span>
+                          <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
+                        </div>
 
-                    {/* Column 2 (MIDDLE RIGHT in RTL): Target Entry Price */}
-                    <div>
-                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة الشراء المستهدفة' : 'Target Entry Price') : (isAr ? 'نقطة البيع المستهدفة' : 'Target Sell Entry')}</span>
-                      <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
-                    </div>
+                        {/* Col 2 (Middle Right in RTL): Current Live Price (Lower than Breakout Trigger) */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
+                          <span className="font-bold text-cyan-400 text-sm flex items-center gap-1">
+                            {current.toFixed(2)} ج.م
+                            <span className={`text-[10px] ${isZeroChange ? 'text-zinc-400' : isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              ({isPositive ? '+' : ''}{pnlPct.toFixed(1)}%)
+                            </span>
+                          </span>
+                        </div>
 
-                    {/* Column 3 (MIDDLE LEFT in RTL): Current Live Price */}
-                    <div>
-                      <span className="text-zinc-500 block text-[11px]">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
-                      <span className="font-bold text-cyan-400 text-sm flex items-center gap-1">
-                        {current.toFixed(2)} ج.م
-                        <span className={`text-[10px] ${isZeroChange ? 'text-zinc-400' : isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          ({isPositive ? '+' : ''}{pnlPct.toFixed(1)}%)
-                        </span>
-                      </span>
-                    </div>
+                        {/* Col 3 (Middle Left in RTL): Breakout Trigger Target Entry Price */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة تفعيل الاختراق' : 'Breakout Trigger Price') : (isAr ? 'نقطة تفعيل الكسر' : 'Breakdown Trigger Price')}</span>
+                          <span className="font-bold text-purple-300 text-sm">{entry.toFixed(2)} ج.م</span>
+                        </div>
 
-                    {/* Column 4 (FAR LEFT in RTL): Target 1 TP1 */}
-                    <div>
-                      <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
-                      <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
-                    </div>
+                        {/* Col 4 (Far Left in RTL): Target 1 TP1 */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
+                          <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Standard Market / Limit Order Grid */}
+                        {/* Column 1 (FAR RIGHT in RTL): Stop Loss SL / Invalidation Level */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (إلغاء هبوط SL)' : 'Stop Exit Invalidation')}</span>
+                          <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
+                        </div>
+
+                        {/* Column 2 (MIDDLE RIGHT in RTL): Target Entry Price */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة الشراء المستهدفة' : 'Target Entry Price') : (isAr ? 'نقطة البيع المستهدفة' : 'Target Sell Entry')}</span>
+                          <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
+                        </div>
+
+                        {/* Column 3 (MIDDLE LEFT in RTL): Current Live Price */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
+                          <span className="font-bold text-cyan-400 text-sm flex items-center gap-1">
+                            {current.toFixed(2)} ج.م
+                            <span className={`text-[10px] ${isZeroChange ? 'text-zinc-400' : isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              ({isPositive ? '+' : ''}{pnlPct.toFixed(1)}%)
+                            </span>
+                          </span>
+                        </div>
+
+                        {/* Column 4 (FAR LEFT in RTL): Target 1 TP1 */}
+                        <div>
+                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
+                          <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Visual Progress Scale Bar */}
