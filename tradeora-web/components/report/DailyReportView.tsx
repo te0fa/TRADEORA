@@ -55,6 +55,7 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
   const isAr = locale === 'ar';
   const { report_date, available_dates = [], market_overview, buy_opportunities, sell_caution_opportunities } = data;
 
+  const [reportScope, setReportScope] = useState<'TOP_PICKS' | 'ALL_MARKET'>('TOP_PICKS');
   const [selectedSector, setSelectedSector] = useState<string>('all');
 
   // Available sectors list for filtering
@@ -66,22 +67,31 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
     return ['all', ...Array.from(sSet)];
   }, [buy_opportunities, sell_caution_opportunities]);
 
-  // Filtered lists by sector
+  // Filtered lists by scope and sector
   const filteredBuy = useMemo(() => {
-    if (selectedSector === 'all') return buy_opportunities;
-    return buy_opportunities.filter(item => item.company?.sector === selectedSector);
-  }, [buy_opportunities, selectedSector]);
+    let list = buy_opportunities;
+    if (reportScope === 'TOP_PICKS') {
+      list = list.slice(0, 10);
+    }
+    if (selectedSector === 'all') return list;
+    return list.filter(item => item.company?.sector === selectedSector);
+  }, [buy_opportunities, reportScope, selectedSector]);
 
   const filteredSell = useMemo(() => {
-    if (selectedSector === 'all') return sell_caution_opportunities;
-    return sell_caution_opportunities.filter(item => item.company?.sector === selectedSector);
-  }, [sell_caution_opportunities, selectedSector]);
+    let list = sell_caution_opportunities;
+    if (reportScope === 'TOP_PICKS') {
+      list = list.slice(0, 10);
+    }
+    if (selectedSector === 'all') return list;
+    return list.filter(item => item.company?.sector === selectedSector);
+  }, [sell_caution_opportunities, reportScope, selectedSector]);
 
   const handlePrintPDF = () => {
     window.print();
   };
 
   const currentDateDisplay = selectedDate || report_date;
+  const totalMarketSignalsCount = buy_opportunities.length + sell_caution_opportunities.length;
 
   return (
     <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 pb-16 font-sans">
@@ -109,6 +119,39 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
           <Download className="w-4 h-4" />
           {isAr ? 'تحميل التقرير اليومي PDF' : 'Download PDF Report'}
         </button>
+      </div>
+
+      {/* Scope Selector Bar: Top Picks vs Full Market Database (Hidden on Print) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 bg-gradient-to-r from-amber-500/15 via-cyan-500/15 to-blue-600/15 border border-amber-500/30 rounded-2xl gap-3 print:hidden backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setReportScope('TOP_PICKS')}
+            className={`px-4 py-2 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
+              reportScope === 'TOP_PICKS'
+                ? 'bg-amber-400 text-slate-950 shadow-lg font-black'
+                : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <span>👑 {isAr ? 'صفقات النخبة الذهبية (الأعلى ثقة ودقة)' : 'Premier Top Picks'}</span>
+          </button>
+
+          <button
+            onClick={() => setReportScope('ALL_MARKET')}
+            className={`px-4 py-2 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
+              reportScope === 'ALL_MARKET'
+                ? 'bg-cyan-500 text-slate-950 shadow-lg font-black'
+                : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <span>🌐 {isAr ? `عرض كنز صفقات السوق الكامل (${totalMarketSignalsCount} سهم)` : `Full Market Database (${totalMarketSignalsCount})`}</span>
+          </button>
+        </div>
+
+        <span className="text-[11px] text-amber-200/90 font-medium px-2">
+          {reportScope === 'TOP_PICKS' 
+            ? (isAr ? '✨ العرض الموصى به: يعرض أقوى الصفقات فقط لحفظ تركيزك' : 'Recommended: Shows top picks for optimal focus')
+            : (isAr ? '🌐 الوضع المتقدم: يعرض قاعدة بيانات صفقات البورصة الكاملة' : 'Advanced Mode: Full market signals database')}
+        </span>
       </div>
 
       {/* Date Picker Bar - Interactive Day-by-Day Selection (Hidden on Print) */}

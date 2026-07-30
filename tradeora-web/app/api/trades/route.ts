@@ -124,6 +124,12 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // Sort trades by confidence descending to identify Top Picks (Top 15 Premier Picks)
+    processedTrades.sort((a: any, b: any) => (parseFloat(b.ml_probability || 0) - parseFloat(a.ml_probability || 0)));
+    processedTrades.forEach((t: any, idx: number) => {
+      t.is_top_pick = idx < 15;
+    });
+
     // 3. Fetch closed trades to compute statistics — v2 only, exclude contaminated history
     const { data: allClosed, error: statsError } = await supabase
       .from('recommended_trades')

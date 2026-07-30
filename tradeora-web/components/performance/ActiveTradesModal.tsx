@@ -33,6 +33,7 @@ export interface ActiveTrade {
   expected_target_date?: string;
   order_type?: 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER' | string;
   trigger_condition_ar?: string;
+  is_top_pick?: boolean;
 }
 
 interface ActiveTradesModalProps {
@@ -45,6 +46,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
   const locale = useLocale();
   const isAr = locale === 'ar';
 
+  const [viewScope, setViewScope] = useState<'TOP_PICKS' | 'ALL_MARKET'>('TOP_PICKS');
   const [dirFilter, setDirFilter] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
@@ -62,7 +64,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
   // Filtered trades
   const filteredTrades = useMemo(() => {
-    return trades.filter(t => {
+    return trades.filter((t, idx) => {
+      // 0. Premier Top Pick Scope Filter
+      if (viewScope === 'TOP_PICKS') {
+        const isTop = t.is_top_pick !== undefined ? t.is_top_pick : idx < 15;
+        if (!isTop) return false;
+      }
+
       // 1. Direction Filter
       const isBuy = (t.trade_type || 'BUY').toUpperCase() === 'BUY';
       if (dirFilter === 'BUY' && !isBuy) return false;
@@ -97,13 +105,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
 
       return true;
     });
-  }, [trades, dirFilter, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
+  }, [trades, viewScope, dirFilter, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xl animate-fade-in font-sans">
-      <div className="glass-card w-full max-w-5xl max-h-[90vh] rounded-3xl p-5 sm:p-8 flex flex-col gap-6 overflow-hidden border border-white/10 shadow-2xl bg-surface-dark/95">
+      <div className="glass-card w-full max-w-5xl max-h-[90vh] rounded-3xl p-5 sm:p-8 flex flex-col gap-5 overflow-hidden border border-white/10 shadow-2xl bg-surface-dark/95">
         
         {/* Modal Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -130,6 +138,39 @@ export function ActiveTradesModal({ isOpen, onClose, trades }: ActiveTradesModal
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Premier Tier Scope Toggle Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-2 bg-gradient-to-r from-amber-500/15 via-accent-blue/15 to-purple-500/15 border border-amber-500/30 rounded-2xl gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewScope('TOP_PICKS')}
+              className={`px-4 py-2 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
+                viewScope === 'TOP_PICKS'
+                  ? 'bg-amber-400 text-black shadow-lg font-black'
+                  : 'text-zinc-300 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <span>👑 {isAr ? 'صفقات النخبة الذهبية (الأعلى ثقة ودقة)' : 'Premier Top Picks'}</span>
+            </button>
+
+            <button
+              onClick={() => setViewScope('ALL_MARKET')}
+              className={`px-4 py-2 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 font-bold ${
+                viewScope === 'ALL_MARKET'
+                  ? 'bg-accent-blue text-white shadow-lg font-black'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <span>🌐 {isAr ? `عرض كنز صفقات السوق الكامل (${trades.length} سهم)` : `Full Market Database (${trades.length})`}</span>
+            </button>
+          </div>
+
+          <span className="text-[11px] text-amber-200/90 font-medium px-2">
+            {viewScope === 'TOP_PICKS' 
+              ? (isAr ? '✨ يعرض حالياً أقوى 15 صفقة مختارة بدقة' : 'Showing top 15 premier picks')
+              : (isAr ? '🌐 يعرض كافة الفرص المتاحة بالسوق' : 'Showing full market database')}
+          </span>
         </div>
 
         {/* Controls & Filter Toolbar */}
