@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     // 1. Fetch trades with company details
     // Exclude contaminated pre-launch signals from performance metrics
-    const LAUNCH_DATE = '2026-07-29T22:42:00+00:00'; // post-reset v2 launch
+    const LAUNCH_DATE = '2026-07-30T00:00:00+00:00'; // post-reset v3 clean launch
     let query = supabase
       .from('recommended_trades')
       .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
