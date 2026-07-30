@@ -71,7 +71,6 @@ export async function GET(req: NextRequest) {
       const confidence = t.ml_probability ? parseFloat(t.ml_probability) : null;
       const requiresWarning = confidence !== null && confidence < 0.75;
       const currentPrice = t.company_id && priceMap[t.company_id] ? priceMap[t.company_id] : t.entry_price;
-      const isBuy = (t.direction || 'buy').toLowerCase() === 'buy';
 
       // Compute expected target date (3-5 business days from recommendation date)
       const recDate = t.recommended_at ? new Date(t.recommended_at) : new Date();
@@ -79,10 +78,18 @@ export async function GET(req: NextRequest) {
       const expDateFormatted = expDateObj.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', year: 'numeric' });
       const expectedTargetDate = `${expDateFormatted} (4 أيام تداول)`;
 
+      const entry = Number(t.entry_price || 0);
+      const tp1 = Number(t.tp1 || 0);
+      const sl = Number(t.sl || 0);
+
+      // Mathematical direction check: tp1 > entry implies BUY setup
+      const isBuy = tp1 > entry || (t.direction || 'buy').toLowerCase() === 'buy';
+      const normalizedDirection = isBuy ? 'buy' : 'sell';
+
       const companyNameStr = t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol;
       const defaultRationale = isBuy
-        ? `توصية شراء لسهم ${companyNameStr} (${t.symbol}) بناءً على ثبات السعر أعلى الدعم عند ${t.sl} ج.م، مع إشارة إيجابية لمؤشر RSI وزخم السيولة التجميعي. المستهدف الأول ${t.tp1} ج.م والمستهدف الثاني ${t.tp2} ج.م.`
-        : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${t.entry_price} ج.م، مع مستهدف هبوط ${t.tp1} ج.م ووقف خسارة ${t.sl} ج.م.`;
+        ? `توصية شراء لسهم ${companyNameStr} (${t.symbol}) بناءً على ثبات السعر أعلى الدعم عند ${sl} ج.م، مع إشارة إيجابية لمؤشر RSI وزخم السيولة التجميعي. المستهدف الأول ${tp1} ج.م والمستهدف الثاني ${t.tp2} ج.م.`
+        : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${entry} ج.م، مع مستهدف هبوط ${tp1} ج.م ووقف خسارة ${sl} ج.م.`;
 
       const snap = t.features_snapshot || {};
       let orderType = 'MARKET';
@@ -103,7 +110,7 @@ export async function GET(req: NextRequest) {
 
       const triggerCondAr = snap.trigger_condition_ar || (
         orderType === 'BREAKOUT_TRIGGER'
-          ? `دخول مشروط باختراق مستوى المقاومة ${(Number(t.entry_price || 1) * 1.01).toFixed(2)} ج.م وبحجم تداول تجميعي`
+          ? `دخول مشروط بااختراق مستوى المقاومة ${(Number(t.entry_price || 1) * 1.01).toFixed(2)} ج.م وبحجم تداول تجميعي`
           : orderType === 'LIMIT'
           ? `أمر معلق بسعر محدد: ارتداد متوقع من مستوى الدعم ${(t.rebound_support_price || Number(t.entry_price || 1) * 0.98).toFixed(2)} ج.م`
           : null
@@ -132,14 +139,15 @@ export async function GET(req: NextRequest) {
         trade_style: tradeStyle,
         trade_style_ar: tradeStyleAr,
         scalp_indicators: scalpIndicators,
-        direction: (t.direction || 'buy').toLowerCase(),
+        direction: normalizedDirection,
+        trade_type: isBuy ? 'BUY' : 'SELL',
         company_name: companyNameStr,
         sector: t.companies ? t.companies.sector : null,
         is_shariah_compliant: t.companies ? (t.companies.is_shariah_compliant ?? false) : false,
         current_price: currentPrice,
         confidence_warning: requiresWarning,
         fra_disclaimer: FRA_DISCLAIMER_AR,
-        explanation_ar: t.explanation_ar || defaultRationale,
+        explanation_ar: defaultRationale,
         expected_target_date: dynamicExpDate,
         order_type: orderType,
         trigger_condition_ar: triggerCondAr
