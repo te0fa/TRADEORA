@@ -47,6 +47,9 @@ interface CandlestickChartProps {
   showBB: boolean;
   showVol: boolean;
   showWyckoff?: boolean;
+  showICT?: boolean;
+  showElliott?: boolean;
+  showChannels?: boolean;
   interval: '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w' | '1M';
   srLevels?: { price: number; type: 'support' | 'resistance'; strength: number; distance: number; isStrong?: boolean; isWeekly?: boolean }[];
   onCrosshairMove?: (time: string | null, data?: {
