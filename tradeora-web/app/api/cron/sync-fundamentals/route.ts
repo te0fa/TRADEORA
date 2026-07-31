@@ -30,9 +30,9 @@ async function handleSyncFundamentals() {
       const currentPrice = prices && prices.length > 0 ? Number(prices[0].close_price) : null;
 
       // Hash-based fallback for realistic metric estimation
-      const hashVal = company.symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const hashVal = company.symbol.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
       const multiplier = 1.12 + ((hashVal % 30) / 100.0);
-      const fairValue = fund?.fair_value || (currentPrice ? Number((currentPrice * multiplier).toFixed(2)) : null);
+      const fairValue = (fund as any)?.fair_value || (currentPrice ? Number((currentPrice * multiplier).toFixed(2)) : null);
       const upside = fairValue && currentPrice && currentPrice > 0
         ? Number((((fairValue - currentPrice) / currentPrice) * 100).toFixed(1))
         : null;
