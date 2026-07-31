@@ -21,8 +21,9 @@ SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL"
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
 from supabase import create_client, Client
-sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+from services.macro_news_engine import macro_engine
 
+sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 class NewsIntelligenceService:
     def __init__(self):
@@ -116,14 +117,12 @@ class NewsIntelligenceService:
                         cid = matched_company["id"] if matched_company else None
                         sec_name = matched_company.get("sector") if matched_company else None
                         
-                        if matched_company:
-                            cat = "corporate"
-                        elif any(k in title for k in ["فائدة", "دولار", "المركزي", "الجنيه"]):
-                            cat = "macro_fx"
-                        else:
-                            cat = "macro_geopolitical"
-
+                        nlp_res = macro_engine.analyze_arabic_nlp_sentiment(title, sec_name)
+                        cat = nlp_res["category"] if not matched_company else "corporate"
                         sentiment, impact_score, expected_impact = self.analyze_sentiment_and_impact(title, cat)
+
+                        # Blend sentiment impact score with macro NLP score
+                        blended_impact = round((impact_score + nlp_res["impact_score"]) / 2.0, 2) if nlp_res["impact_score"] != 0 else impact_score
 
                         news_items.append({
                             "company_id": cid,
@@ -134,8 +133,8 @@ class NewsIntelligenceService:
                             "category": cat,
                             "sentiment": sentiment,
                             "confidence": 1.0,
-                            "impact_score": impact_score,
-                            "expected_impact_ar": expected_impact,
+                            "impact_score": blended_impact,
+                            "expected_impact_ar": expected_impact if not nlp_res.get("badge_ar") else f"{nlp_res['badge_ar']} - {expected_impact}",
                             "sector_name": sec_name
                         })
             except Exception as e:
@@ -172,7 +171,7 @@ def run_news_intelligence_pipeline():
         try:
             sb.table("company_news").upsert(item, on_conflict="url").execute()
         except Exception as e:
-            logger.debug(f"Skip item upsert error: {e}")
+            logger.warning(f"Skip item upsert error for {item.get('url')}: {e}")
 
     logger.info("=== AI News & Geopolitical Intelligence Pipeline Completed Successfully ===")
 
