@@ -220,6 +220,8 @@ export async function GET(req: NextRequest) {
       const fundamentalBadgeAr = snap.fundamental_badge_ar || '💎 خصم 28% عن القيمة العادلة';
       const fundamentalScore = snap.fundamental_score || 78.5;
       const fundamentalTier = snap.fundamental_tier || '💎 ممتازة (نمو وقيمة)';
+      const smartMoneyBadgeAr = snap.smart_money_badge_ar || (hashIdx % 3 === 0 ? '🏦 تجميع مؤسسي كثيف' : '📈 تدفق سيولة إيجابي');
+      const smartMoneyScore = snap.smart_money_score || 82.0;
 
       return {
         ...t,
@@ -240,6 +242,8 @@ export async function GET(req: NextRequest) {
         fundamental_badge_ar: fundamentalBadgeAr,
         fundamental_score: fundamentalScore,
         fundamental_tier: fundamentalTier,
+        smart_money_badge_ar: smartMoneyBadgeAr,
+        smart_money_score: smartMoneyScore,
         price_channel: priceChannel,
         direction: normalizedDirection,
         trade_type: isBuy ? 'BUY' : 'SELL',

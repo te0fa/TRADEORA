@@ -13,6 +13,7 @@ from scripts.split_detector import detect_price_anomaly, check_entry_price_valid
 from services.wyckoff_engine import get_wyckoff_confluence_score, detect_wyckoff_spring, calculate_price_channels
 from services.patterns_engine import get_pattern_confluence_score
 from services.fundamental_engine import calculate_fundamental_score
+from services.smart_money_engine import smart_money_engine
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -403,6 +404,12 @@ def generate_daily_recommendations():
         pattern_boost = pattern_info.get('total_boost', 0.0)
         prob += pattern_boost
 
+        # 6. Smart Money Institutional Accumulation & Volume Spread Boost
+        smart_money_info = smart_money_engine.calculate_smart_money_score(df_candles, co.get('sector'))
+        sm_boost = smart_money_info.get('ml_boost', 0.0)
+        prob += sm_boost
+        smart_money_badge_ar = smart_money_info.get('badge_ar')
+
         prob = min(max(prob, 0.0), 0.99) # Clip between 0 and 0.99
 
         # ATR Validation
@@ -476,6 +483,11 @@ def generate_daily_recommendations():
                 'wyckoff_boost': wyckoff_boost,
                 'pattern_badge_ar': pattern_badge_ar,
                 'pattern_boost': pattern_boost,
+                'smart_money_badge_ar': smart_money_badge_ar,
+                'smart_money_score': smart_money_info.get('smart_money_score'),
+                'fundamental_score': fund_info.get('total_score'),
+                'fundamental_tier': fund_info.get('tier_ar'),
+                'fundamental_badge_ar': fundamental_badge_ar,
                 'price_channel': channel_data if channel_data.get('channel_valid') else None
             }
 

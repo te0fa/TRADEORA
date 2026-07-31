@@ -56,6 +56,8 @@ export interface ActiveTrade {
   fundamental_badge_ar?: string;
   fundamental_score?: number;
   fundamental_tier?: string;
+  smart_money_badge_ar?: string;
+  smart_money_score?: number;
   price_channel?: any;
 }
 
@@ -531,6 +533,17 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           {t.fundamental_badge_ar && (
                             <span className="text-[10px] font-extrabold text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/40 flex items-center gap-1 shadow-sm">
                               {t.fundamental_badge_ar}
+                            </span>
+                          )}
+
+                          {/* Smart Money & Institutional Flow Badge */}
+                          {t.smart_money_badge_ar && (
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-lg border flex items-center gap-1 shadow-sm ${
+                              t.smart_money_badge_ar.includes('تجميع')
+                                ? 'text-amber-300 bg-amber-500/20 border-amber-500/40 animate-pulse'
+                                : 'text-yellow-300 bg-yellow-500/20 border-yellow-500/40'
+                            }`}>
+                              {t.smart_money_badge_ar}
                             </span>
                           )}
                         </div>
