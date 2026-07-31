@@ -12,6 +12,7 @@ from pathlib import Path
 from scripts.split_detector import detect_price_anomaly, check_entry_price_validity
 from services.wyckoff_engine import get_wyckoff_confluence_score, detect_wyckoff_spring, calculate_price_channels
 from services.patterns_engine import get_pattern_confluence_score
+from services.fundamental_engine import calculate_fundamental_score
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -374,21 +375,9 @@ def generate_daily_recommendations():
 
         # Fundamental Adjustments (Fair Value & Dividend Yield)
         co_fund = fund_map.get(cid, {})
-        upside = co_fund.get("upside_potential")
-        div_yield = co_fund.get("dividend_yield")
-        fair_val = co_fund.get("fair_value")
-
-        # 1. Undervalued Boost
-        if upside is not None and upside >= 20.0:
-            prob += 0.08
-        elif upside is not None and upside >= 10.0:
-            prob += 0.04
-        elif upside is not None and upside <= -25.0:
-            prob -= 0.10  # Penalty for severely overvalued stocks
-
-        # 2. High Dividend Yield Defensive Boost
-        if div_yield is not None and div_yield >= 7.0:
-            prob += 0.05
+        fund_info = calculate_fundamental_score(co_fund, last_close)
+        prob += fund_info.get('fundamental_boost', 0.0)
+        fundamental_badge_ar = fund_info.get('badge_ar')
 
         # 3. AI News & Geopolitical Impact Adjustment
         try:
@@ -424,6 +413,17 @@ def generate_daily_recommendations():
         atr_eff = atr_val if atr_val > 0 else (last_close * 0.02)
         decimals = 4 if last_close < 1.0 else 2
         entry_price = round(last_close, decimals)
+
+        # Wyckoff Spring Detection on recent candles
+        wyckoff_spring = detect_wyckoff_spring(df_candles)
+        is_wyckoff_spring = wyckoff_spring.get('is_spring', False)
+        wyckoff_badge_ar = wyckoff_spring.get('details', {}).get('badge_ar') if is_wyckoff_spring else None
+
+        # Price Channels
+        channel_data = calculate_price_channels(df_candles)
+
+        # Classical Pattern Badge
+        pattern_badge_ar = pattern_info.get('badge_ar')
 
         # Condition 1: Probability > 0.65 (High-Conviction BUY Recommendation)
         if prob >= 0.65:

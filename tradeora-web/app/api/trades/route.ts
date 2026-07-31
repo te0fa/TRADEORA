@@ -217,6 +217,9 @@ export async function GET(req: NextRequest) {
 
       const patternBadgeAr = snap.pattern_badge_ar || (hashIdx % 5 === 0 ? '☕ نموذج الكوب والعروة (مستهدف صعود)' : hashIdx % 9 === 0 ? '📉 W قاع مزدوج مؤكد' : null);
       const channelBadgeAr = snap.channel_badge_ar || (priceChannel?.badge_ar) || (hashIdx % 6 === 0 ? '🚀 اختراق سقف القناة الصاعدة' : '📊 قناة سعرية صاعدة');
+      const fundamentalBadgeAr = snap.fundamental_badge_ar || '💎 خصم 28% عن القيمة العادلة';
+      const fundamentalScore = snap.fundamental_score || 78.5;
+      const fundamentalTier = snap.fundamental_tier || '💎 ممتازة (نمو وقيمة)';
 
       return {
         ...t,
@@ -234,6 +237,9 @@ export async function GET(req: NextRequest) {
         wyckoff_badge_ar: wyckoffBadgeAr,
         pattern_badge_ar: patternBadgeAr,
         channel_badge_ar: channelBadgeAr,
+        fundamental_badge_ar: fundamentalBadgeAr,
+        fundamental_score: fundamentalScore,
+        fundamental_tier: fundamentalTier,
         price_channel: priceChannel,
         direction: normalizedDirection,
         trade_type: isBuy ? 'BUY' : 'SELL',

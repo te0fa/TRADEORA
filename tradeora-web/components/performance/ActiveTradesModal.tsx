@@ -53,6 +53,9 @@ export interface ActiveTrade {
   wyckoff_badge_ar?: string;
   pattern_badge_ar?: string;
   channel_badge_ar?: string;
+  fundamental_badge_ar?: string;
+  fundamental_score?: number;
+  fundamental_tier?: string;
   price_channel?: any;
 }
 
@@ -521,6 +524,13 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                                 : 'text-cyan-300 bg-cyan-500/20 border-cyan-500/40'
                             }`}>
                               {t.channel_badge_ar}
+                            </span>
+                          )}
+
+                          {/* Fundamental Valuation & Health Badge */}
+                          {t.fundamental_badge_ar && (
+                            <span className="text-[10px] font-extrabold text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-lg border border-blue-500/40 flex items-center gap-1 shadow-sm">
+                              {t.fundamental_badge_ar}
                             </span>
                           )}
                         </div>
