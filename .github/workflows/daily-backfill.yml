@@ -37,8 +37,9 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           pip install --upgrade pip
+          # tvDatafeed is not on PyPI – install from GitHub
+          pip install git+https://github.com/rongardF/tvdatafeed.git
           pip install \
-            tvDatafeed \
             supabase \
             python-dotenv \
             pandas \
