@@ -268,15 +268,16 @@ export async function dispatchTradeAlert(
 
     // Per-user DMs (if user_ids provided and have telegram_chat_id)
     if (alert.user_ids?.length) {
-      const { data: profiles } = await sb
-        .from('profiles')
-        .select('telegram_chat_id')
-        .in('id', alert.user_ids)
+      const { data: notifSettings } = await sb
+        .from('user_notification_settings')
+        .select('telegram_chat_id, notify_telegram')
+        .in('user_id', alert.user_ids)
+        .eq('notify_telegram', true)
         .not('telegram_chat_id', 'is', null);
 
-      if (profiles?.length) {
+      if (notifSettings?.length) {
         await Promise.all(
-          profiles.map((p: any) => sendTelegram(p.telegram_chat_id, message))
+          notifSettings.map((s: any) => sendTelegram(s.telegram_chat_id, message))
         );
       }
     }
