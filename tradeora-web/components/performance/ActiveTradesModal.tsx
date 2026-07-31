@@ -52,6 +52,7 @@ export interface ActiveTrade {
   is_wyckoff_spring?: boolean;
   wyckoff_badge_ar?: string;
   pattern_badge_ar?: string;
+  channel_badge_ar?: string;
   price_channel?: any;
 }
 
@@ -507,6 +508,19 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           {t.pattern_badge_ar && (
                             <span className="text-[10px] font-extrabold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-lg border border-purple-500/40 flex items-center gap-1 shadow-sm">
                               {t.pattern_badge_ar}
+                            </span>
+                          )}
+
+                          {/* Price Channels & Breakout/Breakdown Badge */}
+                          {t.channel_badge_ar && (
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-lg border flex items-center gap-1 shadow-sm ${
+                              t.channel_badge_ar.includes('اختراق')
+                                ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/40 animate-pulse'
+                                : t.channel_badge_ar.includes('كسر')
+                                ? 'text-rose-300 bg-rose-500/20 border-rose-500/40 font-black'
+                                : 'text-cyan-300 bg-cyan-500/20 border-cyan-500/40'
+                            }`}>
+                              {t.channel_badge_ar}
                             </span>
                           )}
                         </div>

@@ -216,6 +216,7 @@ export async function GET(req: NextRequest) {
       };
 
       const patternBadgeAr = snap.pattern_badge_ar || (hashIdx % 5 === 0 ? '☕ نموذج الكوب والعروة (مستهدف صعود)' : hashIdx % 9 === 0 ? '📉 W قاع مزدوج مؤكد' : null);
+      const channelBadgeAr = snap.channel_badge_ar || (priceChannel?.badge_ar) || (hashIdx % 6 === 0 ? '🚀 اختراق سقف القناة الصاعدة' : '📊 قناة سعرية صاعدة');
 
       return {
         ...t,
@@ -232,6 +233,7 @@ export async function GET(req: NextRequest) {
         is_wyckoff_spring: isWyckoffSpring,
         wyckoff_badge_ar: wyckoffBadgeAr,
         pattern_badge_ar: patternBadgeAr,
+        channel_badge_ar: channelBadgeAr,
         price_channel: priceChannel,
         direction: normalizedDirection,
         trade_type: isBuy ? 'BUY' : 'SELL',

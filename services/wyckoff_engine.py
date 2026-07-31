@@ -129,7 +129,8 @@ def detect_wyckoff_upthrust(df: pd.DataFrame, window: int = 30) -> Dict[str, Any
 
 def calculate_price_channels(df: pd.DataFrame, window: int = 40) -> Dict[str, Any]:
     """
-    Calculates dynamic linear regression Price Channels (Upper Ceiling, Lower Floor, Median Line).
+    Calculates dynamic linear regression Price Channels (Upper Ceiling, Lower Floor, Median Line),
+    classifies Ascending vs Descending channels, and detects Channel Ceiling Breakouts and Floor Breakdowns.
     """
     if df is None or len(df) < window:
         return {'channel_valid': False, 'upper': None, 'lower': None, 'median': None}
@@ -139,6 +140,7 @@ def calculate_price_channels(df: pd.DataFrame, window: int = 40) -> Dict[str, An
         close_col = cols.get('close', 'Close')
         high_col = cols.get('high', 'High')
         low_col = cols.get('low', 'Low')
+        vol_col = cols.get('volume', 'Volume')
 
         recent = df.tail(window).copy().reset_index(drop=True)
         y = recent[close_col].values
@@ -159,18 +161,53 @@ def calculate_price_channels(df: pd.DataFrame, window: int = 40) -> Dict[str, An
         latest_lower = float(lower_channel[-1])
         latest_median = float(trendline[-1])
 
-        # Distance from lower channel floor
-        dist_to_floor = abs(latest_close - latest_lower) / max(0.01, latest_close) * 100
-        is_at_channel_floor = dist_to_floor <= 2.5
+        # Volume Ratio
+        vol_vals = recent[vol_col].values if vol_col in recent.columns else [1.0]*window
+        latest_vol = float(vol_vals[-1])
+        vol_sma = np.mean(vol_vals[-20:]) if len(vol_vals) >= 20 else 1.0
+        vol_ratio = latest_vol / max(1.0, vol_sma)
+
+        # Channel Classifications
+        is_ascending = slope > 0.0001
+        is_descending = slope < -0.0001
+
+        # Breakout & Breakdown Detection
+        is_channel_breakout = (latest_close > latest_upper * 1.002) and (vol_ratio >= 1.25)
+        is_channel_breakdown = latest_close < latest_lower * 0.998
+        is_at_channel_floor = abs(latest_close - latest_lower) / max(0.01, latest_close) * 100 <= 2.5
+
+        # Badges
+        badge_ar = None
+        if is_channel_breakout:
+            badge_ar = '🚀 اختراق سقف القناة الصاعدة' if is_ascending else '🚀 اختراق سقف القناة'
+        elif is_channel_breakdown:
+            badge_ar = '🚨 كسر أرضية القناة'
+        elif is_ascending and is_at_channel_floor:
+            badge_ar = '📊 شراء من قاع القناة الصاعدة'
+        elif is_ascending:
+            badge_ar = '📊 قناة سعرية صاعدة'
+        elif is_descending:
+            badge_ar = '📉 قناة سعرية هابطة'
+
+        confidence_boost = 0.0
+        if is_channel_breakout:
+            confidence_boost = 0.12 # +12% ML boost for channel breakout
+        elif is_ascending and is_at_channel_floor:
+            confidence_boost = 0.10 # +10% ML boost for ascending floor bounce
 
         return {
             'channel_valid': True,
             'upper': round(latest_upper, 2),
             'lower': round(latest_lower, 2),
             'median': round(latest_median, 2),
-            'slope_direction': 'UP' if slope > 0 else 'DOWN',
+            'slope_direction': 'UP' if is_ascending else ('DOWN' if is_descending else 'FLAT'),
+            'is_ascending': is_ascending,
+            'is_descending': is_descending,
+            'is_channel_breakout': is_channel_breakout,
+            'is_channel_breakdown': is_channel_breakdown,
             'is_at_channel_floor': is_at_channel_floor,
-            'confidence_boost': 0.10 if is_at_channel_floor else 0.0
+            'confidence_boost': confidence_boost,
+            'badge_ar': badge_ar
         }
 
     except Exception as e:
