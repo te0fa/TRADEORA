@@ -1,0 +1,56 @@
+name: 📡 Live Session Candles (Every 15 min)
+
+on:
+  schedule:
+    # كل 15 دقيقة أثناء جلسة البورصة المصرية
+    # الجلسة: الأحد-الخميس 10:00 AM – 3:00 PM Cairo (UTC+3)
+    # = 7:00 AM – 12:00 PM UTC
+    - cron: '*/15 7-12 * * 0,1,2,3,4'
+  
+  workflow_dispatch:
+    inputs:
+      intervals:
+        description: 'Intervals to fetch'
+        required: false
+        default: '15m,1h'
+
+jobs:
+  live-candles:
+    name: 📊 Update Live Session Candles
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: pip install yfinance supabase python-dotenv pandas
+
+      - name: 📡 Fetch live session candles (Yahoo Finance)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          INTERVALS="${{ github.event.inputs.intervals || '15m,1h' }}"
+          echo "📡 Fetching live candles: $INTERVALS"
+          python yf_backfill.py --intervals $INTERVALS --live
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-candles-logs-${{ github.run_id }}
+          path: logs/yf_backfill.log
+          retention-days: 3
+
+---
+# ملحوظة: GitHub Actions free tier = 2000 دقيقة/شهر
+# الـ workflow ده: 20 دقيقة × 20 مرة/أسبوع × 4 أسابيع = 1600 دقيقة/شهر
+# تقريباً في حدود الـ free tier
