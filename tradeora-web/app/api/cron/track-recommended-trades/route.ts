@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { dispatchExitSignal } from '@/lib/alert-dispatcher';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -364,6 +365,12 @@ export async function GET(req: NextRequest) {
           closed_at: now.toISOString(),
         };
         results.sl_hit++;
+        // 🔔 Alert: SL hit
+        dispatchExitSignal(sb, {
+          trade_id: trade.id, symbol: trade.symbol,
+          reason: 'sl', reason_ar: `وقف الخسارة مُفعَّل عند ${currentPrice.toFixed(2)} ج.م`,
+          urgency: 'critical', pnl_pct: calcPnl(currentPrice), exit_price: currentPrice,
+        }).catch(() => {});
 
       } else if ((isBuy && currentPrice >= tp2) || (!isBuy && currentPrice <= tp2)) {
         update = {
@@ -372,6 +379,12 @@ export async function GET(req: NextRequest) {
           closed_at: now.toISOString(),
         };
         results.tp2_hit++;
+        // 🔔 Alert: TP2 hit (great news!)
+        dispatchExitSignal(sb, {
+          trade_id: trade.id, symbol: trade.symbol,
+          reason: 'tp2', reason_ar: `🎯🎯 الهدف الثاني محقق! ربح +${calcPnl(currentPrice).toFixed(1)}% عند ${currentPrice.toFixed(2)} ج.م`,
+          urgency: 'high', pnl_pct: calcPnl(currentPrice), exit_price: currentPrice,
+        }).catch(() => {});
 
       } else if ((isBuy && currentPrice >= tp1) || (!isBuy && currentPrice <= tp1)) {
         update = {
@@ -381,6 +394,12 @@ export async function GET(req: NextRequest) {
           features_snapshot: { ...snap, highest_since_entry: highestSinceEntry, tp1_hit_at: now.toISOString() },
         };
         results.tp1_hit++;
+        // 🔔 Alert: TP1 hit
+        dispatchExitSignal(sb, {
+          trade_id: trade.id, symbol: trade.symbol,
+          reason: 'tp1', reason_ar: `🎯 الهدف الأول محقق عند ${currentPrice.toFixed(2)} ج.م (+${calcPnl(currentPrice).toFixed(1)}%) – SL تحرك لسعر الدخول`,
+          urgency: 'high', pnl_pct: calcPnl(currentPrice), exit_price: currentPrice,
+        }).catch(() => {});
 
       } else {
         // ── Dynamic Exit Engine ──────────────────────────────────────────────
@@ -409,6 +428,14 @@ export async function GET(req: NextRequest) {
           else if (exitEval.reason.startsWith('macd'))    results.macd_exit++;
           else if (exitEval.reason.startsWith('ema20'))   results.ema20_exit++;
 
+          // 🔔 Alert: Dynamic exit (critical)
+          dispatchExitSignal(sb, {
+            trade_id: trade.id, symbol: trade.symbol,
+            reason: exitEval.reason, reason_ar: exitEval.reasonAr,
+            urgency: 'critical', pnl_pct: calcPnl(currentPrice),
+            exit_price: currentPrice, new_sl: exitEval.newSl,
+          }).catch(() => {});
+
         } else {
           // No exit – but update trailing SL if changed, and store highest price
           const slChanged = exitEval.newSl > sl + 0.001;
@@ -430,6 +457,13 @@ export async function GET(req: NextRequest) {
           }
           if (exitEval.urgency === 'high' || exitEval.urgency === 'medium') {
             results.dynamic_warnings++;
+            // 🔔 Alert: Warning (high/medium urgency) – no auto-close, just notify
+            dispatchExitSignal(sb, {
+              trade_id: trade.id, symbol: trade.symbol,
+              reason: exitEval.reason, reason_ar: exitEval.reasonAr,
+              urgency: exitEval.urgency as any,
+              pnl_pct: unrealizedPnl, new_sl: exitEval.newSl,
+            }).catch(() => {});
           }
         }
       }
