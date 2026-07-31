@@ -79,8 +79,58 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ...results, message: 'No active recommended trades' });
     }
 
+    // ── STEP 2b: Stale Trade Cleanup (20+ trading days = ~28 calendar days) ─
+    // Backtest: trades with no TP/SL movement after 20 days = Dead Money
+    const STALE_DAYS = 28; // ~20 EGX trading days (Sun-Thu)
+    const staleThreshold = new Date(Date.now() - STALE_DAYS * 86400000).toISOString();
+    const staleTrades = activeTrades.filter(
+      (t: any) => t.recommended_at && t.recommended_at < staleThreshold
+    );
+
+    if (staleTrades.length > 0) {
+      // Fetch prices for stale trades
+      const staleIds = staleTrades.map((t: any) => t.company_id);
+      const { data: stalePrices } = await sb
+        .from('market_prices')
+        .select('company_id, close_price')
+        .in('company_id', staleIds)
+        .order('price_date', { ascending: false });
+
+      const stalePriceMap: Record<string, number> = {};
+      for (const p of (stalePrices ?? []) as any[]) {
+        if (!stalePriceMap[p.company_id] && p.close_price) {
+          stalePriceMap[p.company_id] = parseFloat(p.close_price);
+        }
+      }
+
+      const staleClosePromises = staleTrades.map((t: any) => {
+        const exitPrice = stalePriceMap[t.company_id] ?? parseFloat(t.entry_price);
+        const entry     = parseFloat(t.entry_price);
+        const dir       = t.direction !== 'sell' ? 1 : -1;
+        const pnl       = parseFloat(((exitPrice - entry) / entry * 100 * dir).toFixed(2));
+
+        return Promise.resolve(
+          sb.from('recommended_trades').update({
+            status:      'closed',
+            exit_price:  exitPrice,
+            exit_reason: 'expired_no_movement',
+            pnl_percent: pnl,
+            closed_at:   now.toISOString(),
+          }).eq('id', t.id).then()
+        );
+      });
+
+      await Promise.all(staleClosePromises);
+      (results as any).stale_closed = staleTrades.length;
+    }
+
+    // Remove stale trades from active list to avoid re-processing
+    const activeTradesToProcess = activeTrades.filter(
+      (t: any) => !staleTrades.find((s: any) => s.id === t.id)
+    );
+
     // ── STEP 3: Fetch latest prices in bulk ──────────────────────────────
-    const companyIds = [...new Set(activeTrades.map((t: any) => t.company_id))];
+    const companyIds = [...new Set(activeTradesToProcess.map((t: any) => t.company_id))];
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
 
     const { data: prices } = await sb
@@ -101,7 +151,7 @@ export async function GET(req: NextRequest) {
     // ── STEP 4: Evaluate each trade ──────────────────────────────────────
     const updatePromises: Promise<any>[] = [];
 
-    for (const trade of activeTrades as any[]) {
+    for (const trade of activeTradesToProcess as any[]) {
       const currentPrice = priceMap[trade.company_id];
       if (!currentPrice) {
         results.skipped_no_price++;

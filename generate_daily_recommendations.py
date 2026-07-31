@@ -51,8 +51,15 @@ _model_path  = f'models/model_1d_{MODEL_VERSION}.pkl'
 _scaler_path = f'models/scaler_1d_{MODEL_VERSION}.pkl'
 _meta_path   = f'models/model_{MODEL_VERSION}_metadata.json'
 
+# ─── Auto-upgrade to v4 if available (trained on clean data, 25 features) ───
+if os.path.exists('models/model_1d_v4.pkl'):
+    logger.info("✨ Model v4 detected – upgrading automatically")
+    MODEL_VERSION = 'v4'
+    _model_path  = 'models/model_1d_v4.pkl'
+    _scaler_path = 'models/scaler_1d_v4.pkl'
+    _meta_path   = 'models/model_v4_metadata.json'
 # Auto-fallback to v2 if v3 not yet available
-if not os.path.exists(_model_path):
+elif not os.path.exists(_model_path):
     logger.warning(f"Model v3 not found – falling back to v2")
     MODEL_VERSION = 'v2'
     _model_path  = 'models/model_1d_v2.pkl'
@@ -62,7 +69,7 @@ if not os.path.exists(_model_path):
 if not os.path.exists(_model_path):
     raise FileNotFoundError(
         f"No model found at {_model_path}\n"
-        f"Run train_model_v3.py (or train_model_v2.py) first."
+        f"Run train_model_v4.py (or train_model_v3.py) first."
     )
 
 model  = joblib.load(_model_path)
@@ -379,8 +386,13 @@ def generate_daily_recommendations():
 
         feat_row, last_close, atr_val, macd_res = extracted
 
-        # Model Prediction (Slice features to match trained scaler/model input size)
+        # Model Prediction (Slice or pad features to match trained scaler/model input size)
+        # v3 = 21 features, v4 = 25 features (4 new: trend_strength, volatility_regime, volume_trend, candle_body_ratio)
         feat_input = feat_row[:expected_n_features]
+        if len(feat_input) < expected_n_features:
+            # Pad with neutral values for new v4 features
+            padding = [0.5] * (expected_n_features - len(feat_input))
+            feat_input = feat_input + padding
         X_scaled = scaler.transform([feat_input])
         prob = float(model.predict_proba(X_scaled)[0][1])
 

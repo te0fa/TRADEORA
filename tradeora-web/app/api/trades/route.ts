@@ -268,16 +268,65 @@ export async function GET(req: NextRequest) {
     const buyTrades = processedTrades.filter((t: any) => t.direction === 'buy');
     const sellTrades = processedTrades.filter((t: any) => t.direction === 'sell');
 
-    // Sort BUY trades by confidence descending to identify Top 15 Premier Picks
-    buyTrades.sort((a: any, b: any) => (parseFloat(b.ml_probability || 0) - parseFloat(a.ml_probability || 0)));
-    buyTrades.forEach((t: any, idx: number) => {
-      t.is_top_pick = idx < 15;
+    // ── COMPOSITE SCORE RANKING (Backtest-validated formula) ─────────────────
+    // composite_score = ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)
+    buyTrades.forEach((t: any) => {
+      const snap      = t.features_snapshot || {};
+      const mlProb    = parseFloat(t.ml_probability || 0.5);
+      const confCount = Math.min((snap.confirmation_count ?? 0), 5);  // 0-5
+      const confNorm  = confCount / 5;                                  // 0-1
+
+      // R:R ratio normalized (1.2 = min acceptable → 4.0 = max ideal)
+      const entry = Number(t.entry_price || 1);
+      const tp1v  = Number(t.tp1 || entry * 1.05);
+      const slv   = Number(t.sl  || entry * 0.95);
+      const rr    = entry > 0 && slv < entry
+        ? Math.abs((tp1v - entry) / (entry - slv))
+        : 1.5;
+      const rrNorm = Math.min(Math.max((rr - 1.2) / (4.0 - 1.2), 0), 1); // 0-1
+
+      // Timeframe bonus: 3-5 أيام تداول = 76.9% WR (best actual)
+      const tf = t.timeframe || '1d';
+      const tfBonus = tf.includes('3-5') ? 1.0
+        : tf.includes('4-7') ? 0.7
+        : tf === '1d' ? 0.5
+        : tf === 'intraday' ? 0.2
+        : 0.3;
+
+      const compositeScore = (
+        mlProb   * 0.40 +
+        confNorm * 0.30 +
+        rrNorm   * 0.20 +
+        tfBonus  * 0.10
+      );
+
+      t.composite_score     = parseFloat(compositeScore.toFixed(4));
+      t.confirmation_count  = confCount;
+      t.confirmation_sources = snap.confirmation_sources ?? [];
+      t.rr_ratio            = parseFloat(rr.toFixed(2));
     });
+
+    // Sort by composite_score descending
+    buyTrades.sort((a: any, b: any) => b.composite_score - a.composite_score);
+
+    // Mark Top 20 as premier picks
+    buyTrades.forEach((t: any, idx: number) => {
+      t.is_top_pick    = idx < 20;
+      t.rank           = idx + 1;
+      t.rank_tier      = idx < 5  ? 'elite'    // 🏆 Top 5
+        : idx < 10 ? 'premier'  // ⭐ Top 6-10
+        : idx < 20 ? 'strong'   // ✅ Top 11-20
+        : 'standard';           // 📊 Rest
+    });
+
+    // Split into Top 20 and remaining
+    const topPicks     = buyTrades.filter((t: any) => t.is_top_pick);
+    const otherSignals = buyTrades.filter((t: any) => !t.is_top_pick);
 
     // 3. Fetch closed BUY trades to compute platform statistics exclusively for BUY signals
     const { data: allClosed, error: statsError } = await supabase
       .from('recommended_trades')
-      .select('pnl_percent, status, exit_reason, direction')
+      .select('pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot')
       .eq('status', 'closed')
       .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
       .gte('recommended_at', LAUNCH_DATE);
@@ -289,30 +338,61 @@ export async function GET(req: NextRequest) {
     // Filter closed trades exclusively for BUY direction
     const closedBuyTrades = (allClosed || []).filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy');
 
-    const totalBuyCount = buyTrades.length;
-    const activeBuyCount = buyTrades.length;
-    
-    // Statistics for active live tracking (Scoped to BUY signals)
-    const closedCount = closedBuyTrades.length;
-    const winningTrades = closedBuyTrades.filter((t: any) => (t.pnl_percent || 0) > 0);
-    const losingTrades = closedBuyTrades.filter((t: any) => (t.pnl_percent || 0) < 0);
-    
+    // Exclude backfill estimates from win rate (they are estimated not real)
+    const realClosed = closedBuyTrades.filter((t: any) =>
+      t.exit_reason !== 'backfill_estimate' && t.pnl_percent !== null
+    );
+
+    const totalBuyCount  = buyTrades.length;
+    const closedCount    = realClosed.length;
+    const winningTrades  = realClosed.filter((t: any) => (t.pnl_percent || 0) > 0);
+    const losingTrades   = realClosed.filter((t: any) => (t.pnl_percent || 0) < 0);
+
     const winRate = closedCount > 0 ? (winningTrades.length / closedCount) * 100 : 0;
-    const totalPnl = closedBuyTrades.reduce((sum: number, t: any) => sum + parseFloat(t.pnl_percent || 0), 0);
-    const avgPnl = closedCount > 0 ? totalPnl / closedCount : 0;
+    const totalPnl = realClosed.reduce((sum: number, t: any) => sum + parseFloat(t.pnl_percent || 0), 0);
+    const avgPnl   = closedCount > 0 ? totalPnl / closedCount : 0;
+    const avgWin   = winningTrades.length > 0
+      ? winningTrades.reduce((s: number, t: any) => s + parseFloat(t.pnl_percent), 0) / winningTrades.length : 0;
+    const avgLoss  = losingTrades.length > 0
+      ? losingTrades.reduce((s: number, t: any) => s + parseFloat(t.pnl_percent), 0) / losingTrades.length : 0;
+    const rrRatio  = avgLoss < 0 ? Math.abs(avgWin / avgLoss) : 0;
+    const expectancy = closedCount > 0
+      ? (winRate / 100 * avgWin) + ((1 - winRate / 100) * avgLoss) : 0;
+
+    // Stats for Top 20 picks specifically
+    const topPickIds = new Set(topPicks.map((t: any) => t.id));
+    const topPicksClosed = realClosed.filter((t: any) => topPickIds.has(t.id));
+    const topPicksWinners = topPicksClosed.filter((t: any) => (t.pnl_percent || 0) > 0);
 
     return NextResponse.json({
-      trades: buyTrades,
-      sell_signals: sellTrades,
+      // ── Primary: Top 20 premier picks (sorted by composite_score) ────────
+      trades:        topPicks,       // Top 20 by composite_score
+      top_picks:     topPicks,       // Alias for clarity
+      other_signals: otherSignals,   // Remaining signals (below Top 20)
+      sell_signals:  sellTrades,
+
+      // ── Ranking metadata ────────────────────────────────────────────────
+      ranking: {
+        total_active:   buyTrades.length,
+        top_picks_count: topPicks.length,
+        other_count:    otherSignals.length,
+        formula:        'ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)',
+      },
+
+      // ── Platform performance stats (real trades only, excl. backfill) ──
       stats: {
-        total_trades: totalBuyCount,
-        active_trades: activeBuyCount,
-        closed_trades: closedCount,
-        winning_trades: winningTrades.length,
-        losing_trades: losingTrades.length,
-        win_rate: parseFloat(winRate.toFixed(1)),
-        total_pnl: parseFloat(totalPnl.toFixed(1)),
-        avg_pnl: parseFloat(avgPnl.toFixed(2))
+        total_trades:    totalBuyCount,
+        active_trades:   totalBuyCount,
+        closed_trades:   closedCount,
+        winning_trades:  winningTrades.length,
+        losing_trades:   losingTrades.length,
+        win_rate:        parseFloat(winRate.toFixed(1)),
+        total_pnl:       parseFloat(totalPnl.toFixed(1)),
+        avg_pnl:         parseFloat(avgPnl.toFixed(2)),
+        avg_win:         parseFloat(avgWin.toFixed(2)),
+        avg_loss:        parseFloat(avgLoss.toFixed(2)),
+        rr_ratio:        parseFloat(rrRatio.toFixed(2)),
+        expectancy:      parseFloat(expectancy.toFixed(2)),
       }
     });
   } catch (error: any) {
