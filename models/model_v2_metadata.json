@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "trained_at": "2026-07-31T00:01:04.106120+00:00",
+  "trained_at": "2026-07-31T00:08:04.551928+00:00",
   "macd_version": "standard (MACD - Signal)",
   "data_sources": [
     "tradingview_1d",
