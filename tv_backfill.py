@@ -203,11 +203,24 @@ def backfill_symbol_interval(tv, symbol: str, company_id: str, interval_key: str
         return 'failed', 0
 
 def main():
-    parser = argparse.ArgumentParser(description="TradingView Daily Incremental Backfill Utility")
-    parser.add_argument('--incremental', action='store_true', default=True, help="Fetch only missing candles (default: True)")
-    parser.add_argument('--symbol', type=str, default=None, help="Target specific symbol for backfill")
-    parser.add_argument('symbols_positional', nargs='*', help="Target specific symbols (positional args)")
+    parser = argparse.ArgumentParser(description="TradingView Daily Backfill Utility")
+    mode_grp = parser.add_mutually_exclusive_group()
+    mode_grp.add_argument('--incremental', action='store_true', default=True,
+                          help="Fetch only missing candles since last date in DB (default)")
+    mode_grp.add_argument('--full',        action='store_true', default=False,
+                          help="Force re-fetch ALL candles (fixes missing candles gap)")
+    parser.add_argument('--symbol', type=str, default=None, help="Target specific symbol only")
+    parser.add_argument('--intervals', type=str, default=None,
+                        help="Comma-separated intervals to backfill e.g. 1d,4h (default: all)")
+    parser.add_argument('symbols_positional', nargs='*', help="Target specific symbols (positional)")
     args = parser.parse_args()
+
+    # --full overrides incremental
+    is_incremental = not args.full
+    if args.full:
+        logger.info("🔄 FULL mode: re-fetching all candles (ignoring DB state)")
+    else:
+        logger.info("⚡ INCREMENTAL mode: fetching only missing candles")
 
     target_symbol = args.symbol
     if not target_symbol and args.symbols_positional:
@@ -233,7 +246,15 @@ def main():
         logger.info(f"Starting daily backfill for {len(target_companies)} active companies...")
 
     tv = get_tv()
-    intervals = ['15m', '30m', '1h', '4h', '1d']
+
+    # Filter intervals if --intervals flag provided
+    all_intervals = ['15m', '30m', '1h', '4h', '1d']
+    if args.intervals:
+        requested = [x.strip() for x in args.intervals.split(',')]
+        intervals = [i for i in all_intervals if i in requested]
+        logger.info(f"Backfilling intervals: {intervals}")
+    else:
+        intervals = all_intervals
 
     processed_count = 0
     skipped_count = 0
@@ -250,7 +271,7 @@ def main():
 
         for ivl in intervals:
             try:
-                status, count = backfill_symbol_interval(tv, sym, cid, ivl, incremental=args.incremental)
+                status, count = backfill_symbol_interval(tv, sym, cid, ivl, incremental=is_incremental)
                 total_written += count
                 if status == 'processed':
                     symbol_skipped = False
