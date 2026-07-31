@@ -88,6 +88,21 @@ export async function GET(req: NextRequest) {
       existingTradeMap[t.company_id] = t;
     }
 
+    // ── Fetch breaking news (last 24 hours) for news sentiment evaluation ─────
+    const oneDayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { data: newsItems } = await sb
+      .from('company_news')
+      .select('company_id, impact_score, expected_impact_ar, category')
+      .gte('published_at', oneDayAgo);
+
+    const newsImpactMap: Record<string, number> = {};
+    for (const n of (newsItems ?? []) as any[]) {
+      if (n.company_id && n.impact_score) {
+        if (!newsImpactMap[n.company_id]) newsImpactMap[n.company_id] = 0;
+        newsImpactMap[n.company_id] += Number(n.impact_score);
+      }
+    }
+
     // ── Analyse each company and update signals ──────────────────────
     const tradesToInsert: any[] = [];
     const updatePromises: any[] = [];
@@ -98,6 +113,7 @@ export async function GET(req: NextRequest) {
 
       const closes = closesMap[comp.id] ?? [];
       const closePrice: number = latest.close_price;
+      const newsImpact = newsImpactMap[comp.id] || 0.0;
 
       // Compute change percent
       let changePercent: number = latest.change_percent ?? 0;
@@ -116,15 +132,19 @@ export async function GET(req: NextRequest) {
         trend = closes[0] > closes[1] ? 'up' : closes[0] < closes[1] ? 'down' : 'flat';
       }
 
-      // Determine signal
+      // Determine signal with News Sentiment Adjustment
       let newSignal: 'buy' | 'sell' | null = null;
       let winRate  = 70;
       let mlProb   = 0.70;
 
-      if      (changePercent >= 2.5 && trend === 'up')   { newSignal = 'buy';  winRate = 80; mlProb = 0.83; }
-      else if (changePercent <= -2.5 && trend === 'down') { newSignal = 'sell'; winRate = 75; mlProb = 0.80; }
-      else if (changePercent >= 1.5 && trend !== 'down')  { newSignal = 'buy';  winRate = 72; mlProb = 0.76; }
-      else if (changePercent <= -1.5 && trend !== 'up')   { newSignal = 'sell'; winRate = 70; mlProb = 0.74; }
+      // Apply Breaking News Boost / Penalty to ML Probability
+      if (newsImpact >= 0.25) mlProb += 0.07;
+      else if (newsImpact <= -0.25) mlProb -= 0.09;
+
+      if      ((changePercent >= 2.5 || newsImpact >= 0.4) && trend === 'up')   { newSignal = 'buy';  winRate = 80; mlProb = Math.min(mlProb + 0.13, 0.95); }
+      else if ((changePercent <= -2.5 || newsImpact <= -0.4) && trend === 'down') { newSignal = 'sell'; winRate = 75; mlProb = Math.min(mlProb + 0.10, 0.95); }
+      else if (changePercent >= 1.5 && trend !== 'down')  { newSignal = 'buy';  winRate = 72; mlProb = Math.min(mlProb + 0.06, 0.90); }
+      else if (changePercent <= -1.5 && trend !== 'up')   { newSignal = 'sell'; winRate = 70; mlProb = Math.min(mlProb + 0.04, 0.90); }
 
       const existingTrade = existingTradeMap[comp.id];
 
