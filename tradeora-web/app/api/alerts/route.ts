@@ -9,18 +9,22 @@
  *   ?unread=true     – only unread
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  return createClient(url, key);
+}
 
 const URGENCY_RANK: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1
 };
 
 export async function GET(req: NextRequest) {
-  const sb      = createRouteHandlerClient({ cookies });
-  const { data: { user } } = await sb.auth.getUser();
+  const sb      = getSupabase();
   const params  = req.nextUrl.searchParams;
   const limit   = Math.min(parseInt(params.get('limit') || '20'), 50);
   const urgency = params.get('urgency') || 'medium';
@@ -30,17 +34,16 @@ export async function GET(req: NextRequest) {
     let query = sb
       .from('trade_alerts')
       .select('*')
-      .or(user ? `user_id.eq.${user.id},user_id.is.null` : 'user_id.is.null')
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (unread) query = query.eq('is_read', false);
+    if (unread) query = query.eq('is_read', false) as any;
 
     // Filter by minimum urgency
     const urgencyFilter = Object.entries(URGENCY_RANK)
       .filter(([, rank]) => rank >= (URGENCY_RANK[urgency] || 2))
       .map(([key]) => key);
-    query = query.in('urgency', urgencyFilter);
+    query = query.in('urgency', urgencyFilter) as any;
 
     const { data: alerts, error } = await query;
     if (error) throw error;
@@ -49,7 +52,6 @@ export async function GET(req: NextRequest) {
     const { count } = await sb
       .from('trade_alerts')
       .select('*', { count: 'exact', head: true })
-      .or(user ? `user_id.eq.${user.id},user_id.is.null` : 'user_id.is.null')
       .eq('is_read', false);
 
     return NextResponse.json({
@@ -67,23 +69,14 @@ export async function GET(req: NextRequest) {
  * Body: { alert_ids: string[] } or { mark_all: true }
  */
 export async function PATCH(req: NextRequest) {
-  const sb = createRouteHandlerClient({ cookies });
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
+  const sb   = getSupabase();
   const body = await req.json();
 
   try {
     if (body.mark_all) {
-      await sb.from('trade_alerts')
-        .update({ is_read: true })
-        .or(`user_id.eq.${user.id},user_id.is.null`)
-        .eq('is_read', false);
+      await sb.from('trade_alerts').update({ is_read: true }).eq('is_read', false);
     } else if (body.alert_ids?.length) {
-      await sb.from('trade_alerts')
-        .update({ is_read: true })
-        .in('id', body.alert_ids)
-        .or(`user_id.eq.${user.id},user_id.is.null`);
+      await sb.from('trade_alerts').update({ is_read: true }).in('id', body.alert_ids);
     }
     return NextResponse.json({ success: true });
   } catch (err: any) {
