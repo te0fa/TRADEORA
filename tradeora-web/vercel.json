@@ -5,6 +5,10 @@
       "schedule": "*/15 8-13 * * 0-4"
     },
     {
+      "path": "/api/cron/track-recommended-trades",
+      "schedule": "*/30 7-12 * * 0-4"
+    },
+    {
       "path": "/api/cron/sync-prices",
       "schedule": "0 8 * * 1"
     },

@@ -164,22 +164,27 @@ export async function GET(req: NextRequest) {
       let newSignal: 'buy' | 'sell' | null = null;
       let winRate = Math.round(mlProb * 100);
 
+      // ── RAISED CONFIDENCE THRESHOLDS (empirical: winners/losers both ~0.80) ──
+      // BUY: requires prob >= 0.72  (was 0.65)
+      // SELL: requires prob <= 0.28  (was 0.35)
+      const BUY_GATE  = 0.72;
+      const SELL_GATE = 0.28;
+
       if ((changePercent >= 2.5 || newsImpact >= 0.4) && trend === 'up') {
         mlProb = Math.min(mlProb + 0.08, 0.95);
-        if (mlProb >= 0.65) { newSignal = 'buy'; winRate = Math.round(mlProb * 100); }
+        if (mlProb >= BUY_GATE) { newSignal = 'buy'; winRate = Math.round(mlProb * 100); }
       } else if ((changePercent <= -2.5 || newsImpact <= -0.4) && trend === 'down') {
         mlProb = Math.max(mlProb - 0.10, 0.05);
-        if (mlProb <= 0.35) { newSignal = 'sell'; winRate = Math.round((1 - mlProb) * 100); }
+        if (mlProb <= SELL_GATE) { newSignal = 'sell'; winRate = Math.round((1 - mlProb) * 100); }
       } else if (changePercent >= 1.5 && trend !== 'down') {
         mlProb = Math.min(mlProb + 0.04, 0.90);
-        if (mlProb >= 0.65) { newSignal = 'buy'; winRate = Math.round(mlProb * 100); }
+        if (mlProb >= BUY_GATE) { newSignal = 'buy'; winRate = Math.round(mlProb * 100); }
       } else if (changePercent <= -1.5 && trend !== 'up') {
         mlProb = Math.max(mlProb - 0.06, 0.05);
-        if (mlProb <= 0.35) { newSignal = 'sell'; winRate = Math.round((1 - mlProb) * 100); }
+        if (mlProb <= SELL_GATE) { newSignal = 'sell'; winRate = Math.round((1 - mlProb) * 100); }
       }
-      // Gate: do NOT open intraday trade if ML confidence is weak (0.35 < prob < 0.65)
-      if (mlProb > 0.35 && mlProb < 0.65) newSignal = null;
-
+      // Gate: do NOT open intraday trade if ML confidence is weak
+      if (mlProb > SELL_GATE && mlProb < BUY_GATE) newSignal = null;
 
       const existingTrade = existingTradeMap[comp.id];
 
