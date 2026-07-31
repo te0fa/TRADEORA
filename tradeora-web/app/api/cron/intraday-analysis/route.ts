@@ -103,6 +103,25 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── Fetch latest ML probabilities from recommended_trades ────────
+    const { data: latestTrades } = await sb
+      .from('recommended_trades')
+      .select('company_id, ml_probability, direction, features_snapshot')
+      .in('company_id', ids)
+      .order('recommended_at', { ascending: false });
+
+    // Build ML prob map per company (latest recommendation)
+    const mlProbMap: Record<string, { prob: number; dir: string; snap: any }> = {};
+    for (const tr of (latestTrades ?? []) as any[]) {
+      if (!mlProbMap[tr.company_id]) {
+        mlProbMap[tr.company_id] = {
+          prob: tr.ml_probability ?? 0.65,
+          dir: tr.direction ?? 'buy',
+          snap: tr.features_snapshot ?? {}
+        };
+      }
+    }
+
     // ── Analyse each company and update signals ──────────────────────
     const tradesToInsert: any[] = [];
     const updatePromises: any[] = [];
@@ -132,19 +151,35 @@ export async function GET(req: NextRequest) {
         trend = closes[0] > closes[1] ? 'up' : closes[0] < closes[1] ? 'down' : 'flat';
       }
 
-      // Determine signal with News Sentiment Adjustment
-      let newSignal: 'buy' | 'sell' | null = null;
-      let winRate  = 70;
-      let mlProb   = 0.70;
+      // ─── Use REAL ML probability from daily recommendations ──────────
+      const mlEntry = mlProbMap[comp.id];
+      // Base probability: from ML model if available, otherwise conservative default
+      let mlProb = mlEntry?.prob ?? 0.55;
 
       // Apply Breaking News Boost / Penalty to ML Probability
-      if (newsImpact >= 0.25) mlProb += 0.07;
-      else if (newsImpact <= -0.25) mlProb -= 0.09;
+      if (newsImpact >= 0.25) mlProb = Math.min(mlProb + 0.07, 0.99);
+      else if (newsImpact <= -0.25) mlProb = Math.max(mlProb - 0.09, 0.01);
 
-      if      ((changePercent >= 2.5 || newsImpact >= 0.4) && trend === 'up')   { newSignal = 'buy';  winRate = 80; mlProb = Math.min(mlProb + 0.13, 0.95); }
-      else if ((changePercent <= -2.5 || newsImpact <= -0.4) && trend === 'down') { newSignal = 'sell'; winRate = 75; mlProb = Math.min(mlProb + 0.10, 0.95); }
-      else if (changePercent >= 1.5 && trend !== 'down')  { newSignal = 'buy';  winRate = 72; mlProb = Math.min(mlProb + 0.06, 0.90); }
-      else if (changePercent <= -1.5 && trend !== 'up')   { newSignal = 'sell'; winRate = 70; mlProb = Math.min(mlProb + 0.04, 0.90); }
+      // Intraday momentum confirmation (aligns with or overrides daily ML direction)
+      let newSignal: 'buy' | 'sell' | null = null;
+      let winRate = Math.round(mlProb * 100);
+
+      if ((changePercent >= 2.5 || newsImpact >= 0.4) && trend === 'up') {
+        mlProb = Math.min(mlProb + 0.08, 0.95);
+        if (mlProb >= 0.65) { newSignal = 'buy'; winRate = Math.round(mlProb * 100); }
+      } else if ((changePercent <= -2.5 || newsImpact <= -0.4) && trend === 'down') {
+        mlProb = Math.max(mlProb - 0.10, 0.05);
+        if (mlProb <= 0.35) { newSignal = 'sell'; winRate = Math.round((1 - mlProb) * 100); }
+      } else if (changePercent >= 1.5 && trend !== 'down') {
+        mlProb = Math.min(mlProb + 0.04, 0.90);
+        if (mlProb >= 0.65) { newSignal = 'buy'; winRate = Math.round(mlProb * 100); }
+      } else if (changePercent <= -1.5 && trend !== 'up') {
+        mlProb = Math.max(mlProb - 0.06, 0.05);
+        if (mlProb <= 0.35) { newSignal = 'sell'; winRate = Math.round((1 - mlProb) * 100); }
+      }
+      // Gate: do NOT open intraday trade if ML confidence is weak (0.35 < prob < 0.65)
+      if (mlProb > 0.35 && mlProb < 0.65) newSignal = null;
+
 
       const existingTrade = existingTradeMap[comp.id];
 

@@ -9,6 +9,12 @@ import re
 import logging
 from typing import Dict, Any, List
 
+try:
+    import yfinance as yf
+    _HAS_YFINANCE = True
+except ImportError:
+    _HAS_YFINANCE = False
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("tradeora.macro_news_engine")
 
@@ -87,8 +93,11 @@ class MacroNewsIntelligenceEngine:
         if sector and sector in self.sector_sensitivity:
             sens = self.sector_sensitivity[sector]
             sector_badge = sens.get("badge")
-            if category == "macro_currency_fx":
+            # FIX: was incorrectly checking "macro_currency_fx" instead of "macro_fx"
+            if category == "macro_fx":
                 impact_score += sens.get("usd_devaluation_impact", 0.0)
+            elif category == "macro_geopolitical":
+                impact_score += sens.get("geopolitical_impact", 0.0)
 
         impact_score = min(max(impact_score, -1.0), 1.0)
 
@@ -102,15 +111,44 @@ class MacroNewsIntelligenceEngine:
 
     def get_macro_market_summary(self) -> Dict[str, Any]:
         """
-        Provides current macroeconomic baseline metrics for USD/EGP, Gold, Brent Oil,
-        and Central Bank Interest Rates context.
+        Fetches live macroeconomic data for USD/EGP, Gold, Brent Oil via yfinance.
+        Falls back to conservative static estimates if yfinance unavailable.
         """
+        usd_egp = 48.50
+        gold_usd = 2350.0
+        brent_usd = 78.20
+
+        if _HAS_YFINANCE:
+            try:
+                usd_egp_ticker = yf.Ticker("USDEGP=X")
+                usd_hist = usd_egp_ticker.history(period="2d")
+                if not usd_hist.empty:
+                    usd_egp = round(float(usd_hist['Close'].iloc[-1]), 2)
+
+                gold_ticker = yf.Ticker("GC=F")
+                gold_hist = gold_ticker.history(period="2d")
+                if not gold_hist.empty:
+                    gold_usd = round(float(gold_hist['Close'].iloc[-1]), 2)
+
+                oil_ticker = yf.Ticker("CL=F")
+                oil_hist = oil_ticker.history(period="2d")
+                if not oil_hist.empty:
+                    brent_usd = round(float(oil_hist['Close'].iloc[-1]), 2)
+
+                logger.info(f"Live macro: USD/EGP={usd_egp}, Gold={gold_usd}, Brent={brent_usd}")
+            except Exception as e:
+                logger.warning(f"yfinance macro fetch failed, using fallback: {e}")
+
+        gold_egp_24k = round(gold_usd * usd_egp / 31.1, 1)  # per gram
+        usd_status = "ارتفاع طفيف" if usd_egp > 49 else "مستقر مع حركة مرنة" if usd_egp > 47 else "استقرار"
+
         return {
-            "usd_egp_rate": 48.50,
-            "usd_egp_status": "مستقر مع حركة مرنة",
-            "gold_24k_egp": 4550.0,
-            "gold_status": "📈 ملاذ آمن للتحوط",
-            "brent_crude_usd": 78.20,
+            "usd_egp_rate": usd_egp,
+            "usd_egp_status": usd_status,
+            "gold_usd": gold_usd,
+            "gold_24k_egp": gold_egp_24k,
+            "gold_status": "📈 ملاذ آمن للتحوط" if gold_usd > 2000 else "⚖️ استقرار الذهب",
+            "brent_crude_usd": brent_usd,
             "cbe_interest_rate": "27.25%",
             "macro_risk_level": "⚖️ متوازن (مخاطر جيوسياسية متوسطة)",
             "top_hedged_sectors": ["العقارات", "البتروكيماويات والتصدير", "البنوك"]

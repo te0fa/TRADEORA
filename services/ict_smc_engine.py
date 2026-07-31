@@ -48,25 +48,38 @@ class ICTSMCAnalysisEngine:
         opens = df['open'].values
 
         # 1. Fair Value Gap (FVG) Detection
-        # Bullish FVG: low[i] > high[i-2]
+        # Bullish FVG: low[i] > high[i-2]  (price imbalance – gap between candle i-2 high and candle i low)
         bullish_fvg = False
+        bearish_fvg = False
         fvg_gap_size = 0.0
-        for i in range(n - 1, max(n - 5, 2), -1):
-            if lows[i] > highs[i - 2]:
+
+        # Search last 15 candles (was 5 – too narrow)
+        for i in range(n - 1, max(n - 15, 2), -1):
+            if lows[i] > highs[i - 2] and not bullish_fvg:
                 bullish_fvg = True
                 fvg_gap_size = lows[i] - highs[i - 2]
+            if highs[i] < lows[i - 2] and not bearish_fvg:
+                bearish_fvg = True
+            if bullish_fvg and bearish_fvg:
                 break
 
-        # 2. Bullish Order Block (OB) Detection
-        # Last down-candle before a strong displacement up
+        # 2. Order Block (OB) Detection – Bullish & Bearish
+        # Bullish OB: Last bearish candle before a strong bullish displacement
         bullish_ob = False
+        bearish_ob = False
         ob_price_level = 0.0
-        for i in range(n - 2, max(n - 8, 1), -1):
-            if closes[i] < opens[i]: # Bearish candle
-                # Check if followed by strong displacement upward
+
+        for i in range(n - 2, max(n - 10, 1), -1):
+            if closes[i] < opens[i]:  # Bearish candle
                 if closes[i+1] > highs[i] and (closes[i+1] - opens[i+1]) > (highs[i] - lows[i]):
                     bullish_ob = True
                     ob_price_level = lows[i]
+                    break
+
+        for i in range(n - 2, max(n - 10, 1), -1):
+            if closes[i] > opens[i]:  # Bullish candle
+                if closes[i+1] < lows[i] and (opens[i+1] - closes[i+1]) > (highs[i] - lows[i]):
+                    bearish_ob = True
                     break
 
         # 3. Market Structure Shift (MSS / CHoCH)
@@ -79,10 +92,11 @@ class ICTSMCAnalysisEngine:
         recent_swing_low = min(lows[max(0, n-12):n-2])
         ssl_sweep = (lows[-1] < recent_swing_low) and (closes[-1] > recent_swing_low)
 
-        # Calculate ICT/SMC Score & Badges
+        # Calculate ICT/SMC Score & Badges – combine Bullish & Bearish signals
         ml_boost = 0.0
         badge_ar = None
 
+        # ── Bullish ICT signals ──────────────────────────────
         if ssl_sweep and bullish_fvg:
             badge_ar = "⚡ ICT: سحب سيولة + فجوة FVG صعودية"
             ml_boost = +0.12
@@ -99,14 +113,22 @@ class ICTSMCAnalysisEngine:
             badge_ar = "🧹 ICT: تطهير وسحب سيولة القاع (SSL Sweep)"
             ml_boost = +0.05
 
+        # ── Bearish ICT signals (apply penalty) ──────────────
+        if bearish_fvg and bearish_ob:
+            ml_boost -= 0.10
+        elif bearish_fvg:
+            ml_boost -= 0.05
+
         return {
             "fvg_detected": bullish_fvg,
+            "bearish_fvg_detected": bearish_fvg,
             "ob_detected": bullish_ob,
+            "bearish_ob_detected": bearish_ob,
             "mss_detected": mss_detected,
             "ssl_sweep": ssl_sweep,
             "badge_ar": badge_ar,
-            "ml_boost": ml_boost,
-            "details": f"FVG: {bullish_fvg}, OB: {bullish_ob}, MSS: {mss_detected}, SSL Sweep: {ssl_sweep}"
+            "ml_boost": round(ml_boost, 3),
+            "details": f"Bullish FVG: {bullish_fvg}, Bearish FVG: {bearish_fvg}, OB: {bullish_ob}, MSS: {mss_detected}, SSL Sweep: {ssl_sweep}"
         }
 
 
