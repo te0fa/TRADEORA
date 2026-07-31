@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeEgxSector, isSmeStock } from '@/lib/egx-sectors';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export async function GET() {
     // 1. Fetch all active companies
     const { data: companies, error: compError } = await sb
       .from('companies')
-      .select('id, symbol, name_ar, name_en, sector, is_shariah_compliant')
+      .select('id, symbol, name_ar, name_en, sector, market_type, is_shariah_compliant')
       .eq('status', 'active')
       .order('symbol');
 
@@ -87,7 +88,8 @@ export async function GET() {
           symbol:               c.symbol,
           name_ar:              c.name_ar,
           name_en:              c.name_en,
-          sector:               c.sector === 'بنوك' ? 'البنوك' : (c.sector === 'عقارات' ? 'العقارات والإنشاءات' : c.sector),
+          sector:               normalizeEgxSector(c.sector),
+          is_sme:               isSmeStock(c),
           is_shariah_compliant: Boolean(c.is_shariah_compliant),
           price:                p.close_price,
           change:               change,

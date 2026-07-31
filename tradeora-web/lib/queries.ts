@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { PriceRecord, resolveLatestPrice } from './market-utils';
+import { normalizeEgxSector, isSmeStock } from './egx-sectors';
 
 export interface Company {
   id: string;
@@ -11,6 +12,7 @@ export interface Company {
   market_type: string | null;
   currency: string | null;
   is_shariah_compliant: boolean;
+  is_sme?: boolean | null;
   listing_status: string | null;
 }
 
@@ -136,10 +138,11 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
       isin: item.isin,
       name_ar: item.name_ar,
       name_en: item.name_en,
-      sector: item.sector,
+      sector: normalizeEgxSector(item.sector),
       market_type: item.market_type,
       currency: item.currency,
       is_shariah_compliant: item.is_shariah_compliant,
+      is_sme: isSmeStock(item),
       listing_status: item.listing_status,
       priceRecord,
       isLastResort: false,

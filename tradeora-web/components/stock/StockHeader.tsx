@@ -151,6 +151,11 @@ export function StockHeader({ company, liveTick }: StockHeaderProps) {
               🧪 {locale === 'ar' ? 'سهم مختلط (نسبة تطهير: 1.5%)' : 'Mixed Stock (Purification: 1.5%)'}
             </Badge>
           )}
+          {(company.is_sme || company.market_type === 'sme') && (
+            <Badge variant="glass" className="text-[11px] font-bold text-amber-300 bg-amber-500/15 border-amber-500/30">
+              ⚡ {locale === 'ar' ? 'شركات صغيرة ومتوسطة (Tamayuz / SME)' : 'Small & Medium Enterprises (SME)'}
+            </Badge>
+          )}
         </div>
 
         {/* 3 Sharia Compliance Audit Sources */}

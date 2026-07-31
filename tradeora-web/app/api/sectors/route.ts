@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { normalizeEgxSector, isSmeStock } from '@/lib/egx-sectors';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,7 @@ export async function GET() {
   try {
     const { data: companies, error: compError } = await supabase
       .from('companies')
-      .select('id, symbol, isin, name_ar, name_en, sector');
+      .select('id, symbol, isin, name_ar, name_en, sector, market_type, is_shariah_compliant');
 
     if (compError || !companies) {
       return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 });
@@ -41,14 +42,8 @@ export async function GET() {
     }> = {};
 
     for (const co of companies) {
-      let rawSector = (co.sector || 'قطاعات إضافية ومتنوعة').trim();
-      let normalizedSector = rawSector;
-
-      if (normalizedSector === 'بنوك') normalizedSector = 'البنوك';
-      if (normalizedSector === 'عقارات') normalizedSector = 'العقارات والإنشاءات';
-      if (normalizedSector === 'غير مصنف' || normalizedSector === 'أخرى / غير محدد') normalizedSector = 'قطاعات إضافية ومتنوعة';
-      if (normalizedSector === 'الخدمات الطبية') normalizedSector = 'الرعاية الصحية والأدوية';
-      if (normalizedSector === 'الاتصالات') normalizedSector = 'الاتصالات والتكنولوجيا';
+      const normalizedSector = normalizeEgxSector(co.sector);
+      const sme = isSmeStock(co);
 
       const p = priceMap[co.id];
       const s = statsMap[co.id];
@@ -90,6 +85,8 @@ export async function GET() {
         name_ar: co.name_ar || co.name_en || co.symbol,
         name_en: co.name_en || co.name_ar || co.symbol,
         sector: normalizedSector,
+        is_sme: sme,
+        is_shariah_compliant: Boolean(co.is_shariah_compliant),
         price: priceVal,
         change: changeVal,
         volume: p ? Number(p.volume || 0) : 0,

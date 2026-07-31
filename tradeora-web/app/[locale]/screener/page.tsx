@@ -26,6 +26,7 @@ export default function ScreenerPage() {
   const [filterSector, setFilterSector] = useState('all');
   const [filterChange, setFilterChange] = useState<'all' | 'up' | 'down'>('all');
   const [filterShariah, setFilterShariah] = useState(false);
+  const [filterSme, setFilterSme] = useState(false);
   const [sortBy, setSortBy] = useState<'symbol' | 'price' | 'change' | 'win_rate' | 'volume'>('change');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -77,6 +78,9 @@ export default function ScreenerPage() {
     if (filterShariah) {
       list = list.filter(s => Boolean(s.is_shariah_compliant));
     }
+    if (filterSme) {
+      list = list.filter(s => Boolean(s.is_sme));
+    }
 
     list.sort((a, b) => {
       const va = a[sortBy] ?? 0;
@@ -93,7 +97,7 @@ export default function ScreenerPage() {
         : (va as number) - (vb as number);
     });
     return list;
-  }, [stocks, search, filterSignal, filterSector, filterChange, filterShariah, sortBy, sortDir]);
+  }, [stocks, search, filterSignal, filterSector, filterChange, filterShariah, filterSme, sortBy, sortDir]);
 
   const toggleSort = (key: typeof sortBy) => {
     if (sortBy === key) {
@@ -253,6 +257,18 @@ export default function ScreenerPage() {
             <span>☪️</span>
             <span>{isAr ? 'متوافق مع الشريعة فقط' : 'Shariah Only'}</span>
           </button>
+
+          <button
+            onClick={() => setFilterSme(v => !v)}
+            className={`px-5 py-3 rounded-xl text-sm font-bold transition-all border flex items-center gap-2 cursor-pointer ${
+              filterSme
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_15px_-3px_rgba(245,158,11,0.3)]'
+                : 'glass-input'
+            }`}
+          >
+            <span>⚡</span>
+            <span>{isAr ? 'صغيرة ومتوسطة (SME)' : 'SMEs Only'}</span>
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
@@ -359,10 +375,13 @@ export default function ScreenerPage() {
                         className={`hover:bg-white/5 transition-colors cursor-pointer group ${isLocked ? 'blur-[4px] select-none pointer-events-none opacity-40' : ''}`}
                       >
                         <td className="py-4 px-5 text-start">
-                          <div className="font-bold text-white group-hover:text-accent-blue transition flex items-center gap-2">
+                          <div className="font-bold text-white group-hover:text-accent-blue transition flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-base">{stock.symbol}</span>
                             {stock.is_shariah_compliant && (
                               <Badge variant="success" className="scale-75 origin-left">☪️ {isAr ? 'شرعي' : 'Halal'}</Badge>
+                            )}
+                            {stock.is_sme && (
+                              <Badge variant="glass" className="scale-75 origin-left border-amber-500/40 text-amber-300 bg-amber-500/10">⚡ {isAr ? 'صغيرة ومتوسطة' : 'SME'}</Badge>
                             )}
                           </div>
                           <div className="text-xs text-zinc-500 max-w-[160px] truncate">

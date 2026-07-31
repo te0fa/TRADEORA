@@ -73,6 +73,9 @@ export function StockRow({ stock }: StockRowProps) {
           {stock.is_shariah_compliant && (
             <span className="text-xs" title={tGlobal('stockDetail.shariahCompliant')}>☪️</span>
           )}
+          {(stock.is_sme || stock.market_type === 'sme') && (
+            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded" title={locale === 'ar' ? 'شركات صغيرة ومتوسطة' : 'SME'}>⚡ {locale === 'ar' ? 'صغيرة ومتوسطة' : 'SME'}</span>
+          )}
         </div>
       </td>
 
