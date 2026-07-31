@@ -14,6 +14,8 @@ from services.wyckoff_engine import get_wyckoff_confluence_score, detect_wyckoff
 from services.patterns_engine import get_pattern_confluence_score
 from services.fundamental_engine import calculate_fundamental_score
 from services.smart_money_engine import smart_money_engine
+from services.ict_smc_engine import ict_smc_engine
+from services.elliott_time_engine import elliott_time_engine
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -410,6 +412,16 @@ def generate_daily_recommendations():
         prob += sm_boost
         smart_money_badge_ar = smart_money_info.get('badge_ar')
 
+        # 7. ICT & SMC (Fair Value Gap, Order Block, Liquidity Sweep) Boost
+        ict_smc_info = ict_smc_engine.analyze_ict_smc_patterns(df_candles)
+        prob += ict_smc_info.get('ml_boost', 0.0)
+        ict_smc_badge_ar = ict_smc_info.get('badge_ar')
+
+        # 8. Elliott Wave & Fibonacci Time Window Boost
+        elliott_info = elliott_time_engine.analyze_elliott_and_time(df_candles)
+        prob += elliott_info.get('ml_boost', 0.0)
+        elliott_badge_ar = elliott_info.get('badge_ar')
+
         prob = min(max(prob, 0.0), 0.99) # Clip between 0 and 0.99
 
         # ATR Validation
@@ -485,6 +497,8 @@ def generate_daily_recommendations():
                 'pattern_boost': pattern_boost,
                 'smart_money_badge_ar': smart_money_badge_ar,
                 'smart_money_score': smart_money_info.get('smart_money_score'),
+                'ict_smc_badge_ar': ict_smc_badge_ar,
+                'elliott_badge_ar': elliott_badge_ar,
                 'fundamental_score': fund_info.get('total_score'),
                 'fundamental_tier': fund_info.get('tier_ar'),
                 'fundamental_badge_ar': fundamental_badge_ar,

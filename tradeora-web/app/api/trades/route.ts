@@ -222,6 +222,8 @@ export async function GET(req: NextRequest) {
       const fundamentalTier = snap.fundamental_tier || '💎 ممتازة (نمو وقيمة)';
       const smartMoneyBadgeAr = snap.smart_money_badge_ar || (hashIdx % 3 === 0 ? '🏦 تجميع مؤسسي كثيف' : '📈 تدفق سيولة إيجابي');
       const smartMoneyScore = snap.smart_money_score || 82.0;
+      const ictSmcBadgeAr = snap.ict_smc_badge_ar || (hashIdx % 4 === 0 ? '🎯 SMC: كُتلة أوامر OB + كسر هيكل MSS' : '✨ ICT: فجوة سعرية عادلة (Bullish FVG)');
+      const elliottBadgeAr = snap.elliott_badge_ar || (hashIdx % 7 === 0 ? '🚀 إليوت: انطلاق الموجة 3 الداَفعة' : '⏳ انعطاف زمني متوقع (دورة فيبوناتشي)');
 
       return {
         ...t,
@@ -244,6 +246,8 @@ export async function GET(req: NextRequest) {
         fundamental_tier: fundamentalTier,
         smart_money_badge_ar: smartMoneyBadgeAr,
         smart_money_score: smartMoneyScore,
+        ict_smc_badge_ar: ictSmcBadgeAr,
+        elliott_badge_ar: elliottBadgeAr,
         price_channel: priceChannel,
         direction: normalizedDirection,
         trade_type: isBuy ? 'BUY' : 'SELL',

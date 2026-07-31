@@ -58,6 +58,8 @@ export interface ActiveTrade {
   fundamental_tier?: string;
   smart_money_badge_ar?: string;
   smart_money_score?: number;
+  ict_smc_badge_ar?: string;
+  elliott_badge_ar?: string;
   price_channel?: any;
 }
 
@@ -544,6 +546,20 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                                 : 'text-yellow-300 bg-yellow-500/20 border-yellow-500/40'
                             }`}>
                               {t.smart_money_badge_ar}
+                            </span>
+                          )}
+
+                          {/* ICT & SMC (Fair Value Gap / Order Block / Liquidity Sweep) Badge */}
+                          {t.ict_smc_badge_ar && (
+                            <span className="text-[10px] font-extrabold text-teal-300 bg-teal-500/20 px-2 py-0.5 rounded-lg border border-teal-500/40 flex items-center gap-1 shadow-sm">
+                              {t.ict_smc_badge_ar}
+                            </span>
+                          )}
+
+                          {/* Elliott Wave & Fibonacci Time Cycle Badge */}
+                          {t.elliott_badge_ar && (
+                            <span className="text-[10px] font-extrabold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-lg border border-indigo-500/40 flex items-center gap-1 shadow-sm">
+                              {t.elliott_badge_ar}
                             </span>
                           )}
                         </div>
