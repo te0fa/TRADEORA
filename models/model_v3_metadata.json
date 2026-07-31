@@ -1,0 +1,125 @@
+{
+  "version": "3.0",
+  "trained_at": "2026-07-31T00:52:55.588584+00:00",
+  "features": [
+    "rsi",
+    "macd_hist",
+    "macd_raw",
+    "dist_ema20",
+    "dist_ema50",
+    "atr_pct",
+    "vol_ratio",
+    "price_pos",
+    "bb_width",
+    "bb_pos",
+    "stoch_rsi",
+    "vol_spike",
+    "dist_ath",
+    "day_of_week",
+    "market_regime",
+    "wyckoff_score",
+    "smart_money_norm",
+    "ict_fvg",
+    "ict_ob",
+    "elliott_momentum",
+    "fundamental_norm"
+  ],
+  "n_features": 21,
+  "training_samples": 57604,
+  "class_distribution": {
+    "buy_pct": 55.47,
+    "sell_pct": 44.53
+  },
+  "test_accuracy": 0.5596,
+  "test_precision": 0.5905,
+  "feature_importance_ranking": [
+    {
+      "feature": "elliott_momentum",
+      "importance": 0.063
+    },
+    {
+      "feature": "fundamental_norm",
+      "importance": 0.0582
+    },
+    {
+      "feature": "macd_raw",
+      "importance": 0.0578
+    },
+    {
+      "feature": "atr_pct",
+      "importance": 0.0577
+    },
+    {
+      "feature": "wyckoff_score",
+      "importance": 0.0576
+    },
+    {
+      "feature": "ict_fvg",
+      "importance": 0.0574
+    },
+    {
+      "feature": "market_regime",
+      "importance": 0.0565
+    },
+    {
+      "feature": "dist_ath",
+      "importance": 0.0553
+    },
+    {
+      "feature": "bb_width",
+      "importance": 0.0541
+    },
+    {
+      "feature": "dist_ema50",
+      "importance": 0.0529
+    },
+    {
+      "feature": "ict_ob",
+      "importance": 0.0512
+    },
+    {
+      "feature": "smart_money_norm",
+      "importance": 0.0501
+    },
+    {
+      "feature": "dist_ema20",
+      "importance": 0.0483
+    },
+    {
+      "feature": "rsi",
+      "importance": 0.0434
+    },
+    {
+      "feature": "macd_hist",
+      "importance": 0.0433
+    },
+    {
+      "feature": "price_pos",
+      "importance": 0.0392
+    },
+    {
+      "feature": "stoch_rsi",
+      "importance": 0.0384
+    },
+    {
+      "feature": "bb_pos",
+      "importance": 0.037
+    },
+    {
+      "feature": "vol_ratio",
+      "importance": 0.0362
+    },
+    {
+      "feature": "vol_spike",
+      "importance": 0.0239
+    },
+    {
+      "feature": "day_of_week",
+      "importance": 0.0186
+    }
+  ],
+  "upgrade_notes": {
+    "from_v2": "Added 6 new signals: Wyckoff, Smart Money, ICT FVG/OB, Elliott momentum, Fundamental",
+    "new_features_strategy": "Computed once per stock on tail-40 window, broadcast to all training rows"
+  }
+}

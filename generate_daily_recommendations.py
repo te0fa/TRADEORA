@@ -42,19 +42,27 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── Model Version Control ───────────────────
-# لتغيير النموذج: بدّل MODEL_VERSION فقط
-# v2 = نموذج 2026-07-30 (MACD fix + clean data)
-# v1 = legacy (BUY bias 83.5% - deprecated)
-MODEL_VERSION = 'v2'
+# v3 = 2026-07-31 – 21 features (Wyckoff, ICT, Elliott, Fundamental, Smart Money)
+#      Precision (BUY) = 59.05%  |  Accuracy = 55.96%
+# v2 = 2026-07-30 – 15 features  |  Precision = 57.92%  |  Accuracy = 56.43%
+MODEL_VERSION = 'v3'
 
 _model_path  = f'models/model_1d_{MODEL_VERSION}.pkl'
 _scaler_path = f'models/scaler_1d_{MODEL_VERSION}.pkl'
-_meta_path   = f'models/model_v2_metadata.json'
+_meta_path   = f'models/model_{MODEL_VERSION}_metadata.json'
+
+# Auto-fallback to v2 if v3 not yet available
+if not os.path.exists(_model_path):
+    logger.warning(f"Model v3 not found – falling back to v2")
+    MODEL_VERSION = 'v2'
+    _model_path  = 'models/model_1d_v2.pkl'
+    _scaler_path = 'models/scaler_1d_v2.pkl'
+    _meta_path   = 'models/model_v2_metadata.json'
 
 if not os.path.exists(_model_path):
     raise FileNotFoundError(
-        f"Model file not found: {_model_path}\n"
-        f"Run train_model_v2.py first."
+        f"No model found at {_model_path}\n"
+        f"Run train_model_v3.py (or train_model_v2.py) first."
     )
 
 model  = joblib.load(_model_path)
