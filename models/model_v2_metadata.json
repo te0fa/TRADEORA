@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "trained_at": "2026-07-29T13:18:24.387993+00:00",
+  "trained_at": "2026-07-31T00:01:04.106120+00:00",
   "macd_version": "standard (MACD - Signal)",
   "data_sources": [
     "tradingview_1d",
@@ -32,73 +32,73 @@
     "day_of_week",
     "market_regime"
   ],
-  "training_samples": 53512,
+  "training_samples": 56144,
   "class_distribution": {
-    "buy_pct": 55.42,
-    "sell_pct": 44.58
+    "buy_pct": 55.63,
+    "sell_pct": 44.37
   },
-  "test_accuracy": 0.5635,
-  "test_precision": 0.5761,
+  "test_accuracy": 0.5643,
+  "test_precision": 0.5792,
   "feature_importance_ranking": [
     {
       "feature": "market_regime",
-      "importance": 0.0958
+      "importance": 0.1055
     },
     {
       "feature": "atr_pct",
-      "importance": 0.0859
-    },
-    {
-      "feature": "rsi",
-      "importance": 0.0841
+      "importance": 0.085
     },
     {
       "feature": "bb_width",
-      "importance": 0.0788
+      "importance": 0.0827
     },
     {
       "feature": "macd_raw",
-      "importance": 0.0749
-    },
-    {
-      "feature": "dist_ath",
-      "importance": 0.0735
-    },
-    {
-      "feature": "dist_ema50",
-      "importance": 0.0733
+      "importance": 0.0803
     },
     {
       "feature": "dist_ema20",
-      "importance": 0.073
+      "importance": 0.0798
+    },
+    {
+      "feature": "dist_ath",
+      "importance": 0.0753
+    },
+    {
+      "feature": "rsi",
+      "importance": 0.0732
     },
     {
       "feature": "price_pos",
-      "importance": 0.0704
+      "importance": 0.067
     },
     {
       "feature": "macd_hist",
-      "importance": 0.0662
+      "importance": 0.067
+    },
+    {
+      "feature": "dist_ema50",
+      "importance": 0.0644
     },
     {
       "feature": "bb_pos",
-      "importance": 0.0634
+      "importance": 0.0558
     },
     {
       "feature": "stoch_rsi",
-      "importance": 0.0572
+      "importance": 0.0528
     },
     {
       "feature": "vol_ratio",
-      "importance": 0.0462
+      "importance": 0.0522
     },
     {
       "feature": "day_of_week",
-      "importance": 0.0395
+      "importance": 0.0372
     },
     {
       "feature": "vol_spike",
-      "importance": 0.0178
+      "importance": 0.0216
     }
   ]
 }

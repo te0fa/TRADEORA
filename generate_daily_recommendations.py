@@ -7,6 +7,7 @@ import pandas as pd
 import pandas_ta as ta
 import joblib
 from dotenv import load_dotenv
+from supabase import create_client, Client
 from pathlib import Path
 from scripts.split_detector import detect_price_anomaly, check_entry_price_validity
 from services.wyckoff_engine import get_wyckoff_confluence_score, detect_wyckoff_spring, calculate_price_channels
@@ -403,12 +404,13 @@ def generate_daily_recommendations():
             pass
 
         # 4. Wyckoff Accumulation & Price Channel Confluence Boost
-        wyckoff_info = get_wyckoff_confluence_score(df_sym)
+        df_candles = pd.DataFrame(candles)
+        wyckoff_info = get_wyckoff_confluence_score(df_candles)
         wyckoff_boost = wyckoff_info.get('total_boost', 0.0)
         prob += wyckoff_boost
 
         # 5. Classical Chart Patterns Confluence Boost (Cup & Handle, Double Bottom, Bull Flag)
-        pattern_info = get_pattern_confluence_score(df_sym)
+        pattern_info = get_pattern_confluence_score(df_candles)
         pattern_boost = pattern_info.get('total_boost', 0.0)
         prob += pattern_boost
 
