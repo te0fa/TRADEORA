@@ -1,0 +1,62 @@
+name: 🤖 Daily Recommendations Generator
+
+on:
+  schedule:
+    # يشتغل بعد الـ backfill بساعة – الساعة 4:30 PM Cairo (2:30 PM UTC) الأحد-الخميس
+    - cron: '30 14 * * 0,1,2,3,4'
+  
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force regenerate even if already ran today'
+        required: false
+        default: 'false'
+
+jobs:
+  generate:
+    name: 🧠 Generate Trading Recommendations
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            supabase \
+            python-dotenv \
+            pandas \
+            numpy \
+            joblib \
+            xgboost \
+            scikit-learn \
+            pandas_ta \
+            requests
+
+      - name: 🧠 Generate recommendations
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "🧠 Generating daily recommendations..."
+          python generate_daily_recommendations.py
+        timeout-minutes: 55
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recommendations-logs-${{ github.run_id }}
+          path: logs/generate_recommendations.log
+          retention-days: 7

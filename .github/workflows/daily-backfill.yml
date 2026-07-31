@@ -1,0 +1,71 @@
+name: 🔄 Daily Market Data Backfill
+
+on:
+  schedule:
+    # يشتغل كل يوم الساعة 3:30 PM Cairo (1:30 PM UTC)
+    # بعد إغلاق البورصة المصرية (3:00 PM) – الأحد للخميس
+    - cron: '30 13 * * 0,1,2,3,4'
+  
+  # تشغيل يدوي من GitHub UI لو احتجت
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Backfill mode: incremental or full'
+        required: false
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
+
+jobs:
+  backfill:
+    name: 📊 Backfill EGX Market Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 90  # 303 شركة × 5 timeframes ≈ 60-80 دقيقة
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            tvDatafeed \
+            supabase \
+            python-dotenv \
+            pandas \
+            numpy \
+            requests
+
+      - name: 🔄 Run TV Backfill (incremental)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TV_USERNAME: ${{ secrets.TV_USERNAME }}
+          TV_PASSWORD: ${{ secrets.TV_PASSWORD }}
+        run: |
+          MODE="${{ github.event.inputs.mode || 'incremental' }}"
+          echo "▶️  Running backfill in $MODE mode..."
+          python tv_backfill.py --$MODE
+        timeout-minutes: 85
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backfill-logs-${{ github.run_id }}
+          path: logs/tv_backfill.log
+          retention-days: 7
+
+      - name: ✅ Backfill complete
+        run: |
+          echo "✅ Market data backfill completed at $(date)"
+          echo "Next run: Tomorrow after market close"
