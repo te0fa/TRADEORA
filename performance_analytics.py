@@ -66,8 +66,8 @@ def run_performance_analytics():
         return
     
     df = pd.DataFrame(trades_response)
-    df['recommended_at'] = pd.to_datetime(df['recommended_at'])
-    df['closed_at'] = pd.to_datetime(df['closed_at'])
+    df['recommended_at'] = pd.to_datetime(df['recommended_at'], utc=True, format='ISO8601')
+    df['closed_at'] = pd.to_datetime(df['closed_at'], utc=True, format='ISO8601')
     df['pnl_percent'] = df['pnl_percent'].astype(float)
     df['entry_price'] = df['entry_price'].astype(float)
     df['exit_price'] = df['exit_price'].astype(float)

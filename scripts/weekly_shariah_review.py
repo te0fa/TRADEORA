@@ -69,6 +69,7 @@ def parse_shariah_pdf(pdf_path: str) -> set[str]:
 def main():
     parser = argparse.ArgumentParser(description="Weekly Shariah compliance reviewer.")
     parser.add_argument("--dry-run", action="store_true", help="Run without updating the database.")
+    parser.add_argument("--force",   action="store_true", help="Override safety trigger for large genuine quarterly updates.")
     args = parser.parse_args()
 
     print("============================================================")
@@ -158,10 +159,13 @@ def main():
         print("\n[DRY RUN] Finished without making database updates.")
         sys.exit(0)
 
-    if change_percent > 20.0:
-        print(f"\n❌ SAFETY TRIGGER: Change percentage ({change_percent:.2f}%) exceeds 20% limit!")
+    if change_percent > 40.0 and not args.force:
+        print(f"\n❌ SAFETY TRIGGER: Change percentage ({change_percent:.2f}%) exceeds 40% limit!")
         print("Database updates aborted to prevent accidental data corruption.")
+        print("Use --force flag to override if this change is intentional.")
         sys.exit(1)
+    elif change_percent > 20.0:
+        print(f"\n⚠️  WARNING: Large change ({change_percent:.2f}%) – proceeding with updates...")
 
     # Apply changes to Supabase
     if changes_count == 0:
