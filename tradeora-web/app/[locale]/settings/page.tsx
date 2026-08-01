@@ -321,7 +321,7 @@ export default function SettingsPage() {
                             .select('*')
                             .eq('user_id', user.id)
                             .maybeSingle()
-                            .then(({ data }) => {
+                            .then(({ data }: { data: any }) => {
                               if (data) setTelegramInfo(data);
                               setLoading(false);
                             });

@@ -33,7 +33,7 @@ export default function ComparePage() {
     supabase.from('companies')
       .select('id, symbol, name_ar, name_en')
       .order('symbol')
-      .then(({ data }) => {
+      .then(({ data }: { data: any }) => {
         if (data) setCompanies(data);
       });
   }, []);
@@ -52,8 +52,8 @@ export default function ComparePage() {
         return;
       }
 
-      const c1 = cos.find(c => c.symbol === sym1.toUpperCase());
-      const c2 = cos.find(c => c.symbol === sym2.toUpperCase());
+      const c1 = (cos as any[]).find((c: any) => c.symbol === sym1.toUpperCase());
+      const c2 = (cos as any[]).find((c: any) => c.symbol === sym2.toUpperCase());
 
       if (!c1 || !c2) {
         setLoading(false);

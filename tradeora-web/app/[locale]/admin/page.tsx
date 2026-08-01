@@ -86,16 +86,16 @@ export default function AdminDashboard({ params }: AdminDashboardProps) {
                  .limit(100)
       ]);
 
-      const wins = closedTrades?.filter(
-        t => (t.pnl_percent ?? 0) > 0
+      const wins = (closedTrades as any[])?.filter(
+        (t: any) => (t.pnl_percent ?? 0) > 0
       ).length ?? 0;
-      const total = closedTrades?.length ?? 1;
-      const totalPnl = closedTrades?.reduce(
-        (s, t) => s + (t.pnl_amount ?? 0), 0
+      const total = (closedTrades as any[])?.length ?? 1;
+      const totalPnl = (closedTrades as any[])?.reduce(
+        (s: number, t: any) => s + (t.pnl_amount ?? 0), 0
       ) ?? 0;
 
       const today = new Date().toISOString().split('T')[0];
-      const newToday = usersData?.filter(u =>
+      const newToday = (usersData as any[])?.filter((u: any) =>
         u.created_at?.startsWith(today)
       ).length ?? 0;
 
