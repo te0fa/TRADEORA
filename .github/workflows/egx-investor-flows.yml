@@ -1,0 +1,76 @@
+name: 📊 EGX Daily Investor Flows
+
+on:
+  schedule:
+    # كل يوم الساعة 5:30 PM Cairo (2:30 PM UTC) الأحد-الخميس
+    # بعد إغلاق الجلسة (3 PM) وبعد نشر النشرة الرسمية
+    - cron: '30 14 * * 0,1,2,3,4'
+
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Target date YYYY-MM-DD (default: today)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (parse only, no DB save)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+jobs:
+  scrape-flows:
+    name: 🌍 Scrape EGX Investor Flows
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            playwright \
+            pdfplumber \
+            supabase \
+            python-dotenv \
+            httpx \
+            pypdf
+
+      - name: 🌐 Install Playwright Chromium
+        run: playwright install chromium --with-deps
+
+      - name: 📊 Scrape EGX Daily Bulletin
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          DATE_ARG=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            DATE_ARG="--date ${{ github.event.inputs.date }}"
+          fi
+
+          DRY_RUN=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN="--dry-run"
+          fi
+
+          echo "📊 Scraping EGX investor flows..."
+          python egx_flow_scraper.py $DATE_ARG $DRY_RUN
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: egx-flow-logs-${{ github.run_id }}
+          path: logs/egx_flow_scraper.log
+          retention-days: 7

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { CompanyWithPrice } from '@/lib/queries';
+import { getShariahAudit } from '@/lib/shariah-data';
 import { PriceTag } from '../ui/PriceTag';
 import { QualityDot } from '../ui/QualityDot';
 import { Badge } from '../ui/Badge';
@@ -159,18 +160,23 @@ export function StockHeader({ company, liveTick }: StockHeaderProps) {
         </div>
 
         {/* 3 Sharia Compliance Audit Sources */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-          <span className="text-zinc-400 font-bold">{locale === 'ar' ? 'فحص الشريعة الثلاثي:' : 'Sharia 3-Source Audit:'}</span>
-          <span className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded font-medium">
-            🏛️ EGX 33: {company.is_shariah_compliant ? (locale === 'ar' ? 'مدرج' : 'Listed') : (locale === 'ar' ? 'غير مدرج' : 'Unlisted')}
-          </span>
-          <span className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded font-medium">
-            🇰🇼 Boubyan: {company.is_shariah_compliant ? (locale === 'ar' ? 'متوافق' : 'Compliant') : (locale === 'ar' ? 'يحتاج تطهير' : 'Needs Purification')}
-          </span>
-          <span className="bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded font-medium">
-            🔍 Kasheif: {company.is_shariah_compliant ? (locale === 'ar' ? 'حلال 100%' : '100% Halal') : (locale === 'ar' ? 'مختلط (1.5% تطهير)' : 'Mixed (1.5% Purif)')}
-          </span>
-        </div>
+        {(() => {
+          const audit = company.shariahAudit || getShariahAudit(company);
+          return (
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+              <span className="text-zinc-400 font-bold">{locale === 'ar' ? 'فحص الشريعة الثلاثي المعتمد:' : 'Sharia 3-Source Audit:'}</span>
+              <span className={`px-2 py-0.5 rounded font-medium border ${audit.egx33.isListed ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-white/5'}`}>
+                🏛️ EGX 33: {locale === 'ar' ? audit.egx33.labelAr : audit.egx33.labelEn}
+              </span>
+              <span className={`px-2 py-0.5 rounded font-medium border ${audit.boubyan.isCompliant ? 'bg-blue-500/10 text-blue-300 border-blue-500/20' : 'bg-amber-500/10 text-amber-300 border-amber-500/20'}`}>
+                🇰🇼 Boubyan: {locale === 'ar' ? audit.boubyan.labelAr : audit.boubyan.labelEn}
+              </span>
+              <span className={`px-2 py-0.5 rounded font-medium border ${audit.kasheif.isPure ? 'bg-purple-500/10 text-purple-300 border-purple-500/20' : 'bg-amber-500/10 text-amber-300 border-amber-500/20'}`}>
+                🔍 Kasheif: {locale === 'ar' ? audit.kasheif.labelAr : audit.kasheif.labelEn}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* secondary name and ISIN code */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-text-secondary">

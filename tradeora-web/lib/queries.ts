@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { PriceRecord, resolveLatestPrice } from './market-utils';
 import { normalizeEgxSector, isSmeStock } from './egx-sectors';
+import { getShariahAudit, ShariahSourceAudit } from './shariah-data';
 
 export interface Company {
   id: string;
@@ -13,6 +14,10 @@ export interface Company {
   currency: string | null;
   is_shariah_compliant: boolean;
   is_sme?: boolean | null;
+  is_egx33_shariah?: boolean | null;
+  is_boubyan_compliant?: boolean | null;
+  purification_ratio?: number | null;
+  shariahAudit?: ShariahSourceAudit;
   listing_status: string | null;
 }
 
@@ -41,6 +46,9 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
       market_type,
       currency,
       is_shariah_compliant,
+      is_egx33_shariah,
+      is_boubyan_compliant,
+      purification_ratio,
       listing_status
     `);
 
@@ -143,6 +151,10 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
       currency: item.currency,
       is_shariah_compliant: item.is_shariah_compliant,
       is_sme: isSmeStock(item),
+      is_egx33_shariah: item.is_egx33_shariah,
+      is_boubyan_compliant: item.is_boubyan_compliant,
+      purification_ratio: item.purification_ratio,
+      shariahAudit: getShariahAudit(item),
       listing_status: item.listing_status,
       priceRecord,
       isLastResort: false,
