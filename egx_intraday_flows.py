@@ -74,10 +74,13 @@ def scrape_egx_flows(target_date: date) -> dict | None:
         logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
         return None
 
-    # Check session hours
-    now = datetime.now().time()
-    if not (dtime(10, 0) <= now <= dtime(15, 30)):
-        logger.warning(f"Market hours check: Current time {now} is outside trading hours (10:00-15:30). Skipping.")
+    # Check session hours using Cairo timezone (NOT local/UTC time)
+    import pytz
+    cairo_tz = pytz.timezone('Africa/Cairo')
+    now_cairo = datetime.now(cairo_tz).time()
+    # Allow scraping until 4:00 PM Cairo to capture post-close final numbers
+    if not (dtime(10, 0) <= now_cairo <= dtime(16, 0)):
+        logger.warning(f"Market hours check: Cairo time {now_cairo} is outside 10:00-16:00. Skipping.")
         return None
 
     logger.info(f"🔄 Opening EGX InvestorsTypeCharts.aspx for {target_date}")
@@ -463,6 +466,8 @@ def main():
     parser = argparse.ArgumentParser(description='EGX Complete Investor Flows Scraper v3')
     parser.add_argument('--date',    type=str, default=None, help='Target date YYYY-MM-DD')
     parser.add_argument('--dry-run', action='store_true',    help='Print data without saving')
+    parser.add_argument('--bypass-session-guard', action='store_true',
+                        help='Skip session hours check (for post-close final capture)')
     args = parser.parse_args()
 
     target_date = date.today()
@@ -477,7 +482,21 @@ def main():
     logger.info(f'EGX Complete Flows Scraper v3 — {target_date}')
     logger.info('=' * 60)
 
-    flows = scrape_egx_flows(target_date)
+    # If bypass requested, skip session check by temporarily patching
+    if args.bypass_session_guard:
+        logger.info("[BYPASS] Skipping session hours guard — post-close final capture")
+        # Call _try_scrape directly to bypass the time check in scrape_egx_flows
+        result = None
+        for attempt in range(1, 4):
+            logger.info(f"Attempt {attempt}/3...")
+            result = _try_scrape(target_date)
+            if result is not None:
+                break
+            import time
+            time.sleep(20)
+        flows = result
+    else:
+        flows = scrape_egx_flows(target_date)
 
     if not flows:
         logger.error("❌ Failed to extract flow data. Exiting.")

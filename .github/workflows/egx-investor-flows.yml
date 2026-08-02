@@ -2,13 +2,12 @@ name: 📊 EGX Investor Flows — Auto Scraper
 
 on:
   schedule:
-    # ── الجلسة: 10:00 AM – 3:30 PM Cairo (07:00 – 12:30 UTC) ──────────────
+    # ── الجلسة: 10:00 AM – 3:00 PM Cairo (07:00 – 12:00 UTC) ──────────
     # كل 10 دقايق أثناء الجلسة (أحد-خميس)
     - cron: '0,10,20,30,40,50 7,8,9,10,11 * * 0,1,2,3,4'   # 10:00 → 2:50 PM Cairo
-    - cron: '0,10,20,30 12 * * 0,1,2,3,4'                   # 3:00 → 3:30 PM Cairo
-    # ── بعد الإغلاق: بيانات نهائية رسمية (3:30 PM و 5:00 PM Cairo) ───────────
-    - cron: '35 12 * * 0,1,2,3,4'   # 3:35 PM Cairo — أول تحديث بعد الإغلاق
-    - cron: '0 14 * * 0,1,2,3,4'    # 5:00 PM Cairo — PDF نهائي رسمي
+    # ── بعد الإغلاق: التقاط نهائي (3:05, 3:20, 3:35 PM Cairo) ─────────
+    # الصفحة قد تبقى تعرض البيانات النهائية لدقايق بعد الإغلاق
+    - cron: '5,20,35 12 * * 0,1,2,3,4'   # 3:05, 3:20, 3:35 PM Cairo
 
   # تشغيل يدوي من GitHub UI في أي وقت
   workflow_dispatch:
@@ -82,27 +81,27 @@ jobs:
             echo "mode=both" >> $GITHUB_OUTPUT
           else
             # Auto mode logic:
-            # 10:00 → 15:30 Cairo  →  intraday live scrape
-            # 15:30 → 17:00 Cairo  →  post-session + PDF
-            # else                 →  skip
+            # 10:00 → 15:00 Cairo  →  intraday live scrape
+            # 15:00 → 16:00 Cairo  →  post-close final capture (bypass guard)
+            # else                  →  skip
             TOTAL_MINS_CAIRO=$(( (HOUR_CAIRO * 60) + MIN_UTC ))
             SESSION_START=600    # 10:00 = 600 mins
-            SESSION_END=915      # 15:15 = 915 mins  (give 15 min buffer after 3:00 close)
-            POST_END=1020        # 17:00 = 1020 mins
+            SESSION_CLOSE=900    # 15:00 = 900 mins (session ends)
+            POST_CLOSE_END=960   # 16:00 = 960 mins (1 hour after close)
 
-            if [ "$TOTAL_MINS_CAIRO" -ge "$SESSION_START" ] && [ "$TOTAL_MINS_CAIRO" -lt "$SESSION_END" ]; then
+            if [ "$TOTAL_MINS_CAIRO" -ge "$SESSION_START" ] && [ "$TOTAL_MINS_CAIRO" -lt "$SESSION_CLOSE" ]; then
               echo "mode=intraday" >> $GITHUB_OUTPUT
               echo "📡 INTRADAY mode — session is live (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
-            elif [ "$TOTAL_MINS_CAIRO" -ge "$SESSION_END" ] && [ "$TOTAL_MINS_CAIRO" -lt "$POST_END" ]; then
-              echo "mode=both" >> $GITHUB_OUTPUT
-              echo "📄 POST-SESSION mode — fetching final data + PDF (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
+            elif [ "$TOTAL_MINS_CAIRO" -ge "$SESSION_CLOSE" ] && [ "$TOTAL_MINS_CAIRO" -lt "$POST_CLOSE_END" ]; then
+              echo "mode=post_close" >> $GITHUB_OUTPUT
+              echo "📸 POST-CLOSE mode — final capture with bypass (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
             else
               echo "mode=skip" >> $GITHUB_OUTPUT
               echo "⏭️ Pre-session or night hours — skipping (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
             fi
           fi
 
-      - name: 📡 Intraday Scrape (live session — InvestorsTypeCharts.aspx)
+      - name: 📡 Intraday Scrape (live session)
         if: steps.mode.outputs.mode == 'intraday' || steps.mode.outputs.mode == 'both'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -119,11 +118,11 @@ jobs:
             DRY_RUN="--dry-run"
           fi
 
-          echo "📡 Running intraday scraper v3 (InvestorsTypeCharts.aspx)..."
+          echo "📡 Running intraday scraper..."
           python egx_intraday_flows.py $DATE_ARG $DRY_RUN
 
-      - name: 📄 PDF Scrape (official end-of-day bulletin)
-        if: steps.mode.outputs.mode == 'pdf' || steps.mode.outputs.mode == 'both'
+      - name: 📸 Post-Close Final Capture (bypass session guard)
+        if: steps.mode.outputs.mode == 'post_close'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -139,8 +138,8 @@ jobs:
             DRY_RUN="--dry-run"
           fi
 
-          echo "📄 Running official PDF bulletin scraper..."
-          python egx_flow_scraper.py $DATE_ARG $DRY_RUN || echo "⚠️ PDF scraper failed (PDF may not be published yet)"
+          echo "📸 Post-close final capture (bypass session guard)..."
+          python egx_intraday_flows.py $DATE_ARG $DRY_RUN --bypass-session-guard || echo "⚠️ Page may be empty post-close"
 
       - name: ⏭️ Skip (pre-session or night)
         if: steps.mode.outputs.mode == 'skip'
