@@ -40,6 +40,8 @@ export interface ActiveTrade {
   trigger_condition_ar?: string;
   is_top_pick?: boolean;
   is_shariah_compliant?: boolean;
+  // TP1 / TP2 hit flags from DB status
+  status?: string;  // 'active' | 'tp1_hit' | 'closed'
   scalp_indicators?: {
     volume_surge_ar?: string;
     volatility_ar?: string;
@@ -89,10 +91,14 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
     return signalMode === 'BUY' ? trades : sellSignals;
   }, [signalMode, trades, sellSignals]);
 
-  // Active Scoped Trades (Top 15 vs Full Market Trades for BUY signals)
+  // ── FIX: Show ALL active trades, not just is_top_pick=true ──────────────────
+  // TOP_PICKS scope now shows top 20 by ml_probability desc (not boolean flag)
   const scopedTrades = useMemo(() => {
     if (signalMode === 'BUY' && viewScope === 'TOP_PICKS') {
-      return baseTradesList.filter((t, idx) => (t.is_top_pick !== undefined ? t.is_top_pick : idx < 15));
+      // Sort by confidence desc and take top 20
+      return [...baseTradesList]
+        .sort((a, b) => (b.ml_probability || 0) - (a.ml_probability || 0))
+        .slice(0, 20);
     }
     return baseTradesList;
   }, [baseTradesList, signalMode, viewScope]);
@@ -414,7 +420,6 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                   entry = Number((current * 1.018).toFixed(2));
                 }
               } else {
-                // SELL / Position Reduction direction
                 if (orderType === 'LIMIT' && entry <= current) {
                   entry = Number((current * 1.02).toFixed(2));
                 } else if (orderType === 'BREAKOUT_TRIGGER' && entry >= current) {
@@ -431,11 +436,21 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                 if (tp1 <= entry) tp1 = Number((entry * 1.05).toFixed(2));
                 if (tp2 <= tp1) tp2 = Number((entry * 1.10).toFixed(2));
               } else {
-                // SELL Direction: Target TP1/TP2 are downside (lower), Stop Exit SL is upside (higher invalidation ceiling)
                 if (sl <= entry) sl = Number((entry * 1.05).toFixed(2));
                 if (tp1 >= entry) tp1 = Number((entry * 0.95).toFixed(2));
                 if (tp2 >= tp1) tp2 = Number((entry * 0.90).toFixed(2));
               }
+
+              // ── TP1 / TP2 status detection ───────────────────────────────────────────
+              // tp1_hit: either DB status = 'tp1_hit' OR current price passed TP1
+              const tp1ReachedByDb   = t.status === 'tp1_hit';
+              const tp1ReachedByPx   = isBuy ? current >= tp1 : current <= tp1;
+              const tp1Hit           = tp1ReachedByDb || tp1ReachedByPx;
+              const tp2Hit           = isBuy ? current >= tp2 : current <= tp2;
+              // After TP1 hit, did price pull back from TP1 toward entry? (reversal warning)
+              const postTp1Reversal  = tp1Hit && !tp2Hit && (isBuy ? current < tp1 : current > tp1);
+              // New effective SL after TP1: move to entry (breakeven)
+              const effectiveSl      = tp1Hit ? entry : sl;
 
               // Order Type Execution Status Logic:
               const isLimitPending = orderType === 'LIMIT' && (isBuy ? current > entry : current < entry);
@@ -454,38 +469,57 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
               const isZeroChange = Math.abs(pnlPct) < 0.05;
 
               // Remaining distance calculations
-              const distToTP1 = isBuy ? ((tp1 - current) / current) * 100 : ((current - tp1) / current) * 100;
-              const distToSL = isBuy ? ((current - sl) / current) * 100 : ((sl - current) / current) * 100;
+              const distToTP1   = isBuy ? ((tp1 - current) / current) * 100 : ((current - tp1) / current) * 100;
+              const distToTP2   = isBuy ? ((tp2 - current) / current) * 100 : ((current - tp2) / current) * 100;
               const distToEntry = Math.abs((current - entry) / current) * 100;
 
-              // Progress Scale & Pointer Position Math
+              // ── Progress bar: 3-segment (SL → Entry → TP1 → TP2) ───────────────────
+              // Scale: 0% = entry, 50% = TP1, 100% = TP2  (positive side only)
+              //        negative: 0% = entry → 100% = SL
               let pointerPos = 0;
+              let pointerPosTP2 = 0; // TP2 marker position on bar
+
               if (isLimitPending || isBreakoutPending) {
-                // Calculate progress towards pending entry execution based on standard 4% pending offset gap
                 const maxGap = 4.0;
                 const remaining = Math.min(maxGap, distToEntry);
                 const progressDone = Math.max(0, maxGap - remaining);
                 pointerPos = Math.max(15, Math.min(100, Math.round((progressDone / maxGap) * 100)));
               } else if (isBuy) {
                 if (isZeroChange) {
-                  pointerPos = 0; // Starts clean at 0% when price hasn't moved!
+                  pointerPos = 0;
+                } else if (tp2Hit) {
+                  pointerPos = 100; // full bar
+                } else if (tp1Hit) {
+                  // Between TP1 and TP2: map 50%–100%
+                  const phase2Dist = Math.max(0.01, tp2 - tp1);
+                  const phase2Done = Math.max(0, current - tp1);
+                  pointerPos = 50 + Math.min(50, (phase2Done / phase2Dist) * 50);
                 } else if (current > entry) {
+                  // Between entry and TP1: map 0%–50%
                   const gainDist = Math.max(0.01, tp1 - entry);
-                  pointerPos = Math.min(100, ((current - entry) / gainDist) * 100);
+                  pointerPos = Math.min(50, ((current - entry) / gainDist) * 50);
                 } else {
+                  // Below entry (loss zone): negative
                   const lossDist = Math.max(0.01, entry - sl);
-                  pointerPos = Math.min(100, ((entry - current) / lossDist) * 100);
+                  pointerPos = -Math.min(100, ((entry - current) / lossDist) * 100);
                 }
+                pointerPosTP2 = 100; // TP2 is at far right
               } else {
-                // SELL Direction (Downside drop is positive profit realization)
+                // SELL direction
                 if (isZeroChange) {
                   pointerPos = 0;
+                } else if (tp2Hit) {
+                  pointerPos = 100;
+                } else if (tp1Hit) {
+                  const phase2Dist = Math.max(0.01, tp1 - tp2);
+                  const phase2Done = Math.max(0, tp1 - current);
+                  pointerPos = 50 + Math.min(50, (phase2Done / phase2Dist) * 50);
                 } else if (current < entry) {
                   const dropDist = Math.max(0.01, entry - tp1);
-                  pointerPos = Math.min(100, ((entry - current) / dropDist) * 100);
+                  pointerPos = Math.min(50, ((entry - current) / dropDist) * 50);
                 } else {
                   const riseDist = Math.max(0.01, sl - entry);
-                  pointerPos = Math.min(100, ((current - entry) / riseDist) * 100);
+                  pointerPos = -Math.min(100, ((current - entry) / riseDist) * 100);
                 }
               }
 
@@ -747,48 +781,138 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                     )}
                   </div>
 
-                  {/* Visual Progress Scale Bar */}
+                  {/* ── TP1 Hit Banner: Move SL to Entry ─────────────────────── */}
+                  {tp1Hit && (
+                    <div className={`p-3 rounded-xl border text-xs font-bold flex flex-wrap items-center gap-3 ${
+                      postTp1Reversal
+                        ? 'bg-orange-500/15 border-orange-500/40 text-orange-300'
+                        : tp2Hit
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                    }`}>
+                      <span className="text-base">{tp2Hit ? '🏆' : postTp1Reversal ? '⚠️' : '🎯'}</span>
+                      <div className="flex-1">
+                        {tp2Hit ? (
+                          <span>{isAr ? `🏆 تم تحقيق الهدف الثاني الكامل! (TP2: ${tp2.toFixed(2)} ج.م) — ربح كامل +${pnlPct.toFixed(1)}%` : `TP2 Hit! Full target achieved +${pnlPct.toFixed(1)}%`}</span>
+                        ) : postTp1Reversal ? (
+                          <span>
+                            {isAr
+                              ? `⚠️ السعر تراجع بعد الوصول للهدف الأول (TP1: ${tp1.toFixed(2)} ج.م) — السعر الحالي ${current.toFixed(2)} ج.م. وقف الخسارة الآن عند سعر الدخول (${entry.toFixed(2)} ج.م) — لا خسارة.`
+                              : `Price pulled back after TP1 (${tp1.toFixed(2)} EGP). SL now at entry (${entry.toFixed(2)} EGP) — no loss.`}
+                          </span>
+                        ) : (
+                          <span>
+                            {isAr
+                              ? `🎯 تم تحقيق الهدف الأول! (TP1: ${tp1.toFixed(2)} ج.م) — انقل وقف الخسارة فوراً لسعر الدخول (${entry.toFixed(2)} ج.م) وتابع نحو TP2: ${tp2.toFixed(2)} ج.م.`
+                              : `TP1 hit! Move SL to entry (${entry.toFixed(2)} EGP) now. Target TP2: ${tp2.toFixed(2)} EGP.`}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
+                        postTp1Reversal ? 'bg-orange-500/20 border-orange-400 text-orange-200' : 'bg-amber-500/20 border-amber-400 text-amber-100'
+                      }`}>
+                        {postTp1Reversal ? `حركة بعد TP1 — ${pnlPct.toFixed(1)}%` : `+${pnlPct.toFixed(1)}% ربح`}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Visual Progress Scale Bar — SL ─── Entry ─── TP1 ─── TP2 */}
                   <div className="space-y-1.5 pt-1">
                     <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono">
                       <span>
-                        {isLimitPending 
+                        {isLimitPending
                           ? (isAr ? (isBuy ? `مسار الهبوط لشراء الحد عند ${entry.toFixed(2)} ج.م:` : `مسار الارتداد لبيع الحد عند ${entry.toFixed(2)} ج.م:`) : 'Progress to Entry:')
                           : isBreakoutPending
                           ? (isAr ? (isBuy ? `مسار الصعود لاختراق المقاومة عند ${entry.toFixed(2)} ج.م:` : `مسار الهبوط لكسر الدعم عند ${entry.toFixed(2)} ج.م:`) : 'Progress to Trigger:')
                           : (isAr ? 'مسار الصفقة نحو الهدف / الوقف:' : 'Live Trade Progress:')}
                       </span>
-
-                      <span className={isPendingExecution ? 'text-amber-400 font-bold' : isZeroChange ? 'text-zinc-400 font-medium' : isPositive ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                        {isLimitPending 
-                          ? (isAr ? `باقي ${distToEntry.toFixed(1)}% للتنفيذ عند ${entry.toFixed(2)} ج.م` : `${distToEntry.toFixed(1)}% to entry`)
+                      <span className={`font-bold ${
+                        isPendingExecution ? 'text-amber-400'
+                        : isZeroChange ? 'text-zinc-400'
+                        : tp2Hit ? 'text-emerald-300'
+                        : tp1Hit && postTp1Reversal ? 'text-orange-400'
+                        : tp1Hit ? 'text-amber-300'
+                        : isPositive ? 'text-emerald-400'
+                        : 'text-rose-400'
+                      }`}>
+                        {isLimitPending
+                          ? (isAr ? `باقي ${distToEntry.toFixed(1)}% للتنفيذ` : `${distToEntry.toFixed(1)}% to entry`)
                           : isBreakoutPending
-                          ? (isAr ? `باقي ${distToEntry.toFixed(1)}% للتنفيذ عند ${entry.toFixed(2)} ج.م` : `${distToEntry.toFixed(1)}% to trigger`)
+                          ? (isAr ? `باقي ${distToEntry.toFixed(1)}% للتنفيذ` : `${distToEntry.toFixed(1)}% to trigger`)
                           : isZeroChange
-                          ? (isAr ? 'لم يتغير السعر بعد (بانتظار الحركة)' : 'Price unchanged (0.0%)')
-                          : distToTP1 <= 0 
-                          ? (isAr ? (isBuy ? '🎉 تم تحقيق الهدف الأول!' : '🎉 تم وصول مستهدف الهبوط!') : 'TP1 Hit!') 
+                          ? (isAr ? 'لم يتغير السعر بعد' : 'Price unchanged')
+                          : tp2Hit
+                          ? (isAr ? `🏆 TP2 محقق +${pnlPct.toFixed(1)}%` : `TP2 Hit! +${pnlPct.toFixed(1)}%`)
+                          : tp1Hit
+                          ? (isAr ? `🎯 TP1 محقق — باقي ${distToTP2.toFixed(1)}% للهدف 2` : `TP1 Hit — ${distToTP2.toFixed(1)}% to TP2`)
                           : isPositive
-                          ? `${isAr ? (isBuy ? 'ربح' : 'تحقق هبوط') : 'Gain'} +${pnlPct.toFixed(1)}% (باقي ${distToTP1.toFixed(1)}% للهدف)`
-                          : `${isAr ? 'تراجع' : 'Loss'} -${Math.abs(pnlPct).toFixed(1)}% (الوقف عند ${sl.toFixed(2)} ج.م)`}
+                          ? `${isAr ? 'ربح' : 'Gain'} +${pnlPct.toFixed(1)}% (باقي ${distToTP1.toFixed(1)}% للهدف 1)`
+                          : `${isAr ? 'تراجع' : 'Loss'} -${Math.abs(pnlPct).toFixed(1)}% (الوقف ${effectiveSl.toFixed(2)} ج.م)`}
                       </span>
                     </div>
 
-                    <div dir="ltr" className="relative w-full h-3 bg-zinc-800 rounded-full overflow-hidden border border-white/10">
-                      <div 
+                    {/* Multi-segment bar: [SL zone red] [entry] [0%→TP1 green 50%] [TP1→TP2 teal 100%] */}
+                    <div dir="ltr" className="relative w-full h-3.5 bg-zinc-800 rounded-full overflow-visible border border-white/10">
+                      {/* Filled progress bar */}
+                      <div
                         className={`h-full transition-all duration-500 rounded-full ${
                           isLimitPending
                             ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
                             : isBreakoutPending
                             ? 'bg-gradient-to-r from-purple-500 to-indigo-400'
+                            : pointerPos < 0
+                            ? 'bg-gradient-to-r from-rose-600 to-rose-400'
+                            : tp2Hit
+                            ? 'bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-400'
+                            : tp1Hit && postTp1Reversal
+                            ? 'bg-gradient-to-r from-orange-600 via-orange-500 to-orange-300 animate-pulse'
+                            : tp1Hit
+                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-amber-400'
                             : isZeroChange
                             ? 'bg-zinc-600'
-                            : isPositive 
-                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400' 
+                            : isPositive
+                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400'
                             : 'bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400'
                         }`}
-                        style={{ width: `${Math.max(0, Math.min(100, pointerPos))}%` }}
+                        style={{ width: `${Math.max(0, Math.min(100, Math.abs(pointerPos)))}%` }}
                       />
+                      {/* TP1 midpoint marker at 50% */}
+                      {!isPendingExecution && (
+                        <div
+                          className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
+                          style={{ left: '50%' }}
+                          title={`TP1: ${tp1.toFixed(2)}`}
+                        />
+                      )}
+                      {/* TP1 label */}
+                      {!isPendingExecution && (
+                        <span className="absolute -top-4 text-[9px] font-bold text-amber-400 font-mono" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+                          TP1
+                        </span>
+                      )}
+                      {/* TP2 label at far right */}
+                      {!isPendingExecution && (
+                        <span className="absolute -top-4 text-[9px] font-bold text-teal-400 font-mono" style={{ right: 0 }}>
+                          TP2
+                        </span>
+                      )}
+                      {/* SL label at far left */}
+                      {!isPendingExecution && (
+                        <span className="absolute -top-4 text-[9px] font-bold text-rose-400 font-mono" style={{ left: 0 }}>
+                          SL
+                        </span>
+                      )}
                     </div>
+
+                    {/* TP2 value display below bar */}
+                    {!isPendingExecution && (
+                      <div className="flex items-center justify-between text-[10px] font-mono mt-1">
+                        <span className="text-rose-400">{effectiveSl.toFixed(2)} ج.م</span>
+                        <span className="text-zinc-500">{entry.toFixed(2)} ج.م</span>
+                        <span className="text-amber-400">{tp1.toFixed(2)} ج.م</span>
+                        <span className="text-teal-400 font-bold">{tp2.toFixed(2)} ج.م ←TP2</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Institutional Cancellation Safeguard Notice for Pending Orders */}
