@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -9,6 +10,14 @@ const NO_CACHE = {
   'Pragma': 'no-cache',
   'Expires': '0',
 };
+
+function getSb() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kdjsguozssxvtmlmqhpz.supabase.co';
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkanNndW96c3N4dnRtbG1xaHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NzM0MDMsImV4cCI6MjA5OTQ0OTQwM30.kTSTIVQedOCupcjwidSOca4_m4s6Qp2Wh5t1Zi7_Wmg';
+  return createClient(supabaseUrl, supabaseKey, {
+    global: { fetch: (url, options) => fetch(url, { ...options, cache: 'no-store' }) }
+  });
+}
 
 // ── Helper: safely read a numeric DB field ──────────────────────────────────
 function n(row: any, ...fields: string[]): number {
@@ -27,9 +36,10 @@ function n(row: any, ...fields: string[]): number {
 export async function GET(req: NextRequest) {
   try {
     const todayStr = new Date().toISOString().split('T')[0];
+    const sb = getSb();
 
     // 1. Fetch latest available record ordered by trade_date desc, created_at desc
-    const { data: flows, error: flowsErr } = await supabase
+    const { data: flows, error: flowsErr } = await sb
       .from('daily_investor_flows')
       .select('*')
       .order('trade_date', { ascending: false })
