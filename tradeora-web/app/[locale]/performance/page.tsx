@@ -22,6 +22,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { ActiveTradesModal } from '@/components/performance/ActiveTradesModal';
+import { QualityDrilldownModal } from '@/components/performance/QualityDrilldownModal';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -71,6 +72,25 @@ export default function PerformancePage() {
   const [qualityMetrics, setQualityMetrics] = useState<any>(null);
   const [evaluationTier, setEvaluationTier] = useState<'premier_elite' | 'standard_market' | 'combined'>('premier_elite');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Drill-down Modal States
+  const [drilldownModalOpen, setDrilldownModalOpen] = useState(false);
+  const [drilldownFilter, setDrilldownFilter] = useState<'all' | 'tp1' | 'tp2' | 'sl' | 'trailing' | 'breakeven'>('all');
+  const [drilldownTitle, setDrilldownTitle] = useState('');
+
+  const activeQualityMetrics = useMemo(() => {
+    if (tierEvaluations && tierEvaluations[evaluationTier]?.quality_metrics) {
+      return tierEvaluations[evaluationTier].quality_metrics;
+    }
+    return qualityMetrics;
+  }, [tierEvaluations, evaluationTier, qualityMetrics]);
+
+  const activeClosedTradesList = useMemo(() => {
+    if (tierEvaluations && tierEvaluations[evaluationTier]?.closed_trades_list) {
+      return tierEvaluations[evaluationTier].closed_trades_list;
+    }
+    return [];
+  }, [tierEvaluations, evaluationTier]);
 
 
   // Personal states
@@ -331,7 +351,7 @@ export default function PerformancePage() {
                     >
                       <option value="premier_elite">👑 تقييم صفقات النخبة الذهبية (درجة ثقة 85% - 99%) [الرئيسي]</option>
                       <option value="standard_market">🌐 تقييم إشارات السوق العامة (درجة ثقة 65% - 84%)</option>
-                      <option value="combined">📊 التقييم الشامل المدمج (كافة إشارات السوق - 99 صفقة)</option>
+                      <option value="combined">📊 التقييم الشامل المدمج (كافة إشارات السوق - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
                     </select>
                   </div>
                 </div>
@@ -427,39 +447,70 @@ export default function PerformancePage() {
                   </motion.div>
                 </div>
 
-                {/* Quality Metrics: TP1 vs TP2 vs SL */}
-                {qualityMetrics && qualityMetrics.total_decided > 0 && (
+                {/* Quality Metrics: TP1 vs TP2 vs SL (Interactive Drill-down) */}
+                {activeQualityMetrics && activeQualityMetrics.total_decided > 0 && (
                   <motion.div variants={itemVariants} className="mb-6">
                     <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
                       <div className="flex items-center gap-2 mb-4">
                         <span className="text-lg">🎯</span>
-                        <h3 className="text-sm font-black text-white uppercase tracking-wider">مقياس جودة الإشارات — دقة الأهداف</h3>
-                        <span className="text-xs text-zinc-500 font-medium mr-auto">{qualityMetrics.total_decided} صفقة محسومة</span>
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider">مقياس جودة الإشارات — دقة الأهداف (اضغط للتفاصيل والتعلم)</h3>
+                        <span className="text-xs text-zinc-500 font-medium mr-auto">{activeQualityMetrics.total_decided} صفقة محسومة</span>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-3 flex flex-col gap-1">
-                          <span className="text-[10px] font-bold text-emerald-400">🎯 هدف أول TP1</span>
-                          <div className="text-2xl font-black text-emerald-400 font-mono">{qualityMetrics.tp1_hit_rate}%</div>
-                          <div className="text-[10px] text-zinc-500">{qualityMetrics.tp1_hit_count} صفقة{qualityMetrics.avg_tp1_pnl > 0 && <span className="text-emerald-400 font-bold"> · +{qualityMetrics.avg_tp1_pnl}%</span>}</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{width:qualityMetrics.tp1_hit_rate+"%"}} /></div>
+                        <div 
+                          onClick={() => {
+                            setDrilldownFilter('tp1');
+                            setDrilldownTitle('🎯 صفقات تحقيق الهدف الأول TP1 (تحليل نجاح النموذج)');
+                            setDrilldownModalOpen(true);
+                          }}
+                          className="bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                        >
+                          <span className="text-[10px] font-bold text-emerald-400 group-hover:underline">🎯 هدف أول TP1 ➔</span>
+                          <div className="text-2xl font-black text-emerald-400 font-mono">{activeQualityMetrics.tp1_hit_rate}%</div>
+                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.tp1_hit_count} صفقة{activeQualityMetrics.avg_tp1_pnl > 0 && <span className="text-emerald-400 font-bold"> · +{activeQualityMetrics.avg_tp1_pnl}%</span>}</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{width:activeQualityMetrics.tp1_hit_rate+"%"}} /></div>
                         </div>
-                        <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-3 flex flex-col gap-1">
-                          <span className="text-[10px] font-bold text-blue-400">🏆 هدف ثاني TP2</span>
-                          <div className="text-2xl font-black text-blue-400 font-mono">{qualityMetrics.tp2_hit_rate}%</div>
-                          <div className="text-[10px] text-zinc-500">{qualityMetrics.tp2_hit_count} صفقة{qualityMetrics.avg_tp2_pnl > 0 && <span className="text-blue-400 font-bold"> · +{qualityMetrics.avg_tp2_pnl}%</span>}</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:qualityMetrics.tp2_hit_rate+"%"}} /></div>
+
+                        <div 
+                          onClick={() => {
+                            setDrilldownFilter('tp2');
+                            setDrilldownTitle('🏆 صفقات تحقيق الهدف الثاني TP2 (تحليل الأهداف العالية)');
+                            setDrilldownModalOpen(true);
+                          }}
+                          className="bg-blue-500/10 border border-blue-500/25 hover:border-blue-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                        >
+                          <span className="text-[10px] font-bold text-blue-400 group-hover:underline">🏆 هدف ثاني TP2 ➔</span>
+                          <div className="text-2xl font-black text-blue-400 font-mono">{activeQualityMetrics.tp2_hit_rate}%</div>
+                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.tp2_hit_count} صفقة{activeQualityMetrics.avg_tp2_pnl > 0 && <span className="text-blue-400 font-bold"> · +{activeQualityMetrics.avg_tp2_pnl}%</span>}</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:activeQualityMetrics.tp2_hit_rate+"%"}} /></div>
                         </div>
-                        <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-xl p-3 flex flex-col gap-1">
-                          <span className="text-[10px] font-bold text-yellow-400">🛡 خروج محمي</span>
-                          <div className="text-2xl font-black text-yellow-400 font-mono">{qualityMetrics.total_decided>0?(((qualityMetrics.trailing_count+qualityMetrics.breakeven_count)/qualityMetrics.total_decided)*100).toFixed(1):0}%</div>
-                          <div className="text-[10px] text-zinc-500">{qualityMetrics.trailing_count+qualityMetrics.breakeven_count} صفقة</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 rounded-full" style={{width:(qualityMetrics.total_decided>0?((qualityMetrics.trailing_count+qualityMetrics.breakeven_count)/qualityMetrics.total_decided)*100:0)+"%"}} /></div>
+
+                        <div 
+                          onClick={() => {
+                            setDrilldownFilter('trailing');
+                            setDrilldownTitle('🛡 صفقات الخروج المحمي وحماية الأرباح (Trailing / Breakeven)');
+                            setDrilldownModalOpen(true);
+                          }}
+                          className="bg-yellow-500/10 border border-yellow-500/25 hover:border-yellow-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                        >
+                          <span className="text-[10px] font-bold text-yellow-400 group-hover:underline">🛡 خروج محمي ➔</span>
+                          <div className="text-2xl font-black text-yellow-400 font-mono">{activeQualityMetrics.total_decided>0?(((activeQualityMetrics.trailing_count+activeQualityMetrics.breakeven_count)/activeQualityMetrics.total_decided)*100).toFixed(1):0}%</div>
+                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.trailing_count+activeQualityMetrics.breakeven_count} صفقة</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 rounded-full" style={{width:(activeQualityMetrics.total_decided>0?((activeQualityMetrics.trailing_count+activeQualityMetrics.breakeven_count)/activeQualityMetrics.total_decided)*100:0)+"%"}} /></div>
                         </div>
-                        <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-3 flex flex-col gap-1">
-                          <span className="text-[10px] font-bold text-red-400">🔴 وقف خسارة SL</span>
-                          <div className="text-2xl font-black text-red-400 font-mono">{qualityMetrics.sl_hit_rate}%</div>
-                          <div className="text-[10px] text-zinc-500">{qualityMetrics.sl_hit_count} صفقة{qualityMetrics.avg_sl_pnl<0 && <span className="text-red-400 font-bold"> · {qualityMetrics.avg_sl_pnl}%</span>}</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{width:qualityMetrics.sl_hit_rate+"%"}} /></div>
+
+                        <div 
+                          onClick={() => {
+                            setDrilldownFilter('sl');
+                            setDrilldownTitle('🔴 صفقات وقف الخسارة SL (تحليل وتطوير النموذج)');
+                            setDrilldownModalOpen(true);
+                          }}
+                          className="bg-red-500/10 border border-red-500/25 hover:border-red-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                        >
+                          <span className="text-[10px] font-bold text-red-400 group-hover:underline">🔴 وقف خسارة SL ➔</span>
+                          <div className="text-2xl font-black text-red-400 font-mono">{activeQualityMetrics.sl_hit_rate}%</div>
+                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.sl_hit_count} صفقة{activeQualityMetrics.avg_sl_pnl<0 && <span className="text-red-400 font-bold"> · {activeQualityMetrics.avg_sl_pnl}%</span>}</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{width:activeQualityMetrics.sl_hit_rate+"%"}} /></div>
                         </div>
                       </div>
                     </div>
@@ -751,6 +802,15 @@ export default function PerformancePage() {
         onClose={() => setIsModalOpen(false)}
         trades={activeTradesForModal}
         sellSignals={sellSignalsForModal}
+      />
+
+      <QualityDrilldownModal
+        isOpen={drilldownModalOpen}
+        onClose={() => setDrilldownModalOpen(false)}
+        filterType={drilldownFilter}
+        filterTitle={drilldownTitle}
+        tierLabel={activeStats?.confidence_range_ar || 'ثقة النموذج: 85% - 99%'}
+        trades={activeClosedTradesList}
       />
     </div>
   );

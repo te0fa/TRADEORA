@@ -4,6 +4,8 @@ import { calcMarketRegime } from '@/lib/ta-utils';
 import { TradeRiskLevelsEvaluator, MarketDataEvaluator, TechnicalIndicatorEvaluator } from '@/lib/domain';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 // Constitution Constants (Article 5.3 & Article 11.3)
 const CONSTITUTIONAL_MIN_CONFIDENCE = 0.65;
@@ -371,46 +373,43 @@ export async function GET(req: NextRequest) {
       (t.direction || 'buy').toLowerCase() === 'buy' && t.pnl_percent !== null
     );
 
-    // Quality Metrics: separate TP1 / TP2 / SL breakdown
-    const totalDecided = closedBuyTrades.length + (tp1HitTrades?.length || 0);
-    const tp2Wins   = closedBuyTrades.filter((t: any) => t.exit_reason === 'tp2').length;
-    const tp1Wins   = closedBuyTrades.filter((t: any) => t.exit_reason === 'tp1').length +
-                      (tp1HitTrades || []).filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy').length;
-    const slLosses  = closedBuyTrades.filter((t: any) => t.exit_reason === 'sl').length;
-    const trailingClosed = closedBuyTrades.filter((t: any) => t.exit_reason === 'trailing_stop').length;
-    const breakevenClosed = closedBuyTrades.filter((t: any) => t.exit_reason === 'breakeven').length;
-    const dynamicClosed = closedBuyTrades.filter((t: any) =>
-      !['tp2','tp1','sl','trailing_stop','breakeven','expired_no_movement'].includes(t.exit_reason)
-    ).length;
+    // ── Helper: Build tier-specific Quality Metrics ─────────────────────────
+    function buildQualityMetrics(closedList: any[], tp1HitList: any[]) {
+      const totalDecided = closedList.length + tp1HitList.length;
+      const tp2Wins = closedList.filter((t: any) => t.exit_reason === 'tp2').length;
+      const tp1Wins = closedList.filter((t: any) => t.exit_reason === 'tp1').length + tp1HitList.length;
+      const slLosses = closedList.filter((t: any) => t.exit_reason === 'sl').length;
+      const trailingClosed = closedList.filter((t: any) => t.exit_reason === 'trailing_stop').length;
+      const breakevenClosed = closedList.filter((t: any) => t.exit_reason === 'breakeven').length;
+      const dynamicClosed = closedList.filter((t: any) =>
+        !['tp2','tp1','sl','trailing_stop','breakeven','expired_no_movement'].includes(t.exit_reason)
+      ).length;
 
-    const qualityMetrics = {
-      total_decided:    totalDecided,
-      tp1_hit_count:    tp1Wins,
-      tp2_hit_count:    tp2Wins,
-      sl_hit_count:     slLosses,
-      trailing_count:   trailingClosed,
-      breakeven_count:  breakevenClosed,
-      dynamic_count:    dynamicClosed,
-      // Rates
-      tp1_hit_rate:     totalDecided > 0 ? parseFloat(((tp1Wins / totalDecided) * 100).toFixed(1)) : 0,
-      tp2_hit_rate:     totalDecided > 0 ? parseFloat(((tp2Wins / totalDecided) * 100).toFixed(1)) : 0,
-      sl_hit_rate:      totalDecided > 0 ? parseFloat(((slLosses / totalDecided) * 100).toFixed(1)) : 0,
-      // Avg PnL per exit type
-      avg_tp2_pnl:      tp2Wins > 0
-        ? parseFloat((closedBuyTrades.filter((t: any) => t.exit_reason === 'tp2').reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / tp2Wins).toFixed(2))
-        : 0,
-      avg_tp1_pnl:      tp1Wins > 0
-        ? parseFloat((
-            [
-              ...closedBuyTrades.filter((t: any) => t.exit_reason === 'tp1'),
-              ...(tp1HitTrades || []).filter((t: any) => (t.direction||'buy').toLowerCase() === 'buy')
-            ].reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / tp1Wins
-          ).toFixed(2))
-        : 0,
-      avg_sl_pnl:       slLosses > 0
-        ? parseFloat((closedBuyTrades.filter((t: any) => t.exit_reason === 'sl').reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / slLosses).toFixed(2))
-        : 0,
-    };
+      return {
+        total_decided:    totalDecided,
+        tp1_hit_count:    tp1Wins,
+        tp2_hit_count:    tp2Wins,
+        sl_hit_count:     slLosses,
+        trailing_count:   trailingClosed,
+        breakeven_count:  breakevenClosed,
+        dynamic_count:    dynamicClosed,
+        tp1_hit_rate:     totalDecided > 0 ? parseFloat(((tp1Wins / totalDecided) * 100).toFixed(1)) : 0,
+        tp2_hit_rate:     totalDecided > 0 ? parseFloat(((tp2Wins / totalDecided) * 100).toFixed(1)) : 0,
+        sl_hit_rate:      totalDecided > 0 ? parseFloat(((slLosses / totalDecided) * 100).toFixed(1)) : 0,
+        avg_tp2_pnl:      tp2Wins > 0
+          ? parseFloat((closedList.filter((t: any) => t.exit_reason === 'tp2').reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / tp2Wins).toFixed(2))
+          : 0,
+        avg_tp1_pnl:      tp1Wins > 0
+          ? parseFloat((
+              [...closedList.filter((t: any) => t.exit_reason === 'tp1'), ...tp1HitList]
+                .reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / (tp1Wins || 1)
+            ).toFixed(2))
+          : 0,
+        avg_sl_pnl:       slLosses > 0
+          ? parseFloat((closedList.filter((t: any) => t.exit_reason === 'sl').reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / slLosses).toFixed(2))
+          : 0,
+      };
+    }
 
     const closedCount   = closedBuyTrades.length;
     const winningTrades = closedBuyTrades.filter((t: any) => Number(t.pnl_percent || 0) > 0);
@@ -421,17 +420,22 @@ export async function GET(req: NextRequest) {
     const avgPnl     = closedCount > 0 ? totalPnl / closedCount : 0;
     const avgWin     = winningTrades.length > 0 ? winningTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / winningTrades.length : 0;
     const avgLoss    = losingTrades.length > 0 ? losingTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / losingTrades.length : 0;
-    const rrRatio    = Math.abs(avgLoss) > 0 ? Math.abs(avgWin / avgLoss) : 0;
-    const expectancy = closedCount > 0 ? (winRate / 100 * avgWin) + ((1 - winRate / 100) * avgLoss) : 0;
-
     const activeCount = buyTrades.length;
 
     // Premier Elite signals (Confidence >= 0.85 or top pick)
     const premierBuyTrades = buyTrades.filter((t: any) => (t.ml_probability && Number(t.ml_probability) >= 0.85) || t.is_top_pick);
     const standardBuyTrades = buyTrades.filter((t: any) => !((t.ml_probability && Number(t.ml_probability) >= 0.85) || t.is_top_pick));
 
-    const closedPremierTrades = closedBuyTrades.filter((t: any) => (t.ml_probability && Number(t.ml_probability) >= 0.85));
+    const closedPremierTrades  = closedBuyTrades.filter((t: any) => (t.ml_probability && Number(t.ml_probability) >= 0.85));
     const closedStandardTrades = closedBuyTrades.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= 0.85));
+
+    const tp1HitBuy = (tp1HitTrades || []).filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy');
+    const tp1HitPremier  = tp1HitBuy.filter((t: any) => (t.ml_probability && Number(t.ml_probability) >= 0.85));
+    const tp1HitStandard = tp1HitBuy.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= 0.85));
+
+    const premierQualityMetrics  = buildQualityMetrics(closedPremierTrades, tp1HitPremier);
+    const standardQualityMetrics = buildQualityMetrics(closedStandardTrades, tp1HitStandard);
+    const combinedQualityMetrics = buildQualityMetrics(closedBuyTrades, tp1HitBuy);
 
     const closedPremierCount = closedPremierTrades.length;
     const premierWinRate = closedPremierCount > 0 ? (closedPremierTrades.filter((t: any) => Number(t.pnl_percent) > 0).length / closedPremierCount) * 100 : 0;
@@ -453,7 +457,7 @@ export async function GET(req: NextRequest) {
       sell_signals:  sellTrades,
 
       // ── Quality Metrics: TP1 vs TP2 vs SL breakdown ──────────────────────
-      quality_metrics: qualityMetrics,
+      quality_metrics: combinedQualityMetrics,
 
       // ── Dual-Tier Evaluation Breakdown ───────────────────────────────────
       tier_evaluations: {
@@ -467,7 +471,9 @@ export async function GET(req: NextRequest) {
           win_rate: parseFloat(premierWinRate.toFixed(1)),
           total_pnl: parseFloat(premierTotalPnl.toFixed(1)),
           avg_pnl: parseFloat(premierAvgPnl.toFixed(2)),
+          quality_metrics: premierQualityMetrics,
           trades: premierBuyTrades,
+          closed_trades_list: closedPremierTrades,
         },
         standard_market: {
           label_ar: '🌐 إشارات السوق العامة',
@@ -479,7 +485,9 @@ export async function GET(req: NextRequest) {
           win_rate: parseFloat(standardWinRate.toFixed(1)),
           total_pnl: parseFloat(standardTotalPnl.toFixed(1)),
           avg_pnl: parseFloat(standardAvgPnl.toFixed(2)),
+          quality_metrics: standardQualityMetrics,
           trades: standardBuyTrades,
+          closed_trades_list: closedStandardTrades,
         },
         combined: {
           label_ar: '📊 التقييم الشامل المدمج (كافة الإشارات)',
@@ -491,7 +499,9 @@ export async function GET(req: NextRequest) {
           win_rate: parseFloat(winRate.toFixed(1)),
           total_pnl: parseFloat(totalPnl.toFixed(1)),
           avg_pnl: parseFloat(avgPnl.toFixed(2)),
+          quality_metrics: combinedQualityMetrics,
           trades: buyTrades,
+          closed_trades_list: closedBuyTrades,
         }
       },
 
@@ -515,10 +525,6 @@ export async function GET(req: NextRequest) {
         win_rate:        parseFloat(premierWinRate.toFixed(1)),
         total_pnl:       parseFloat(premierTotalPnl.toFixed(1)),
         avg_pnl:         parseFloat(premierAvgPnl.toFixed(2)),
-        avg_win:         parseFloat(avgWin.toFixed(2)),
-        avg_loss:        parseFloat(avgLoss.toFixed(2)),
-        rr_ratio:        parseFloat(rrRatio.toFixed(2)),
-        expectancy:      parseFloat(expectancy.toFixed(2)),
       }
     });
   } catch (error: any) {
