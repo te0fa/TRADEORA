@@ -199,9 +199,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        db_error: flowsErr ? (flowsErr as any).message : null,
-        flows_count: flows ? flows.length : 0,
-        raw_latest: latest,
         latest: exactLatest,
         distribution: {
           by_nationality: pieNationality,
