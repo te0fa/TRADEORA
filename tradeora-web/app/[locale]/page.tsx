@@ -583,7 +583,7 @@ export default function DashboardPage({ params }: Props) {
               {stat.icon}
             </div>
             <p className="text-3xl font-black text-white font-mono leading-none mb-2">
-              {stat.value.toLocaleString('en-US')}{stat.suffix}
+              {stat.value != null ? Number(stat.value).toLocaleString('en-US') : 0}{stat.suffix}
             </p>
             <p className="text-xs text-zinc-400">{stat.label}</p>
           </Card>

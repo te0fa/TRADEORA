@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, TrendingDown, Zap, DollarSign, ChevronRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { TrendingUp, TrendingDown, Zap, DollarSign } from 'lucide-react';
 
 interface MarketMoversProps {
   locale: string;
@@ -63,7 +63,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
             {isAr ? 'ترتيب الأكثر تداولاً وتغيراً بالبورصة (Top Movers)' : 'EGX Top Market Movers'}
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
-            {isAr ? 'الحدث الحي للأسهم الأكثر ارتفاعاً وانخفاضاً والأنشط بقيمة وحجم التداول.' : 'Live feed of top gainers, losers, and most active stocks by volume & value.'}
+            {isAr ? 'الحدث الحي والختامي للأسهم الأكثر ارتفاعاً وانخفاضاً والأنشط بقيمة وحجم التداول.' : 'Live & session-close feed of top gainers, losers, and most active stocks.'}
           </p>
         </div>
 
@@ -71,7 +71,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
         <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-900 border border-zinc-800 text-xs font-bold">
           <button
             onClick={() => setActiveTab('gainers')}
-            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'gainers' ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -81,7 +81,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
 
           <button
             onClick={() => setActiveTab('losers')}
-            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'losers' ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -91,7 +91,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
 
           <button
             onClick={() => setActiveTab('volume')}
-            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'volume' ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -101,7 +101,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
 
           <button
             onClick={() => setActiveTab('value')}
-            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'value' ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20' : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -112,42 +112,52 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
       </div>
 
       {/* Stock Movers List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 font-mono">
-        {list.map((st: any, idx: number) => (
-          <motion.div
-            key={st.id || idx}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => router.push(`/${locale}/stock/${st.symbol}`)}
-            className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-emerald-500/40 transition-all cursor-pointer flex items-center justify-between gap-3 group"
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-xl bg-zinc-800 text-emerald-400 font-bold text-xs flex items-center justify-center border border-zinc-700">
-                {idx + 1}
-              </span>
-              <div>
-                <span className="font-bold text-white text-sm block group-hover:text-emerald-400 transition-colors">
-                  {st.symbol}
-                </span>
-                <span className="text-[11px] text-zinc-400 line-clamp-1">
-                  {st.name_ar}
-                </span>
-              </div>
-            </div>
+      {list.length === 0 ? (
+        <div className="text-center py-8 text-xs text-zinc-500 font-mono">
+          {isAr ? 'لا توجد بيانات متاحة لهذا التبويب حالياً' : 'No data available for this tab.'}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 font-mono">
+          {list.map((st: any, idx: number) => {
+            const priceVal = Number(st.price || 0);
+            const changeVal = Number(st.change_pct || 0);
+            return (
+              <motion.div
+                key={st.id || st.symbol || idx}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => router.push(`/${locale}/stock/${st.symbol}`)}
+                className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-emerald-500/40 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-xl bg-zinc-800 text-emerald-400 font-bold text-xs flex items-center justify-center border border-zinc-700">
+                    {idx + 1}
+                  </span>
+                  <div>
+                    <span className="font-bold text-white text-sm block group-hover:text-emerald-400 transition-colors">
+                      {st.symbol}
+                    </span>
+                    <span className="text-[11px] text-zinc-400 line-clamp-1">
+                      {st.name_ar || st.symbol}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="text-right">
-              <span className="text-sm font-bold text-white block">
-                {st.price.toFixed(2)} <span className="text-[10px] text-zinc-500">ج.م</span>
-              </span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded inline-block ${
-                st.change_pct >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-              }`}>
-                {st.change_pct >= 0 ? '+' : ''}{st.change_pct}%
-              </span>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-white block">
+                    {priceVal.toFixed(2)} <span className="text-[10px] text-zinc-500">ج.م</span>
+                  </span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded inline-block ${
+                    changeVal >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                  }`}>
+                    {changeVal >= 0 ? '+' : ''}{changeVal.toFixed(2)}%
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

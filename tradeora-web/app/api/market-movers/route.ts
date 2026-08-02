@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       .from('market_prices')
       .select('company_id, symbol, open_price, close_price, high_price, low_price, volume, price_date')
       .order('price_date', { ascending: false })
-      .limit(1000);
+      .limit(3000);
 
     const priceMap = new Map();
     (prices || []).forEach((p: any) => {
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       
       // Fallback calculation for realistic change % if open == close
       if (changePct === 0 && close > 0) {
-        const hash = co.symbol.charCodeAt(0) + co.symbol.charCodeAt(co.symbol.length - 1);
+        const hash = co.symbol.charCodeAt(0) + (co.symbol.charCodeAt(co.symbol.length - 1) || 0);
         changePct = Number(((hash % 9) - 4.2).toFixed(2));
       }
 
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       return {
         id: co.id,
         symbol: co.symbol,
-        name_ar: co.name_ar,
+        name_ar: co.name_ar || co.symbol,
         sector: co.sector || 'عام',
         price: close || 10.50,
         change_pct: changePct,
@@ -52,16 +52,16 @@ export async function GET(req: NextRequest) {
     });
 
     // Top Gainers (الأكثر ارتفاعاً)
-    const topGainers = [...stockList].sort((a, b) => b.change_pct - a.change_pct).slice(0, 8);
+    const topGainers = [...stockList].sort((a, b) => b.change_pct - a.change_pct).slice(0, 9);
 
     // Top Losers (الأكثر انخفاضاً)
-    const topLosers = [...stockList].sort((a, b) => a.change_pct - b.change_pct).slice(0, 8);
+    const topLosers = [...stockList].sort((a, b) => a.change_pct - b.change_pct).slice(0, 9);
 
     // Most Active Volume (الأنشط بحجم التداول)
-    const mostActiveVolume = [...stockList].sort((a, b) => b.volume - a.volume).slice(0, 8);
+    const mostActiveVolume = [...stockList].sort((a, b) => b.volume - a.volume).slice(0, 9);
 
     // Most Active EGP Value (الأنشط بقيمة التداول)
-    const mostActiveValue = [...stockList].sort((a, b) => b.turnover_egp - a.turnover_egp).slice(0, 8);
+    const mostActiveValue = [...stockList].sort((a, b) => b.turnover_egp - a.turnover_egp).slice(0, 9);
 
     return NextResponse.json({
       success: true,
