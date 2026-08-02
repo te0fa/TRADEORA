@@ -1,9 +1,9 @@
-name: Tradeora Real-time Active Trades Tracking
+name: Tradeora Real-time Active Trades Tracking (LEGACY - DISABLED)
+# ⚠️ DISABLED: Replaced by trade-monitor.yml which is more reliable and efficient
+# Kept for reference only - do not re-enable
 
 on:
-  schedule:
-    # Run every 15 minutes during EGX trading hours (Sunday to Thursday, 8 AM - 3 PM UTC / 10 AM - 5 PM Cairo Time)
-    - cron: '*/15 8-15 * * 0-4'
+  # DISABLED - use trade-monitor.yml instead
   workflow_dispatch:
 
 concurrency:
