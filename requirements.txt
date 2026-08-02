@@ -1,21 +1,38 @@
+# ── Core: Database & HTTP ──────────────────────────────
 supabase>=2.28.3
-pandas>=3.0.2
-openpyxl>=3.1.5
-pypdf>=6.14.2
 python-dotenv>=1.2.2
 pydantic-settings>=2.14.0
-pytest>=9.0.3
-beautifulsoup4>=4.14.3
 requests>=2.33.1
-selenium>=4.46.0
-playwright>=1.61.0
-pdfplumber>=0.11.10
 pytz>=2024.1
-yfinance>=0.2.40
-vectorbt>=0.26.1
-quantstats>=0.0.62
-matplotlib>=3.7.0
-pandas-ta>=0.3.14b
+
+# ── Data & Analytics ───────────────────────────────────
+# NOTE: pandas<3 required for pandas-ta + quantstats + vectorbt compatibility
+pandas>=2.1,<3.0
+numpy>=1.26,<2.0
+openpyxl>=3.1.5
+
+# ── Machine Learning ───────────────────────────────────
 xgboost>=2.0.0
 scikit-learn>=1.3.0
 joblib>=1.3.0
+yfinance>=0.2.40
+
+# ── Technical Analysis ─────────────────────────────────
+pandas-ta>=0.3.14b
+
+# ── Backtesting & Performance ──────────────────────────
+vectorbt>=0.26.1
+quantstats>=0.0.62
+matplotlib>=3.7.0
+
+# ── Web Scraping ───────────────────────────────────────
+beautifulsoup4>=4.14.3
+selenium>=4.46.0
+playwright>=1.61.0
+
+# ── Document Parsing ───────────────────────────────────
+pypdf>=6.14.2
+pdfplumber>=0.11.10
+
+# ── Testing ────────────────────────────────────────────
+pytest>=9.0.3
