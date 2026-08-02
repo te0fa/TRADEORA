@@ -2,8 +2,8 @@ name: cockroach-sync
 
 on:
   schedule:
-    # كل يوم الساعة 8 مساءً بتوقيت القاهرة (6 PM UTC)
-    - cron: '0 18 * * 1-5'
+    # كل 6 ساعات (12 ص، 6 ص، 12 م، 6 م بتوقيت القاهرة)
+    - cron: '0 */6 * * 1-5'
   workflow_dispatch:
     inputs:
       mode:
@@ -11,7 +11,7 @@ on:
         required: true
         default: 'full'
         type: choice
-        options: ['check', 'schema', 'data', 'full']
+        options: ['check', 'schema', 'data', 'full', 'reverse']
       days:
         description: 'Days back for data sync'
         required: false
@@ -30,14 +30,22 @@ jobs:
       - name: Install dependencies
         run: pip install supabase psycopg2-binary python-dotenv
 
-      - name: Run sync (scheduled = full)
+      - name: Run full sync (scheduled)
         if: github.event_name == 'schedule'
         env:
           SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_URL:  ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DATABASE_URL:              ${{ secrets.COCKROACHDB_URL }}
-        run: python cockroach_sync.py --full --days 90
+        run: |
+          python cockroach_sync.py --schema
+          python cockroach_sync.py --data --days 30
+          python cockroach_sync.py --check | tee sync_report.txt
+          # Alert if drift > 100 rows
+          if grep -q 'diff=-[1-9][0-9][0-9]' sync_report.txt; then
+            echo '::warning::Database drift detected! Check sync_report.txt'
+            cat sync_report.txt
+          fi
 
       - name: Run sync (manual)
         if: github.event_name == 'workflow_dispatch'
@@ -47,3 +55,11 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DATABASE_URL:              ${{ secrets.COCKROACHDB_URL }}
         run: python cockroach_sync.py --${{ github.event.inputs.mode }} --days ${{ github.event.inputs.days || '90' }}
+
+      - name: Upload drift report
+        if: always() && github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-report-${{ github.run_id }}
+          path: sync_report.txt
+          retention-days: 7
