@@ -214,6 +214,28 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
+
+  // ── EGX Session Gate: only run during trading hours (10:00–15:45 Cairo = 07:00–12:45 UTC) ──
+  // Skip off-hours UNLESS triggered manually (no Authorization header = Vercel cron trigger)
+  const hourUTC  = now.getUTCHours();
+  const minUTC   = now.getUTCMinutes();
+  const totalMin = hourUTC * 60 + minUTC;
+  const DAY      = now.getUTCDay(); // 0=Sun, 1=Mon…5=Sat (EGX: Sun–Thu = 0–4)
+  const isWeekday = DAY >= 0 && DAY <= 4;
+  // Session: 07:00–12:45 UTC (= 10:00–15:45 Cairo)
+  const isSession  = totalMin >= 420 && totalMin <= 765;
+  // Allow slight post-session window: until 13:30 UTC (= 16:30 Cairo) for final close-of-day pass
+  const isPostSession = totalMin > 765 && totalMin <= 810;
+
+  if (!isWeekday || (!isSession && !isPostSession)) {
+    return NextResponse.json({
+      skipped: true,
+      reason: 'Outside EGX trading hours',
+      utc_time: `${hourUTC}:${String(minUTC).padStart(2,'0')}`,
+      cairo_time: `${(hourUTC + 3) % 24}:${String(minUTC).padStart(2,'0')}`,
+    });
+  }
+
   const results = {
     tp1_hit:          0,
     tp2_hit:          0,
@@ -228,6 +250,7 @@ export async function GET(req: NextRequest) {
     skipped_no_price: 0,
     stale_closed:     0,
   };
+
 
   try {
     // ── STEP 1: Backfill – fix closed trades missing pnl_percent ─────────────

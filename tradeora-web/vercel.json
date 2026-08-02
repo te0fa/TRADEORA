@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/track-recommended-trades",
-      "schedule": "0 15 * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

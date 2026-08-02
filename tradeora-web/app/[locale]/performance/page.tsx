@@ -68,8 +68,10 @@ export default function PerformancePage() {
   const [platformSellSignals, setPlatformSellSignals] = useState<any[]>([]);
   const [platformStats, setPlatformStats] = useState<any>(null);
   const [tierEvaluations, setTierEvaluations] = useState<any>(null);
+  const [qualityMetrics, setQualityMetrics] = useState<any>(null);
   const [evaluationTier, setEvaluationTier] = useState<'premier_elite' | 'standard_market' | 'combined'>('premier_elite');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
 
   // Personal states
   const [personalTrades, setPersonalTrades] = useState<UserTrade[]>([]);
@@ -144,6 +146,7 @@ export default function PerformancePage() {
         setPlatformSellSignals(platData.sell_signals || []);
         setPlatformStats(platData.stats || null);
         setTierEvaluations(platData.tier_evaluations || null);
+        setQualityMetrics(platData.quality_metrics || null);
 
         
         if (persData.success) {
@@ -423,6 +426,45 @@ export default function PerformancePage() {
                     </Card>
                   </motion.div>
                 </div>
+
+                {/* Quality Metrics: TP1 vs TP2 vs SL */}
+                {qualityMetrics && qualityMetrics.total_decided > 0 && (
+                  <motion.div variants={itemVariants} className="mb-6">
+                    <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-lg">🎯</span>
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider">مقياس جودة الإشارات — دقة الأهداف</h3>
+                        <span className="text-xs text-zinc-500 font-medium mr-auto">{qualityMetrics.total_decided} صفقة محسومة</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-3 flex flex-col gap-1">
+                          <span className="text-[10px] font-bold text-emerald-400">🎯 هدف أول TP1</span>
+                          <div className="text-2xl font-black text-emerald-400 font-mono">{qualityMetrics.tp1_hit_rate}%</div>
+                          <div className="text-[10px] text-zinc-500">{qualityMetrics.tp1_hit_count} صفقة{qualityMetrics.avg_tp1_pnl > 0 && <span className="text-emerald-400 font-bold"> · +{qualityMetrics.avg_tp1_pnl}%</span>}</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{width:qualityMetrics.tp1_hit_rate+"%"}} /></div>
+                        </div>
+                        <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-3 flex flex-col gap-1">
+                          <span className="text-[10px] font-bold text-blue-400">🏆 هدف ثاني TP2</span>
+                          <div className="text-2xl font-black text-blue-400 font-mono">{qualityMetrics.tp2_hit_rate}%</div>
+                          <div className="text-[10px] text-zinc-500">{qualityMetrics.tp2_hit_count} صفقة{qualityMetrics.avg_tp2_pnl > 0 && <span className="text-blue-400 font-bold"> · +{qualityMetrics.avg_tp2_pnl}%</span>}</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:qualityMetrics.tp2_hit_rate+"%"}} /></div>
+                        </div>
+                        <div className="bg-yellow-500/10 border border-yellow-500/25 rounded-xl p-3 flex flex-col gap-1">
+                          <span className="text-[10px] font-bold text-yellow-400">🛡 خروج محمي</span>
+                          <div className="text-2xl font-black text-yellow-400 font-mono">{qualityMetrics.total_decided>0?(((qualityMetrics.trailing_count+qualityMetrics.breakeven_count)/qualityMetrics.total_decided)*100).toFixed(1):0}%</div>
+                          <div className="text-[10px] text-zinc-500">{qualityMetrics.trailing_count+qualityMetrics.breakeven_count} صفقة</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 rounded-full" style={{width:(qualityMetrics.total_decided>0?((qualityMetrics.trailing_count+qualityMetrics.breakeven_count)/qualityMetrics.total_decided)*100:0)+"%"}} /></div>
+                        </div>
+                        <div className="bg-red-500/10 border border-red-500/25 rounded-xl p-3 flex flex-col gap-1">
+                          <span className="text-[10px] font-bold text-red-400">🔴 وقف خسارة SL</span>
+                          <div className="text-2xl font-black text-red-400 font-mono">{qualityMetrics.sl_hit_rate}%</div>
+                          <div className="text-[10px] text-zinc-500">{qualityMetrics.sl_hit_count} صفقة{qualityMetrics.avg_sl_pnl<0 && <span className="text-red-400 font-bold"> · {qualityMetrics.avg_sl_pnl}%</span>}</div>
+                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{width:qualityMetrics.sl_hit_rate+"%"}} /></div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                   <motion.div variants={itemVariants} className="lg:col-span-1">

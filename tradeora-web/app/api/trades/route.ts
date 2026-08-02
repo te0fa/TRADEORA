@@ -360,10 +360,57 @@ export async function GET(req: NextRequest) {
       .select('pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at')
       .eq('status', 'closed');
 
+    // Also fetch tp1_hit trades (still open, but TP1 achieved = partial win)
+    const { data: tp1HitTrades } = await supabase
+      .from('recommended_trades')
+      .select('pnl_percent, direction, ml_probability')
+      .eq('status', 'tp1_hit');
+
     // Filter closed trades for BUY direction with valid PnL
     const closedBuyTrades = (allClosed || []).filter((t: any) =>
       (t.direction || 'buy').toLowerCase() === 'buy' && t.pnl_percent !== null
     );
+
+    // Quality Metrics: separate TP1 / TP2 / SL breakdown
+    const totalDecided = closedBuyTrades.length + (tp1HitTrades?.length || 0);
+    const tp2Wins   = closedBuyTrades.filter((t: any) => t.exit_reason === 'tp2').length;
+    const tp1Wins   = closedBuyTrades.filter((t: any) => t.exit_reason === 'tp1').length +
+                      (tp1HitTrades || []).filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy').length;
+    const slLosses  = closedBuyTrades.filter((t: any) => t.exit_reason === 'sl').length;
+    const trailingClosed = closedBuyTrades.filter((t: any) => t.exit_reason === 'trailing_stop').length;
+    const breakevenClosed = closedBuyTrades.filter((t: any) => t.exit_reason === 'breakeven').length;
+    const dynamicClosed = closedBuyTrades.filter((t: any) =>
+      !['tp2','tp1','sl','trailing_stop','breakeven','expired_no_movement'].includes(t.exit_reason)
+    ).length;
+
+    const qualityMetrics = {
+      total_decided:    totalDecided,
+      tp1_hit_count:    tp1Wins,
+      tp2_hit_count:    tp2Wins,
+      sl_hit_count:     slLosses,
+      trailing_count:   trailingClosed,
+      breakeven_count:  breakevenClosed,
+      dynamic_count:    dynamicClosed,
+      // Rates
+      tp1_hit_rate:     totalDecided > 0 ? parseFloat(((tp1Wins / totalDecided) * 100).toFixed(1)) : 0,
+      tp2_hit_rate:     totalDecided > 0 ? parseFloat(((tp2Wins / totalDecided) * 100).toFixed(1)) : 0,
+      sl_hit_rate:      totalDecided > 0 ? parseFloat(((slLosses / totalDecided) * 100).toFixed(1)) : 0,
+      // Avg PnL per exit type
+      avg_tp2_pnl:      tp2Wins > 0
+        ? parseFloat((closedBuyTrades.filter((t: any) => t.exit_reason === 'tp2').reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / tp2Wins).toFixed(2))
+        : 0,
+      avg_tp1_pnl:      tp1Wins > 0
+        ? parseFloat((
+            [
+              ...closedBuyTrades.filter((t: any) => t.exit_reason === 'tp1'),
+              ...(tp1HitTrades || []).filter((t: any) => (t.direction||'buy').toLowerCase() === 'buy')
+            ].reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / tp1Wins
+          ).toFixed(2))
+        : 0,
+      avg_sl_pnl:       slLosses > 0
+        ? parseFloat((closedBuyTrades.filter((t: any) => t.exit_reason === 'sl').reduce((s: number, t: any) => s + Number(t.pnl_percent || 0), 0) / slLosses).toFixed(2))
+        : 0,
+    };
 
     const closedCount   = closedBuyTrades.length;
     const winningTrades = closedBuyTrades.filter((t: any) => Number(t.pnl_percent || 0) > 0);
@@ -396,6 +443,7 @@ export async function GET(req: NextRequest) {
     const standardTotalPnl = closedStandardCount > 0 ? closedStandardTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 0;
     const standardAvgPnl = closedStandardCount > 0 ? standardTotalPnl / closedStandardCount : 0;
 
+
     return NextResponse.json({
       // ── Primary: Top premier picks (sorted by composite_score) ────────────
       trades:        premierBuyTrades.length > 0 ? premierBuyTrades : buyTrades, // Default primary is Premier Elite
@@ -403,6 +451,9 @@ export async function GET(req: NextRequest) {
       top_picks:     topPicks,       // Top 20 premier picks
       other_signals: otherSignals,   // Remaining signals
       sell_signals:  sellTrades,
+
+      // ── Quality Metrics: TP1 vs TP2 vs SL breakdown ──────────────────────
+      quality_metrics: qualityMetrics,
 
       // ── Dual-Tier Evaluation Breakdown ───────────────────────────────────
       tier_evaluations: {
