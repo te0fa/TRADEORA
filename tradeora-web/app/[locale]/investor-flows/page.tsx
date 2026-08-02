@@ -20,12 +20,17 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
           headers: { 'Cache-Control': 'no-cache' }
         });
         const json = await res.json();
-        if (json.success) {
+        if (json.success && json.latest) {
           setData(json);
           setIsToday(json.is_live_today === true);
           setFetchedAt(new Date().toLocaleTimeString('ar-EG', {
             hour: '2-digit', minute: '2-digit', second: '2-digit'
           }));
+        } else if (json.success) {
+          // API succeeded but no latest data yet (market not started or no DB rows)
+          setData(json);
+          setIsToday(false);
+          setFetchedAt('');
         }
       } catch (err) {
         console.error('Error fetching investor flows:', err);
@@ -252,6 +257,26 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
           {isAr ? 'الجداول الرسمية اللحظية لتدفقات الجلسة (بالجنيه المصري)' : 'Official EGX Live Breakdown Tables (EGP)'}
         </h2>
 
+        {/* Guard: only render tables when we have actual data */}
+        {!latest ? (
+          <div className="glass-panel p-10 rounded-3xl border border-zinc-800 flex flex-col items-center justify-center gap-4 text-center">
+            <span className="text-4xl">📊</span>
+            <p className="text-lg font-bold text-white">
+              {isAr ? 'بيانات التدفقات غير متوفرة حالياً' : 'No Flow Data Available'}
+            </p>
+            <p className="text-sm text-zinc-400 max-w-md">
+              {isAr
+                ? 'لم تبدأ الجلسة بعد أو لم يتم رفع بيانات التدفقات لهذا اليوم. ستظهر البيانات تلقائياً بعد بداية التداول (10:00 صباحاً بتوقيت القاهرة).'
+                : 'Session has not started yet or flow data has not been uploaded for today. Data will appear automatically after trading begins (10:00 AM Cairo time).'}
+            </p>
+            {data?.data_date && (
+              <p className="text-xs text-amber-400 font-mono bg-amber-500/10 px-3 py-1.5 rounded border border-amber-500/20">
+                ⚠️ {isAr ? `آخر بيانات متاحة: ${data.data_date}` : `Last available data: ${data.data_date}`}
+              </p>
+            )}
+          </div>
+        ) : (<>
+
         {/* Table 1: Overall Totals by Nationality */}
         <div className="glass-panel p-5 rounded-3xl border border-zinc-800 space-y-3">
           <div className="flex items-center justify-between">
@@ -383,6 +408,7 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
             </table>
           </div>
         </div>
+        </>)}
       </div>
     </div>
   );
