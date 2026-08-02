@@ -11,11 +11,15 @@ export async function GET(req: NextRequest) {
       .eq('status', 'active');
 
     // Fetch the LATEST price per company — using real 308k rows
-    const { data: prices } = await supabase
+    const { data: prices, error: priceErr } = await supabase
       .from('market_prices')
-      .select('company_id, symbol, open_price, close_price, high_price, low_price, volume, price_date')
+      .select('company_id, open_price, close_price, high_price, low_price, volume, price_date')
       .order('price_date', { ascending: false })
       .limit(5000);
+
+    if (priceErr) {
+      console.error('Error fetching market_prices in market-movers:', priceErr);
+    }
 
     const priceMap = new Map<string, any>();
     (prices || []).forEach((p: any) => {
@@ -66,22 +70,18 @@ export async function GET(req: NextRequest) {
     }
 
     const topGainers = [...stockList]
-      .filter(s => s.change_pct !== 0)
       .sort((a, b) => b.change_pct - a.change_pct)
       .slice(0, 9);
 
     const topLosers = [...stockList]
-      .filter(s => s.change_pct !== 0)
       .sort((a, b) => a.change_pct - b.change_pct)
       .slice(0, 9);
 
     const mostActiveVolume = [...stockList]
-      .filter(s => s.volume > 0)
       .sort((a, b) => b.volume - a.volume)
       .slice(0, 9);
 
     const mostActiveValue = [...stockList]
-      .filter(s => s.turnover_egp > 0)
       .sort((a, b) => b.turnover_egp - a.turnover_egp)
       .slice(0, 9);
 
