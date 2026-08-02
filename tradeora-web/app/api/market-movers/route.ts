@@ -33,7 +33,10 @@ export async function GET(req: NextRequest) {
     // 3. Fetch LIVE real-time quotes directly from TradingView Scanner API
     const tvUrl = 'https://scanner.tradingview.com/egypt/scan';
     const payload = {
-      filter: [{ left: 'type', operation: 'in_range', right: ['stock', 'dr', 'fund'] }],
+      filter: [
+        { left: 'type', operation: 'in_range', right: ['stock', 'dr', 'fund'] },
+        { left: 'volume', operation: 'greater', right: 0 }
+      ],
       options: { lang: 'en' },
       symbols: { query: { types: [] }, tickers: [] },
       columns: ['name', 'description', 'close', 'change', 'change_abs', 'open', 'high', 'low', 'volume', 'value'],
@@ -45,8 +48,13 @@ export async function GET(req: NextRequest) {
     try {
       const tvRes = await fetch(tvUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-        next: { revalidate: 5 } // Cache for 5 seconds max
+        headers: { 
+          'Content-Type': 'application/json', 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Origin': 'https://www.tradingview.com',
+          'Referer': 'https://www.tradingview.com/'
+        },
+        cache: 'no-store'
       });
       if (tvRes.ok) {
         const json = await tvRes.json();
@@ -73,7 +81,8 @@ export async function GET(req: NextRequest) {
         const volume = Number(d[8] || 0);
         const value = Number(d[9] || (close * volume));
 
-        if (close <= 0) continue;
+        // Require positive price and real volume (untraded stocks like DCRC with 0 volume are excluded)
+        if (close <= 0 || volume <= 0) continue;
 
         const co = companyMap.get(sym);
         const companyId = co?.id || sym;
@@ -121,7 +130,8 @@ export async function GET(req: NextRequest) {
         if (!p) return;
         const close = Number(p.close_price || 0);
         const open = Number(p.open_price || close);
-        if (close <= 0) return;
+        const volume = Number(p.volume || 0);
+        if (close <= 0 || volume <= 0) return;
         const changePct = open > 0 ? Number((((close - open) / open) * 100).toFixed(2)) : 0;
         const isHalted = haltedSymbols.has(co.symbol.toUpperCase());
 
@@ -133,8 +143,8 @@ export async function GET(req: NextRequest) {
           price: close,
           change_pct: changePct,
           volatility_pct: Math.abs(changePct),
-          volume: Number(p.volume || 0),
-          turnover_egp: close * Number(p.volume || 0),
+          volume: volume,
+          turnover_egp: close * volume,
           price_date: p.price_date,
           is_halted: isHalted,
           halt_status_ar: isHalted ? '⏸️ إيقاف رسمى من البورصة (10د)' : null,
