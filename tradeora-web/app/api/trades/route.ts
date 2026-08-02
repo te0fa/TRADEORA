@@ -19,13 +19,13 @@ export async function GET(req: NextRequest) {
     const symbol = searchParams.get('symbol');
 
     // 1. Fetch trades with company details
-    // Exclude contaminated pre-launch signals from performance metrics
-    const LAUNCH_DATE = '2026-07-30T00:00:00+00:00'; // post-reset v3 clean launch
+    // Exclude contaminated pre-launch signals from performance metrics (Fresh Reset: Aug 3, 2026)
+    const LAUNCH_DATE = '2026-08-03T00:00:00+00:00'; // fresh start post-reset
     let query = supabase
       .from('recommended_trades')
       .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
-      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset') // preserve NULL exit_reasons for active signals
-      .gte('recommended_at', LAUNCH_DATE)                         // only show v2 signals
+      .neq('exit_reason', 'pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE)
       .order('recommended_at', { ascending: false });
 
     if (symbol) {
@@ -38,15 +38,9 @@ export async function GET(req: NextRequest) {
       throw fetchError;
     }
 
-    // If no trades found after launch date, relax filter to all-time
-    if (!trades || trades.length === 0) {
-      const fallbackQuery = supabase
-        .from('recommended_trades')
-        .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
-        .order('recommended_at', { ascending: false })
-        .limit(limit);
-      const { data: allTrades } = await fallbackQuery;
-      trades = allTrades || [];
+    // If no trades found after reset date, return clean empty list
+    if (!trades) {
+      trades = [];
     }
 
     // 2. Fetch latest prices for active companies
@@ -360,13 +354,16 @@ export async function GET(req: NextRequest) {
     const { data: allClosed } = await supabase
       .from('recommended_trades')
       .select('pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at')
-      .eq('status', 'closed');
+      .eq('status', 'closed')
+      .neq('exit_reason', 'pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE);
 
     // Also fetch tp1_hit trades (still open, but TP1 achieved = partial win)
     const { data: tp1HitTrades } = await supabase
       .from('recommended_trades')
       .select('pnl_percent, direction, ml_probability')
-      .eq('status', 'tp1_hit');
+      .eq('status', 'tp1_hit')
+      .gte('recommended_at', LAUNCH_DATE);
 
     // Filter closed trades for BUY direction with valid PnL
     const closedBuyTrades = (allClosed || []).filter((t: any) =>
@@ -377,7 +374,7 @@ export async function GET(req: NextRequest) {
     function buildQualityMetrics(closedList: any[], tp1HitList: any[]) {
       const totalDecided = closedList.length + tp1HitList.length;
       const tp2Wins = closedList.filter((t: any) => t.exit_reason === 'tp2').length;
-      const tp1Wins = closedList.filter((t: any) => t.exit_reason === 'tp1').length + tp1HitList.length;
+      const tp1Wins = closedList.filter((t: any) => t.exit_reason === 'tp1' || t.exit_reason === 'tp2').length + tp1HitList.length;
       const slLosses = closedList.filter((t: any) => t.exit_reason === 'sl').length;
       const trailingClosed = closedList.filter((t: any) => t.exit_reason === 'trailing_stop').length;
       const breakevenClosed = closedList.filter((t: any) => t.exit_reason === 'breakeven').length;
