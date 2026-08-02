@@ -1,0 +1,92 @@
+name: 🤖 Trade Monitor — Auto Close TP/SL
+
+on:
+  schedule:
+    # كل 10 دقايق أثناء جلسة البورصة (10:00 AM – 3:30 PM Cairo = 07:00-12:30 UTC)
+    # أحد - خميس
+    - cron: '0,10,20,30,40,50 7,8,9,10,11 * * 0,1,2,3,4'
+    - cron: '0,10,20,30 12 * * 0,1,2,3,4'
+    # بعد الجلسة — تحديث نهائي (3:40 PM Cairo = 12:40 UTC)
+    - cron: '40 12 * * 0,1,2,3,4'
+
+  # تشغيل يدوي
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (check only, no DB changes)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+jobs:
+  monitor-trades:
+    name: 📊 Check & Close Active Trades
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install supabase python-dotenv
+
+      - name: 🕐 Check if within trading hours
+        id: check_hours
+        run: |
+          HOUR_UTC=$(date -u +%-H)
+          MIN_UTC=$(date -u +%-M)
+          HOUR_CAIRO=$((HOUR_UTC + 3))
+          TOTAL_MINS=$((HOUR_CAIRO * 60 + MIN_UTC))
+
+          echo "Cairo time: ${HOUR_CAIRO}:${MIN_UTC}"
+
+          # Trading hours: 10:00 AM - 3:45 PM Cairo (600 - 945 mins)
+          if [ "$TOTAL_MINS" -ge 600 ] && [ "$TOTAL_MINS" -le 945 ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ Within trading hours — running monitor"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Outside trading hours (Cairo ${HOUR_CAIRO}:${MIN_UTC}) — skipping"
+          fi
+
+          # Allow manual runs always
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual trigger — running regardless of time"
+          fi
+
+      - name: 🤖 Run Trade Monitor
+        if: steps.check_hours.outputs.should_run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          DRY_RUN=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN="--dry-run"
+          fi
+          echo "🤖 Running trade monitor..."
+          python trade_monitor.py $DRY_RUN
+
+      - name: ⏭️ Skip
+        if: steps.check_hours.outputs.should_run != 'true'
+        run: echo "⏭️ Outside trading hours — no monitoring needed"
+
+      - name: 📋 Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-monitor-logs-${{ github.run_id }}
+          path: logs/trade_monitor.log
+          retention-days: 7

@@ -138,10 +138,13 @@ export default function PerformancePage() {
       fetch('/api/user-trades').then(res => res.json())
     ])
       .then(([platData, persData]) => {
-        setPlatformTrades(platData.trades || []);
+        // Use all_buy_trades for the modal so ALL active trades appear (top 20 by composite_score)
+        // 'trades' = only premierBuyTrades (ml_prob >= 0.85) → causes 10/20 limit bug
+        setPlatformTrades(platData.all_buy_trades || platData.trades || []);
         setPlatformSellSignals(platData.sell_signals || []);
         setPlatformStats(platData.stats || null);
         setTierEvaluations(platData.tier_evaluations || null);
+
         
         if (persData.success) {
           setPersonalTrades(persData.trades || []);
