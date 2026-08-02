@@ -232,6 +232,28 @@ export async function GET(req: NextRequest) {
       const ictSmcBadgeAr = snap.ict_smc_badge_ar || (hashIdx % 4 === 0 ? '🎯 SMC: كُتلة أوامر OB + كسر هيكل MSS' : '✨ ICT: فجوة سعرية عادلة (Bullish FVG)');
       const elliottBadgeAr = snap.elliott_badge_ar || (hashIdx % 7 === 0 ? '🚀 إليوت: انطلاق الموجة 3 الداَفعة' : '⏳ انعطاف زمني متوقع (دورة فيبوناتشي)');
 
+      // Compute activation status:
+      let isActivated = true;
+      let activationStatusAr = '⚡ صفقة مفعلة (سعر السوق المباشر)';
+
+      if (orderType === 'LIMIT') {
+        if (isBuy) {
+          isActivated = safeCurrentPrice <= finalEntry * 1.005;
+          activationStatusAr = isActivated ? '⚡ صفقة مفعلة (وصل السعر لأمر الليميت)' : '⏳ أمر ليميت معلق (بانتظار وصول السعر)';
+        } else {
+          isActivated = safeCurrentPrice >= finalEntry * 0.995;
+          activationStatusAr = isActivated ? '⚡ صفقة مفعلة (وصل السعر لأمر الليميت)' : '⏳ أمر ليميت معلق (بانتظار وصول السعر)';
+        }
+      } else if (orderType === 'BREAKOUT_TRIGGER') {
+        if (isBuy) {
+          isActivated = safeCurrentPrice >= finalEntry * 0.995;
+          activationStatusAr = isActivated ? '⚡ صفقة مفعلة (اختراق وتأكيد الدخول)' : '🎯 أمر مشروط معلق (بانتظار كسر المقاومة)';
+        } else {
+          isActivated = safeCurrentPrice <= finalEntry * 1.005;
+          activationStatusAr = isActivated ? '⚡ صفقة مفعلة (اختراق وتأكيد الدخول)' : '🎯 أمر مشروط معلق (بانتظار كسر الدعم)';
+        }
+      }
+
       return {
         ...t,
         entry_price: finalEntry,
@@ -267,7 +289,9 @@ export async function GET(req: NextRequest) {
         explanation_ar: defaultRationale,
         expected_target_date: dynamicExpDate,
         order_type: orderType,
-        trigger_condition_ar: triggerCondAr
+        trigger_condition_ar: triggerCondAr,
+        is_activated: isActivated,
+        activation_status_ar: activationStatusAr,
       };
     });
 
@@ -374,6 +398,8 @@ export async function GET(req: NextRequest) {
       stats: {
         total_trades:    activeCount + closedCount,
         active_trades:   activeCount,
+        activated_trades: buyTrades.filter((t: any) => t.is_activated).length,
+        pending_trades:  buyTrades.filter((t: any) => !t.is_activated).length,
         closed_trades:   closedCount,
         winning_trades:  winningTrades.length,
         losing_trades:   losingTrades.length,

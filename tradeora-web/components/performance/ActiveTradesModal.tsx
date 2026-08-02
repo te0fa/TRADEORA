@@ -61,6 +61,8 @@ export interface ActiveTrade {
   ict_smc_badge_ar?: string;
   elliott_badge_ar?: string;
   price_channel?: any;
+  is_activated?: boolean;
+  activation_status_ar?: string;
 }
 
 interface ActiveTradesModalProps {
@@ -79,7 +81,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
   const [shariahOnly, setShariahOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
-  const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'ACTIVATED' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
   const [strategyFilter, setStrategyFilter] = useState<'ALL' | 'DAY_TRADING' | 'SWING_POSITION'>('ALL');
 
   // Base list depending on signal mode tab
@@ -119,8 +121,11 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
       // 0. Shariah Compliance Filter
       if (shariahOnly && !t.is_shariah_compliant) return false;
 
-      // 1. Order Type Filter
-      if (orderTypeFilter !== 'ALL') {
+      // 1. Order Type Filter (including ACTIVATED filter)
+      if (orderTypeFilter === 'ACTIVATED') {
+        const isAct = t.is_activated || t.order_type === 'MARKET';
+        if (!isAct) return false;
+      } else if (orderTypeFilter !== 'ALL') {
         const type = t.order_type || 'MARKET';
         if (type !== orderTypeFilter) return false;
       }
@@ -301,6 +306,15 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                 }`}
               >
                 {isAr ? 'جميع الأوامر' : 'All Types'}
+              </button>
+              <button
+                onClick={() => setOrderTypeFilter('ACTIVATED')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  orderTypeFilter === 'ACTIVATED' ? 'bg-emerald-500 text-black shadow-lg font-black' : 'text-emerald-400 hover:text-white bg-emerald-500/10 border border-emerald-500/20'
+                }`}
+              >
+                <Zap className="w-3 h-3 fill-emerald-400" />
+                <span>{isAr ? '⚡ المفعلة فقط' : '⚡ Activated Only'}</span>
               </button>
               <button
                 onClick={() => setOrderTypeFilter('MARKET')}

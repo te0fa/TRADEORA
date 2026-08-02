@@ -338,15 +338,21 @@ export default function PerformancePage() {
                         <Activity className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
                       </div>
                       <div>
-                        <div className="text-3xl font-black text-white font-mono flex items-baseline justify-between">
+                        <div className="text-3xl font-black text-white font-mono flex items-baseline justify-between flex-wrap gap-2">
                           <span>{platformStats.total_trades}</span>
-                          <span className="text-xs font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded border border-accent-blue/20">
-                            {activeTradesForModal.length} Active ➔
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                              ⚡ {platformStats.activated_trades ?? activeTradesForModal.filter((t: any) => t.is_activated).length} مفعلة
+                            </span>
+                            <span className="text-xs font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded border border-accent-blue/20">
+                              {activeTradesForModal.length} Active ➔
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-zinc-500 mt-1 font-medium flex gap-3">
-                          <span className="text-up-green">W: {platformStats.winning_trades}</span>
-                          <span className="text-down-red">L: {platformStats.losing_trades}</span>
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium flex items-center gap-3">
+                          <span className="text-up-green font-bold">W: {platformStats.winning_trades}</span>
+                          <span className="text-down-red font-bold">L: {platformStats.losing_trades}</span>
+                          <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded">⚡ {platformStats.activated_trades ?? 0} مفعلة</span>
                         </p>
                       </div>
                     </Card>
