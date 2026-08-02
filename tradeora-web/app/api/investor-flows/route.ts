@@ -35,6 +35,8 @@ function n(row: any, ...fields: string[]): number {
 
 export async function GET(req: NextRequest) {
   try {
+    // Force live runtime execution on every request
+    const _reqUrl = req.nextUrl.searchParams.get('t');
     const todayStr = new Date().toISOString().split('T')[0];
     const sb = getSb();
 
