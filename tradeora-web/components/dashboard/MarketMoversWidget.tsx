@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Zap, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, DollarSign, Activity } from 'lucide-react';
 
 interface MarketMoversProps {
   locale: string;
@@ -14,7 +14,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
   const isAr = locale === 'ar';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'gainers' | 'losers' | 'volume' | 'value'>('gainers');
+  const [activeTab, setActiveTab] = useState<'gainers' | 'losers' | 'volume' | 'value' | 'scalp'>('gainers');
 
   useEffect(() => {
     async function fetchMovers() {
@@ -32,7 +32,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
     }
 
     fetchMovers();
-    const interval = setInterval(fetchMovers, 10000); // Live poll every 10 sec
+    const interval = setInterval(fetchMovers, 10000); // Live poll every 10 sec during trading hours
     return () => clearInterval(interval);
   }, []);
 
@@ -51,7 +51,23 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
     ? data?.top_losers || []
     : activeTab === 'volume'
     ? data?.most_active_volume || []
-    : data?.most_active_value || [];
+    : activeTab === 'value'
+    ? data?.most_active_value || []
+    : data?.most_volatile_scalp || [];
+
+  function formatVolume(val: number): string {
+    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B`;
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`;
+    if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
+    return `${val.toLocaleString('en-US')}`;
+  }
+
+  function formatTurnover(val: number): string {
+    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B ج.م`;
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M ج.م`;
+    if (val >= 1_000) return `${(val / 1_000).toFixed(0)}K ج.م`;
+    return `${val.toLocaleString('en-US')} ج.م`;
+  }
 
   return (
     <div className="glass-panel p-6 rounded-3xl border border-zinc-800 space-y-6">
@@ -63,12 +79,12 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
             {isAr ? 'ترتيب الأكثر تداولاً وتغيراً بالبورصة (Top Movers)' : 'EGX Top Market Movers'}
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
-            {isAr ? 'الحدث الحي والختامي للأسهم الأكثر ارتفاعاً وانخفاضاً والأنشط بقيمة وحجم التداول.' : 'Live & session-close feed of top gainers, losers, and most active stocks.'}
+            {isAr ? 'الحدث الحي والختامي للأسهم الأكثر ارتفاعاً وانخفاضاً، والأنشط حجماً وقيمة، وأسرع الأسهم تذبذباً للمضاربة (Scalping).' : 'Live & session-close feed of top gainers, losers, active volume/value, and scalp volatility movers.'}
           </p>
         </div>
 
         {/* Tabs Control */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-900 border border-zinc-800 text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-zinc-900 border border-zinc-800 text-xs font-bold">
           <button
             onClick={() => setActiveTab('gainers')}
             className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -108,6 +124,16 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
             <DollarSign className="w-3.5 h-3.5" />
             <span>{isAr ? 'الأنشط بالقيمة' : 'Value'}</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('scalp')}
+            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'scalp' ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>{isAr ? '⚡ أنشط حركة (Scalp)' : 'Scalp Volatility'}</span>
+          </button>
         </div>
       </div>
 
@@ -121,6 +147,10 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
           {list.map((st: any, idx: number) => {
             const priceVal = Number(st.price || 0);
             const changeVal = Number(st.change_pct || 0);
+            const volVal = Number(st.volume || 0);
+            const turnoverVal = Number(st.turnover_egp || 0);
+            const volatilityVal = Number(st.volatility_pct || 0);
+
             return (
               <motion.div
                 key={st.id || st.symbol || idx}
@@ -140,6 +170,22 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
                     <span className="text-[11px] text-zinc-400 line-clamp-1">
                       {st.name_ar || st.symbol}
                     </span>
+                    {/* Display Volume / Value / Volatility metric label */}
+                    {activeTab === 'volume' && (
+                      <span className="text-[10px] text-blue-400 font-bold block mt-0.5">
+                        📦 {formatVolume(volVal)} سهم
+                      </span>
+                    )}
+                    {activeTab === 'value' && (
+                      <span className="text-[10px] text-amber-400 font-bold block mt-0.5">
+                        💰 {formatTurnover(turnoverVal)}
+                      </span>
+                    )}
+                    {activeTab === 'scalp' && (
+                      <span className="text-[10px] text-purple-400 font-bold block mt-0.5">
+                        ⚡ تذبذب سريع ±{volatilityVal.toFixed(1)}%
+                      </span>
+                    )}
                   </div>
                 </div>
 

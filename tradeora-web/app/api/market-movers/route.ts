@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
 
         const open = Number(p.open_price || 0);
         const close = Number(p.close_price || 0);
+        const high = Number(p.high_price || close);
+        const low = Number(p.low_price || close);
         const volume = Number(p.volume || 0);
 
         if (close <= 0) return null;
@@ -44,6 +46,14 @@ export async function GET(req: NextRequest) {
           changePct = Number((((close - open) / open) * 100).toFixed(2));
         }
 
+        // Enforce EGX Official Daily Price Circuit Breaker Limit (Max ±20.00%)
+        if (changePct > 20.0) changePct = 19.99;
+        if (changePct < -20.0) changePct = -19.99;
+
+        // Calculate Intraday Volatility Range for Fast Scalping (high vs low)
+        let volatilityPct = low > 0 && high > 0 ? Number((((high - low) / low) * 100).toFixed(2)) : Math.abs(changePct);
+        if (volatilityPct > 25.0) volatilityPct = 24.8;
+
         return {
           id: co.id,
           symbol: co.symbol,
@@ -51,6 +61,7 @@ export async function GET(req: NextRequest) {
           sector: co.sector || 'عام',
           price: close,
           change_pct: changePct,
+          volatility_pct: volatilityPct,
           volume: volume,
           turnover_egp: close * volume,
           price_date: p.price_date,
@@ -65,6 +76,7 @@ export async function GET(req: NextRequest) {
         top_losers: [],
         most_active_volume: [],
         most_active_value: [],
+        most_volatile_scalp: [],
         note: 'لا توجد بيانات أسعار متاحة حالياً',
       });
     }
@@ -85,12 +97,19 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.turnover_egp - a.turnover_egp)
       .slice(0, 9);
 
+    // Fast Intraday Scalp Volatility Movers (الأسهم الأكثر تذبذباً وسرعة بالحركة)
+    const mostVolatileScalp = [...stockList]
+      .filter(s => s.volume > 50000) // minimum liquidity requirement
+      .sort((a, b) => b.volatility_pct - a.volatility_pct)
+      .slice(0, 9);
+
     return NextResponse.json({
       success: true,
       top_gainers: topGainers,
       top_losers: topLosers,
       most_active_volume: mostActiveVolume,
       most_active_value: mostActiveValue,
+      most_volatile_scalp: mostVolatileScalp,
       total_stocks_analyzed: stockList.length,
     });
   } catch (err: any) {
