@@ -14,7 +14,7 @@ egx_intraday_flows.py — v3 COMPLETE REWRITE
 """
 
 import os, sys, re, time, logging, json, argparse
-from datetime import date, datetime
+from datetime import date, datetime, time as dtime
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -65,8 +65,8 @@ def parse_egp(text: str) -> float | None:
 
 def scrape_egx_flows(target_date: date) -> dict | None:
     """
-    Use Playwright to load InvestorsTypeCharts.aspx.
-    Extracts all 3 tables completely and returns structured data.
+    Use Playwright to load InvestorsTypeCharts.aspx and extract live flow data.
+    NOTE: Data is only available during trading session (10:00 AM - 3:00 PM Cairo).
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -74,7 +74,34 @@ def scrape_egx_flows(target_date: date) -> dict | None:
         logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
         return None
 
+    # Check session hours
+    now = datetime.now().time()
+    if not (dtime(10, 0) <= now <= dtime(15, 30)):
+        logger.warning(f"Market hours check: Current time {now} is outside trading hours (10:00-15:30). Skipping.")
+        return None
+
     logger.info(f"🔄 Opening EGX InvestorsTypeCharts.aspx for {target_date}")
+
+    MAX_RETRIES = 3
+    for attempt in range(1, MAX_RETRIES + 1):
+        logger.info(f"Attempt {attempt}/{MAX_RETRIES}...")
+        result = _try_scrape(target_date)
+        if result is not None:
+            return result
+        if attempt < MAX_RETRIES:
+            logger.warning(f"Attempt {attempt} failed — retrying in 20s...")
+            time.sleep(20)
+
+    logger.error("All attempts failed")
+    return None
+
+
+def _try_scrape(target_date: date) -> dict | None:
+    """Single scrape attempt."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -83,6 +110,7 @@ def scrape_egx_flows(target_date: date) -> dict | None:
                 '--no-sandbox', '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
                 '--disable-web-security',
+                '--disable-dev-shm-usage',
             ]
         )
         context = browser.new_context(
@@ -98,15 +126,11 @@ def scrape_egx_flows(target_date: date) -> dict | None:
         extracted = None
 
         try:
-            # Step 1: Warm up via home page (bypass WAF)
-            logger.info("Step 1: Loading home page to bypass WAF...")
-            page.goto(HOME_URL, timeout=35000, wait_until='domcontentloaded')
-            time.sleep(4)
-
-            # Step 2: Navigate to the flows page
-            logger.info("Step 2: Loading InvestorsTypeCharts.aspx...")
-            page.goto(INTRADAY_URL, timeout=50000, wait_until='networkidle')
-            time.sleep(8)  # Wait for AJAX UpdatePanel to load all tables
+            # Go directly to the investor flows page
+            logger.info("Loading InvestorsTypeCharts.aspx directly...")
+            page.goto(INTRADAY_URL, timeout=60000, wait_until='domcontentloaded')
+            time.sleep(10)  # Wait for ASP.NET AJAX UpdatePanel to load all 3 tables
+            logger.info("  ✅ Page loaded")
 
             # Step 3: Extract ALL table data via structured JS
             logger.info("Step 3: Extracting all 3 tables from DOM...")
@@ -185,7 +209,7 @@ def scrape_egx_flows(target_date: date) -> dict | None:
                     logger.info(f"    Row: {row[:5]}")
 
         except Exception as e:
-            logger.error(f"Playwright error: {e}", exc_info=True)
+            logger.error(f"Playwright error: {e}")
         finally:
             browser.close()
 
