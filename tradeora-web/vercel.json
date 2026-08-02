@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/track-recommended-trades",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-investor-flows",
+      "schedule": "*/15 8-13 * * 0-4"
+    },
+    {
+      "path": "/api/cron/sync-shariah",
+      "schedule": "0 16 * * 5"
     }
   ]
 }
