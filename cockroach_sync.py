@@ -165,13 +165,26 @@ def sync_data(days_back: int = 90):
 
     # Core tables
     tables = [
-        ('companies',              'id',         None,       None),
-        ('recommended_trades',     'id',         days_back,  'recommended_at'),
-        ('daily_investor_flows',   'id',         180,        'trade_date'),
-        ('sector_investor_flows',  'id',         90,         'trade_date'),
-        ('egx_shariah_index',      'symbol',     None,       None),
-        ('intraday_snapshots',     'id',         30,         'snapshot_time'),
+        # ─── Operational (Supabase primary) ───────────────────
+        ('companies',                'id',     None,       None),
+        ('egx_shariah_index',        'symbol', None,       None),
+        ('recommended_trades',       'id',     days_back,  'recommended_at'),
+        ('daily_investor_flows',     'id',     365,        'trade_date'),
+        ('sector_investor_flows',    'id',     365,        'trade_date'),
+        # ─── Market Data ──────────────────────────────────────
+        ('market_prices',            'id',     days_back,  'price_date'),
+        ('intraday_snapshots',       'id',     30,         'snapshot_time'),
+        # ─── Analytics (new tables) ───────────────────────────
+        ('corporate_events',         'id',     180,        'event_date'),
+        ('insider_trading',          'id',     180,        'transaction_date'),
+        ('technical_levels',         'id',     30,         'calculated_at'),
+        ('seasonality_patterns',     'id',     None,       None),
+        ('volume_profiles',          'id',     30,         'calculated_at'),
+        ('price_volume_levels',      'id',     30,         'calculated_at'),
+        ('orderbook_snapshots',      'id',     7,          'snapshot_at'),
+        ('market_breadth_snapshots', 'id',     30,         'snapshot_at'),
     ]
+
 
     for table, pk, days, date_col in tables:
         n = sync_table(table, pk, days or days_back, date_col)
