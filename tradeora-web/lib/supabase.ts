@@ -5,27 +5,21 @@ const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 
 let _rawClient: SupabaseClient | null = null;
 
-function getRawClient(): SupabaseClient {
+export function getRawClient(): SupabaseClient {
   if (!_rawClient) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_ANON_KEY;
+    const supabaseAnonKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
     _rawClient = createOriginalClient(supabaseUrl, supabaseAnonKey);
   }
   return _rawClient;
 }
 
 export function createClient(url?: string, key?: string) {
-  return supabase;
+  return getRawClient();
 }
 
 export const supabase = new Proxy({} as any, {
   get(_target, prop) {
-    // Only use direct PostgreSQL / CockroachDB driver when running on Server Side (Node.js)
-    if (prop === 'from' && typeof window === 'undefined') {
-      // Dynamic require ensures 'pg' is never bundled into browser client code
-      const { fromTable } = require('./postgres-client');
-      return (tableName: string) => fromTable(tableName);
-    }
     const raw = getRawClient() as any;
     return raw[prop];
   },
