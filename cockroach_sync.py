@@ -11,7 +11,7 @@ cockroach_sync.py
     python cockroach_sync.py --check     # مقارنة الأرقام بين الاثنين
 """
 
-import os, sys, json, logging, argparse
+import os, sys, json, time, logging, argparse
 from datetime import date, timedelta
 from dotenv import load_dotenv
 load_dotenv()
@@ -104,59 +104,72 @@ def serialize_row(row: dict) -> dict:
     return out
 
 
-def sync_table(table: str, pk: str, days_back: int = 90, date_col: str = None,
-               page_size: int = 1000):  # Supabase max = 1000 rows/request
-    """Sync a table from Supabase → CockroachDB using paginated upsert."""
-    logger.info(f"  Syncing {table}...")
-    total_synced = 0
-    offset = 0
+def upsert_to_cockroach(table: str, pk: str, rows: list, retries: int = 3) -> bool:
+    """Upsert rows into CockroachDB with retry on connection errors."""
+    cols    = list(rows[0].keys())
+    col_str = ', '.join(f'"{c}"' for c in cols)
+    val_str = ', '.join(f'%({c})s' for c in cols)
+    upd_str = ', '.join(f'"{c}" = EXCLUDED."{c}"' for c in cols if c != pk)
+    sql = f"""
+        INSERT INTO {table} ({col_str})
+        VALUES ({val_str})
+        ON CONFLICT ("{pk}") DO UPDATE SET {upd_str}
+    """
+    for attempt in range(retries):
+        try:
+            with cr_conn() as conn:          # fresh connection each time
+                with conn.cursor() as cur:
+                    psycopg2.extras.execute_batch(cur, sql, rows, page_size=500)
+                conn.commit()
+            return True
+        except Exception as e:
+            wait = 2 ** attempt
+            logger.warning(f"    ⚠️  CockroachDB attempt {attempt+1}/{retries} failed: {e}. Retrying in {wait}s...")
+            time.sleep(wait)
+    logger.error(f"    ❌ Giving up after {retries} attempts")
+    return False
 
-    try:
-        while True:
-            # Fetch page from Supabase
+
+def sync_table(table: str, pk: str, days_back: int = 90, date_col: str = None,
+               page_size: int = 1000, start_offset: int = 0):
+    """Sync a table from Supabase → CockroachDB using paginated upsert with retry."""
+    logger.info(f"  Syncing {table} (offset={start_offset:,})...")
+    total_synced = 0
+    offset = start_offset
+
+    while True:
+        # ── Fetch from Supabase ────────────────────────────────
+        try:
             q = sb.table(table).select('*')
             if date_col:
                 since = (date.today() - timedelta(days=days_back)).isoformat()
                 q = q.gte(date_col, since)
             q = q.order(pk).range(offset, offset + page_size - 1)
             rows = q.execute().data or []
+        except Exception as e:
+            logger.error(f"    ❌ Supabase fetch error at offset {offset}: {e}")
+            break
 
-            if not rows:
-                break
+        if not rows:
+            break
 
-            # Serialize JSONB columns
-            rows = [serialize_row(r) for r in rows]
+        # ── Serialize + Upsert into CockroachDB ───────────────
+        rows = [serialize_row(r) for r in rows]
+        ok   = upsert_to_cockroach(table, pk, rows)
+        if not ok:
+            logger.error(f"    ❌ Stopped at offset {offset} – resume with --start {offset}")
+            break
 
-            # Upsert into CockroachDB
-            cols    = list(rows[0].keys())
-            col_str = ', '.join(f'"{c}"' for c in cols)
-            val_str = ', '.join(f'%({c})s' for c in cols)
-            upd_str = ', '.join(f'"{c}" = EXCLUDED."{c}"' for c in cols if c != pk)
+        total_synced += len(rows)
+        page_num = (offset - start_offset) // page_size + 1
+        logger.info(f"    Page {page_num}: {len(rows)} rows (total: {total_synced:,}, offset: {offset:,})")
 
-            upsert_sql = f"""
-                INSERT INTO {table} ({col_str})
-                VALUES ({val_str})
-                ON CONFLICT ("{pk}") DO UPDATE SET {upd_str}
-            """
+        if len(rows) < page_size:
+            break
+        offset += page_size
 
-            with cr_conn() as conn:
-                with conn.cursor() as cur:
-                    psycopg2.extras.execute_batch(cur, upsert_sql, rows, page_size=500)
-                conn.commit()
-
-            total_synced += len(rows)
-            logger.info(f"    Page {offset//page_size + 1}: {len(rows)} rows (total: {total_synced:,})")
-
-            if len(rows) < page_size:
-                break
-            offset += page_size
-
-        logger.info(f"    ✅ {total_synced:,} rows synced")
-        return total_synced
-
-    except Exception as e:
-        logger.error(f"    ❌ Error syncing {table}: {e}")
-        return total_synced
+    logger.info(f"    ✅ {total_synced:,} rows synced from {table}")
+    return total_synced
 
 
 def sync_data(days_back: int = 90):
