@@ -55,9 +55,26 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
   ];
 
   const pieCategory = data?.distribution?.by_category || [
-    { name: isAr ? 'مؤسسات' : 'Institutions', value: 0, color: '#EAB308' },
-    { name: isAr ? 'أفراد' : 'Retail',          value: 0, color: '#3B82F6' },
+    { name: isAr ? 'مؤسسات' : 'Institutions', name_en: 'Institutions', value: 78.99, color: '#EAB308' },
+    { name: isAr ? 'أفراد' : 'Retail',          name_en: 'Retail',       value: 21.01, color: '#3B82F6' },
   ];
+
+  const instVal = pieCategory.find((c: any) => c.name_en === 'Institutions' || c.name === 'مؤسسات')?.value || 78.99;
+  const indVal  = pieCategory.find((c: any) => c.name_en === 'Retail' || c.name === 'أفراد')?.value || 21.01;
+
+  const formatM = (v: number) => {
+    const abs = Math.abs(v);
+    if (abs >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)} مليار`;
+    if (abs >= 1_000_000)     return `${(v / 1_000_000).toFixed(1)} مليون`;
+    return `${v.toLocaleString('ar-EG')}`;
+  };
+
+  const egpIndNet  = latest?.egyptian_ind_net || 0;
+  const egpIndBuy  = latest?.egyptian_ind_buy || 0;
+  const egpIndSell = latest?.egyptian_ind_sell || 0;
+  const forNet     = latest?.foreigners_net || 0;
+  const egpInstNet = latest?.egyptian_inst_net || 0;
+  const arabNet    = latest?.arab_total_net || 0;
 
 
   function formatEGP(val: number): string {
@@ -205,18 +222,18 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
 
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none font-mono">
               <span className="text-[11px] text-zinc-400">{isAr ? 'مؤسسات' : 'Institutions'}</span>
-              <span className="text-xl font-black text-yellow-400">70.79%</span>
+              <span className="text-xl font-black text-yellow-400">{instVal}%</span>
             </div>
           </div>
 
           <div className="flex items-center justify-around text-xs font-mono pt-2 border-t border-zinc-800/80">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-yellow-500 inline-block" />
-              <span className="text-zinc-300">{isAr ? 'مؤسسات: 70.79%' : 'Institutions: 70.79%'}</span>
+              <span className="text-zinc-300">{isAr ? `مؤسسات: ${instVal}%` : `Institutions: ${instVal}%`}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
-              <span className="text-zinc-300">{isAr ? 'أفراد: 29.21%' : 'Retail: 29.21%'}</span>
+              <span className="text-zinc-300">{isAr ? `أفراد: ${indVal}%` : `Retail: ${indVal}%`}</span>
             </div>
           </div>
         </motion.div>
@@ -230,21 +247,25 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-zinc-300 leading-relaxed font-sans pt-1">
           <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-1">
-            <span className="font-bold text-emerald-400 block text-xs">1. صافي شراء الأفراد المصريين (+667.9M ج.م):</span>
+            <span className={`font-bold block text-xs ${egpIndNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              1. صافي {egpIndNet >= 0 ? 'شراء' : 'بيع'} الأفراد المصريين ({egpIndNet >= 0 ? '+' : ''}{formatM(egpIndNet)} ج.م):
+            </span>
             <p className="text-zinc-400">
-              سجل الأفراد المصريون صافي شراء ضخم قدره **+667,904,619 جنيه** (شراء 7.62 مليار مقابل بيع 6.95 مليار)، مما يوضح دخول سيولة قوية وحركة مضاربية إيجابية.
+              سجل الأفراد المصريون صافي {egpIndNet >= 0 ? 'شراء' : 'بيع'} قدره **{egpIndNet >= 0 ? '+' : ''}{egpIndNet.toLocaleString('ar-EG')} جنيه** (شراء {(egpIndBuy / 1e9).toFixed(2)} مليار مقابل بيع {(egpIndSell / 1e9).toFixed(2)} مليار)، مما يوضح اتجاهات السيولة وتأثير الأفراد بالجلسة.
             </p>
           </div>
           <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-1">
-            <span className="font-bold text-emerald-400 block text-xs">2. صافي شراء الأجانب الكلي (+14.18M ج.م):</span>
+            <span className={`font-bold block text-xs ${forNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              2. صافي {forNet >= 0 ? 'شراء' : 'بيع'} الأجانب الكلي ({forNet >= 0 ? '+' : ''}{formatM(forNet)} ج.م):
+            </span>
             <p className="text-zinc-400">
-              سجل الأجانب ومؤسسات الأجانب شراءً صافياً بمقدار **+14,184,924 جنيه**، مما يمنح الثقة والاستقرار للأسهم القيادية بالبورصة المصرية.
+              سجل المستثمرون ومؤسسات الأجانب صافي {forNet >= 0 ? 'شراء' : 'بيع'} بمقدار **{forNet >= 0 ? '+' : ''}{forNet.toLocaleString('ar-EG')} جنيه**، مما يمثل مؤشر تدفقات رأس المال الأجنبي بالبورصة المصرية.
             </p>
           </div>
           <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-1">
-            <span className="font-bold text-yellow-400 block text-xs">3. امتصاص مبيعات العرب والمؤسسات:</span>
+            <span className="font-bold text-yellow-400 block text-xs">3. تعاملات العرب والمؤسسات المصرية:</span>
             <p className="text-zinc-400">
-              امتصت مشتريات الأفراد المصريين المبيعات الصافية للمؤسسات المصرية (-488M ج.م) والمستثمرين العرب (-194M ج.م) وحافظت على القوة الشرائية للجلسة.
+              سجلت المؤسسات المصرية صافي {egpInstNet >= 0 ? 'شراء' : 'بيع'} قدره **{formatM(egpInstNet)} ج.م**، بينما سجل المستثمرون العرب صافي {arabNet >= 0 ? 'شراء' : 'بيع'} قدره **{formatM(arabNet)} ج.م** بالجلسة.
             </p>
           </div>
         </div>

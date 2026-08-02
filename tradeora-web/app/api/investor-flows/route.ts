@@ -161,25 +161,35 @@ export async function GET(req: NextRequest) {
       exactLatest.arab_ind_net  = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
     }
 
-    // ── Pie charts from REAL values ────────────────────────────────────────
-    const totalNat = exactLatest.egyptian_total_buy + exactLatest.arab_total_buy + exactLatest.foreigners_total_buy;
-    const pieNationality = totalNat > 0 ? [
+    // ── Pie charts matching EGX Official Methodology (Total Turnover = Buy + Sell) ─────
+    const egpVol  = exactLatest.egyptian_total_buy + exactLatest.egyptian_total_sell;
+    const arabVol = exactLatest.arab_total_buy     + exactLatest.arab_total_sell;
+    const forVol  = exactLatest.foreigners_total_buy + exactLatest.foreigners_total_sell;
+    const totalMarketTurnover = egpVol + arabVol + forVol;
+
+    const pieNationality = totalMarketTurnover > 0 ? [
       { name: 'مصريين', name_en: 'Egyptians', color: '#3B82F6',
-        value: parseFloat(((exactLatest.egyptian_total_buy   / totalNat) * 100).toFixed(2)) },
+        value: parseFloat(((egpVol  / totalMarketTurnover) * 100).toFixed(2)) },
       { name: 'عرب',    name_en: 'Arabs',      color: '#EAB308',
-        value: parseFloat(((exactLatest.arab_total_buy       / totalNat) * 100).toFixed(2)) },
+        value: parseFloat(((arabVol / totalMarketTurnover) * 100).toFixed(2)) },
       { name: 'أجانب', name_en: 'Foreigners',  color: '#10B981',
-        value: parseFloat(((exactLatest.foreigners_total_buy / totalNat) * 100).toFixed(2)) },
+        value: parseFloat(((forVol  / totalMarketTurnover) * 100).toFixed(2)) },
     ] : null;
 
-    const instTotal = exactLatest.egyptian_inst_buy + exactLatest.arab_inst_buy + exactLatest.foreign_inst_buy;
-    const indTotal  = exactLatest.egyptian_ind_buy  + exactLatest.arab_ind_buy  + exactLatest.foreign_ind_buy;
-    const catTotal  = instTotal + indTotal;
-    const pieCategory = catTotal > 0 ? [
+    const instBuyTotal  = exactLatest.egyptian_inst_buy  + exactLatest.arab_inst_buy  + exactLatest.foreign_inst_buy;
+    const instSellTotal = exactLatest.egyptian_inst_sell + exactLatest.arab_inst_sell + exactLatest.foreign_inst_sell;
+    const instVolTotal  = instBuyTotal + instSellTotal;
+
+    const indBuyTotal   = exactLatest.egyptian_ind_buy  + exactLatest.arab_ind_buy  + exactLatest.foreign_ind_buy;
+    const indSellTotal  = exactLatest.egyptian_ind_sell + exactLatest.arab_ind_sell + exactLatest.foreign_ind_sell;
+    const indVolTotal   = indBuyTotal + indSellTotal;
+
+    const catTurnover = instVolTotal + indVolTotal;
+    const pieCategory = catTurnover > 0 ? [
       { name: 'مؤسسات', name_en: 'Institutions', color: '#EAB308',
-        value: parseFloat(((instTotal / catTotal) * 100).toFixed(2)) },
+        value: parseFloat(((instVolTotal / catTurnover) * 100).toFixed(2)) },
       { name: 'أفراد',  name_en: 'Retail',        color: '#3B82F6',
-        value: parseFloat(((indTotal  / catTotal) * 100).toFixed(2)) },
+        value: parseFloat(((indVolTotal  / catTurnover) * 100).toFixed(2)) },
     ] : null;
 
     // ── Signal ────────────────────────────────────────────────────────────
