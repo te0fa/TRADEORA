@@ -30,11 +30,21 @@ export async function GET(req: NextRequest) {
       query = query.eq('symbol', symbol.toUpperCase());
     }
 
-    const { data: trades, error: fetchError } = await query.limit(limit);
-
+    let { data: trades, error: fetchError } = await query.limit(limit);
 
     if (fetchError) {
       throw fetchError;
+    }
+
+    // If no trades found after launch date, relax filter to all-time
+    if (!trades || trades.length === 0) {
+      const fallbackQuery = supabase
+        .from('recommended_trades')
+        .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
+        .order('recommended_at', { ascending: false })
+        .limit(limit);
+      const { data: allTrades } = await fallbackQuery;
+      trades = allTrades || [];
     }
 
     // 2. Fetch latest prices for active companies

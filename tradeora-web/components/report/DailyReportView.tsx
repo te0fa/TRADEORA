@@ -291,10 +291,10 @@ export function DailyReportView({ data, selectedDate, onDateChange, isLoadingDat
           <div>
             <span className="text-[11px] text-slate-400 print:text-gray-600 block">{isAr ? 'مؤشر EGX 30' : 'EGX 30 Index'}</span>
             <span className="text-lg font-mono font-bold text-white print:text-black block">
-              {market_overview.egx30_value.toLocaleString()}
+              {market_overview?.egx30_value != null ? Number(market_overview.egx30_value).toLocaleString() : '---'}
             </span>
-            <span dir="ltr" className={`text-xs font-bold font-mono inline-block ${market_overview.egx30_change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {market_overview.egx30_change >= 0 ? `+${market_overview.egx30_change.toFixed(2)}%` : `${market_overview.egx30_change.toFixed(2)}%`}
+            <span dir="ltr" className={`text-xs font-bold font-mono inline-block ${(market_overview?.egx30_change ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {market_overview?.egx30_change != null ? ((market_overview.egx30_change >= 0 ? '+' : '') + Number(market_overview.egx30_change).toFixed(2) + '%') : '---'}
             </span>
           </div>
 

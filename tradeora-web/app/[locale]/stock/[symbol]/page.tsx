@@ -289,7 +289,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <StockNewsPanel companyId={company.id} />
+        <StockNewsPanel companyId={company.id} symbol={symbol} />
       </motion.div>
 
       <motion.div variants={itemVariants}>
