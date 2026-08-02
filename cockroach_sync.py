@@ -105,7 +105,7 @@ def serialize_row(row: dict) -> dict:
 
 
 def sync_table(table: str, pk: str, days_back: int = 90, date_col: str = None,
-               page_size: int = 5000):
+               page_size: int = 1000):  # Supabase max = 1000 rows/request
     """Sync a table from Supabase → CockroachDB using paginated upsert."""
     logger.info(f"  Syncing {table}...")
     total_synced = 0
