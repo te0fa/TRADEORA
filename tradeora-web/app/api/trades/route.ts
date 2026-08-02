@@ -15,7 +15,8 @@ const FRA_DISCLAIMER_AR = "تنويه الهيئة العامة للرقابة �
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam) : 1000;
     const symbol = searchParams.get('symbol');
 
     // 1. Fetch trades with company details

@@ -188,7 +188,43 @@ export async function GET(req: NextRequest) {
 
       const existingTrade = existingTradeMap[comp.id];
 
-      // ── Close trade if signal reversed ───────────────────────────────
+      // ── 1. Invalidate / Cancel pending inactive trade if signal turned negative or negative news hit ──
+      if (existingTrade && !existingTrade.is_activated && (newsImpact <= -0.20 || mlProb < BUY_GATE)) {
+        updatePromises.push(
+          sb
+            .from('recommended_trades')
+            .update({
+              status:      'closed',
+              exit_price:  closePrice,
+              exit_reason: 'invalidated_before_activation',
+              pnl_percent: 0,
+              closed_at:   now.toISOString(),
+            })
+            .eq('id', existingTrade.id)
+            .then()
+        );
+        delete existingTradeMap[comp.id];
+      }
+      // ── 2. Add dynamic warning alert if activated trade faces surprise negative catalyst ──
+      else if (existingTrade && (newsImpact <= -0.25 || changePercent <= -2.0)) {
+        const currentAlerts = existingTrade.dynamic_exit_alerts || {};
+        updatePromises.push(
+          sb
+            .from('recommended_trades')
+            .update({
+              dynamic_exit_alerts: {
+                ...currentAlerts,
+                warning_ar: '⚠️ تحذير: رصد خبر سلبي مفاجئ / تسارع هبوطي - يُفضل حماية الأرباح أو تفعيل الخروج المحمي.',
+                warning_level: 'HIGH',
+                updated_at: now.toISOString(),
+              }
+            })
+            .eq('id', existingTrade.id)
+            .then()
+        );
+      }
+
+      // ── 3. Close trade if signal reversed ───────────────────────────────
       if (existingTrade && newSignal && existingTrade.direction !== newSignal) {
         const entryPrice: number = existingTrade.entry_price ?? closePrice;
         const pnl = ((closePrice - entryPrice) / entryPrice) * 100;
@@ -209,7 +245,7 @@ export async function GET(req: NextRequest) {
         delete existingTradeMap[comp.id];
       }
 
-      // ── Queue new trade if signal detected and none exists ──────────
+      // ── 4. Queue new trade ONLY if no active trade for this company exists (STRICT DEDUPLICATION) ──────────
       if (!existingTradeMap[comp.id] && newSignal) {
         const tp1 = newSignal === 'buy'
           ? parseFloat((closePrice * 1.05).toFixed(4))
