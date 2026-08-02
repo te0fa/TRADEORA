@@ -4,8 +4,21 @@ on:
   schedule:
     # كل 6 ساعات (12 ص، 6 ص، 12 م، 6 م بتوقيت القاهرة)
     - cron: '0 */6 * * 1-5'
+  repository_dispatch:
+    # يشتغل فوراً لما Supabase Webhook يبعت إشارة
+    types: [db-change-sync]
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Sync mode'
+        required: true
+        default: 'full'
+        type: choice
+        options: ['check', 'schema', 'data', 'full', 'reverse']
+      days:
+        description: 'Days back for data sync'
+        required: false
+        default: '90'
       mode:
         description: 'Sync mode'
         required: true
