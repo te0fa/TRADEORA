@@ -172,6 +172,12 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
                     <span className="text-[11px] text-zinc-400 line-clamp-1">
                       {st.name_ar || st.symbol}
                     </span>
+                    {/* Circuit Breaker Halt Badge */}
+                    {st.is_halted && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 animate-pulse mt-0.5">
+                        {st.halt_status_ar || '⏸️ موقوف مؤقتاً 10د'}
+                      </span>
+                    )}
                     {/* Display Volume / Value / Volatility metric label */}
                     {activeTab === 'volume' && (
                       <span className="text-[10px] text-blue-400 font-bold block mt-0.5">

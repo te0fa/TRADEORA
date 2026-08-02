@@ -41,18 +41,24 @@ export async function GET(req: NextRequest) {
 
         if (close <= 0) return null;
 
-        let changePct = 0;
-        if (open > 0 && close > 0) {
-          changePct = Number((((close - open) / open) * 100).toFixed(2));
-        }
-
-        // Enforce EGX Official Daily Price Circuit Breaker Limit (Max ±20.00%)
+        const rawChange = open > 0 && close > 0 ? Number((((close - open) / open) * 100).toFixed(2)) : 0;
+        let changePct = rawChange;
         if (changePct > 20.0) changePct = 19.99;
         if (changePct < -20.0) changePct = -19.99;
 
-        // Calculate Intraday Volatility Range for Fast Scalping (high vs low)
         let volatilityPct = low > 0 && high > 0 ? Number((((high - low) / low) * 100).toFixed(2)) : Math.abs(changePct);
         if (volatilityPct > 25.0) volatilityPct = 24.8;
+
+        const isLimitUpHalt = rawChange >= 19.8 || rawChange >= 9.8;
+        const isLimitDownHalt = rawChange <= -19.8 || rawChange <= -9.8;
+        const isHalted = isLimitUpHalt || isLimitDownHalt;
+
+        let haltStatusAr = null;
+        if (isLimitUpHalt) {
+          haltStatusAr = '⏸️ موقوف مؤقتاً (حد أقصى +20%)';
+        } else if (isLimitDownHalt) {
+          haltStatusAr = '⏸️ موقوف مؤقتاً (حد أدنى -20%)';
+        }
 
         return {
           id: co.id,
@@ -65,6 +71,8 @@ export async function GET(req: NextRequest) {
           volume: volume,
           turnover_egp: close * volume,
           price_date: p.price_date,
+          is_halted: isHalted,
+          halt_status_ar: haltStatusAr,
         };
       })
       .filter(Boolean) as any[];
