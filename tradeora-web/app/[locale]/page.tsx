@@ -452,6 +452,12 @@ export default function DashboardPage({ params }: Props) {
                 {(investorFlows.latest.egyptian_inst_net / 1e6).toFixed(1)}M ج.م
               </span>
             </div>
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px]">{isAr ? 'أفراد مصرية' : 'Egy Retail'}</span>
+              <span className={`font-bold ${investorFlows.latest.egyptian_ind_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {(investorFlows.latest.egyptian_ind_net / 1e6).toFixed(1)}M ج.م
+              </span>
+            </div>
             <button
               onClick={() => router.push(`/${locale}/investor-flows`)}
               className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-all text-xs"
