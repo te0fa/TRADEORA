@@ -92,44 +92,53 @@ export default function DashboardPage({ params }: Props) {
     fetchInvestorFlows();
 
     const fetchLiveIndices = async () => {
-      // 1. Direct TradingView Scanner fetch from browser for instant 0-lag live updates
+      // Single TradingView Scanner call for ALL 3 indices — same source, same speed
       try {
         const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI'] },
+            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI', 'EGX:EGX33'] },
             columns: ['close', 'change']
-          })
+          }),
+          cache: 'no-store',
         });
         if (tvRes.ok) {
           const tvData = await tvRes.json();
           const rows = tvData?.data || [];
           const egx30Row = rows.find((r: any) => r.s === 'EGX:EGX30')?.d;
           const egx70Row = rows.find((r: any) => r.s === 'EGX:EGX70EWI')?.d;
-          if (egx30Row && egx30Row[0] != null) {
-            setEgx30({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
-          }
-          if (egx70Row && egx70Row[0] != null) {
-            setEgx70({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
-          }
-        } else {
-          fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()).then(setEgx30).catch(() => {});
-          fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()).then(setEgx70).catch(() => {});
-        }
-      } catch {
-        fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()).then(setEgx30).catch(() => {});
-        fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()).then(setEgx70).catch(() => {});
-      }
+          const egx33Row = rows.find((r: any) => r.s === 'EGX:EGX33')?.d;
 
-      // 2. Fetch EGX33 Shariah Index from API (Scraped live from Mubasher)
-      fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()).then(setEgx33).catch(() => {});
+          if (egx30Row?.[0] != null)
+            setEgx30({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
+          if (egx70Row?.[0] != null)
+            setEgx70({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
+          if (egx33Row?.[0] != null)
+            setEgx33({ value: parseFloat(Number(egx33Row[0]).toFixed(2)), change: parseFloat(Number(egx33Row[1] ?? 0).toFixed(2)) });
+
+          // TV returned at least one index — skip fallback
+          if (egx30Row || egx70Row || egx33Row) return;
+        }
+      } catch { /* fall through to server API fallback */ }
+
+      // Fallback: server-side APIs in parallel (TV CORS blocked on Vercel)
+      const [r30, r70, r33] = await Promise.allSettled([
+        fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()),
+        fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()),
+        fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()),
+      ]);
+      if (r30.status === 'fulfilled' && r30.value?.value) setEgx30(r30.value);
+      if (r70.status === 'fulfilled' && r70.value?.value) setEgx70(r70.value);
+      if (r33.status === 'fulfilled' && r33.value?.value) setEgx33(r33.value);
     };
 
     fetchLiveIndices();
     fetchInvestorFlows();
     fetchMarketBreadth();
-    const indexIntervalId = setInterval(fetchLiveIndices, 3000);
+    // Poll every 5 seconds — same interval for all 3 indices
+    const indexIntervalId = setInterval(fetchLiveIndices, 5000);
+
 
     // Heavy database data polling (every 5 minutes)
     const dbIntervalId = setInterval(() => {
