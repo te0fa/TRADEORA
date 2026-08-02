@@ -32,22 +32,13 @@ export function StockNewsPanel({ companyId, symbol }: StockNewsPanelProps) {
     async function loadNews() {
       setLoading(true);
       try {
-        // Try by companyId first, fall back to symbol
-        let url = `/api/news?companyId=${companyId}&limit=6`;
-        if (symbol) url = `/api/news?symbol=${symbol}&limit=6`;
+        let url = `/api/news?companyId=${companyId}&limit=10`;
+        if (symbol) url = `/api/news?symbol=${symbol}&limit=10`;
         
         const res = await fetch(url);
         const data = await res.json();
         const items = data.news || [];
-        
-        // If no company-specific news, show recent general news
-        if (items.length === 0) {
-          const genRes = await fetch('/api/news?limit=4');
-          const genData = await genRes.json();
-          setNews((genData.news || []).slice(0, 4));
-        } else {
-          setNews(items.slice(0, 5));
-        }
+        setNews(items);
       } catch (e) {
         console.error('Failed to load stock news', e);
         setNews([]);

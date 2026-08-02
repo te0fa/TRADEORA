@@ -20,19 +20,28 @@ export async function GET(req: NextRequest) {
       .order('published_at', { ascending: false })
       .limit(limit);
 
-    // Filter by company
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    } else if (symbol) {
-      const { data: comp } = await supabase
-        .from('companies')
-        .select('id')
-        .ilike('symbol', symbol)
-        .maybeSingle();
-      if (comp?.id) {
-        query = query.eq('company_id', comp.id);
+    // Filter by company or symbol
+    if (companyId || symbol) {
+      let targetCompId = companyId;
+      let targetSymbol = symbol;
+
+      if (!targetCompId && symbol) {
+        const { data: comp } = await supabase
+          .from('companies')
+          .select('id, symbol')
+          .ilike('symbol', symbol)
+          .maybeSingle();
+        if (comp?.id) {
+          targetCompId = comp.id;
+          targetSymbol = comp.symbol;
+        }
+      }
+
+      if (targetCompId && targetSymbol) {
+        query = query.or(`company_id.eq.${targetCompId},title.ilike.%[${targetSymbol}]%,title.ilike.%${targetSymbol}%,content.ilike.%${targetSymbol}%`);
+      } else if (targetCompId) {
+        query = query.eq('company_id', targetCompId);
       } else {
-        // No company found — return empty, not fake
         return NextResponse.json({ success: true, news: [] });
       }
     }
