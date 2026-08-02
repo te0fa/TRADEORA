@@ -174,24 +174,6 @@ export default function PerformancePage() {
       .filter((t: any) => t.status === 'closed' && t.closed_at && t.pnl_percent !== null)
       .sort((a: any, b: any) => new Date(a.closed_at!).getTime() - new Date(b.closed_at!).getTime());
 
-    if (closed.length === 0) {
-      let sum = 0;
-      const sampleSymbols = ['RAYA', 'RMDA', 'FNAR', 'ASPI', 'COMI', 'TMGH', 'ETEL', 'HRHO', 'ABUK', 'SWDY', 'JUFO', 'CLHO', 'PHDC', 'ESRS'];
-      const pnlSteps = [2.4, 3.8, -1.2, 4.5, 3.1, 5.2, -0.8, 4.1, 3.6, 6.0, 2.9, 4.4, -1.5, 5.8, 3.9, 4.7];
-      const today = new Date();
-      return pnlSteps.map((pnl, i) => {
-        sum += pnl;
-        const d = new Date(today);
-        d.setDate(d.getDate() - (pnlSteps.length - i));
-        return {
-          tradeIndex: i + 1,
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          pnl: parseFloat(sum.toFixed(1)),
-          symbol: sampleSymbols[i % sampleSymbols.length]
-        };
-      });
-    }
-
     let sum = 0;
     return closed.map((t: any, i: number) => {
       sum += t.pnl_percent || 0;

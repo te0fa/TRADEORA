@@ -334,54 +334,40 @@ export async function GET(req: NextRequest) {
     const otherSignals = buyTrades.filter((t: any) => !t.is_top_pick);
 
     // 3. Fetch closed BUY trades to compute platform statistics
-    let { data: allClosed } = await supabase
+    const { data: allClosed } = await supabase
       .from('recommended_trades')
       .select('pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at')
-      .eq('status', 'closed')
-      .gte('recommended_at', LAUNCH_DATE);
+      .eq('status', 'closed');
 
-    // Fallback: If no closed trades after LAUNCH_DATE, fetch all closed trades
-    if (!allClosed || allClosed.length === 0) {
-      const { data: fallbackClosed } = await supabase
-        .from('recommended_trades')
-        .select('pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at')
-        .eq('status', 'closed')
-        .limit(500);
-      allClosed = fallbackClosed || [];
-    }
-
-    // Filter closed trades for BUY direction or valid PnL
+    // Filter closed trades for BUY direction with valid PnL
     const closedBuyTrades = (allClosed || []).filter((t: any) =>
       (t.direction || 'buy').toLowerCase() === 'buy' && t.pnl_percent !== null
     );
 
-    let closedCount   = closedBuyTrades.length;
-    let winningTrades = closedBuyTrades.filter((t: any) => Number(t.pnl_percent || 0) > 0);
-    let losingTrades  = closedBuyTrades.filter((t: any) => Number(t.pnl_percent || 0) < 0);
+    const closedCount   = closedBuyTrades.length;
+    const winningTrades = closedBuyTrades.filter((t: any) => Number(t.pnl_percent || 0) > 0);
+    const losingTrades  = closedBuyTrades.filter((t: any) => Number(t.pnl_percent || 0) < 0);
 
-    let winRate   = closedCount > 0 ? (winningTrades.length / closedCount) * 100 : 78.5;
-    let totalPnl  = closedCount > 0 ? closedBuyTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 164.2;
-    let avgPnl    = closedCount > 0 ? totalPnl / closedCount : 3.8;
-    let avgWin    = winningTrades.length > 0 ? winningTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / winningTrades.length : 5.4;
-    let avgLoss   = losingTrades.length > 0 ? losingTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / losingTrades.length : -2.1;
-    let rrRatio   = Math.abs(avgLoss) > 0 ? Math.abs(avgWin / avgLoss) : 2.57;
-    let expectancy = closedCount > 0 ? (winRate / 100 * avgWin) + ((1 - winRate / 100) * avgLoss) : 3.2;
+    const winRate    = closedCount > 0 ? (winningTrades.length / closedCount) * 100 : 0;
+    const totalPnl   = closedCount > 0 ? closedBuyTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 0;
+    const avgPnl     = closedCount > 0 ? totalPnl / closedCount : 0;
+    const avgWin     = winningTrades.length > 0 ? winningTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / winningTrades.length : 0;
+    const avgLoss    = losingTrades.length > 0 ? losingTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / losingTrades.length : 0;
+    const rrRatio    = Math.abs(avgLoss) > 0 ? Math.abs(avgWin / avgLoss) : 0;
+    const expectancy = closedCount > 0 ? (winRate / 100 * avgWin) + ((1 - winRate / 100) * avgLoss) : 0;
 
-    const totalBuyCount = buyTrades.length || 100;
-    const finalClosedCount = closedCount > 0 ? closedCount : 142;
-    const finalWinningCount = closedCount > 0 ? winningTrades.length : 111;
-    const finalLosingCount = closedCount > 0 ? losingTrades.length : 31;
+    const activeCount = buyTrades.length;
 
     return NextResponse.json({
-      // ── Primary: Top 20 premier picks (sorted by composite_score) ────────
-      trades:        topPicks,       // Top 20 by composite_score
-      top_picks:     topPicks,       // Alias for clarity
-      other_signals: otherSignals,   // Remaining signals (below Top 20)
+      // ── Primary: Top premier picks (sorted by composite_score) ────────────
+      trades:        topPicks,       // Top picks by composite_score
+      top_picks:     topPicks,       // Alias
+      other_signals: otherSignals,   // Remaining signals
       sell_signals:  sellTrades,
 
       // ── Ranking metadata ────────────────────────────────────────────────
       ranking: {
-        total_active:   buyTrades.length,
+        total_active:   activeCount,
         top_picks_count: topPicks.length,
         other_count:    otherSignals.length,
         formula:        'ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)',
@@ -389,11 +375,11 @@ export async function GET(req: NextRequest) {
 
       // ── Platform performance stats ─────────────────────────────────────
       stats: {
-        total_trades:    totalBuyCount + finalClosedCount,
-        active_trades:   totalBuyCount,
-        closed_trades:   finalClosedCount,
-        winning_trades:  finalWinningCount,
-        losing_trades:   finalLosingCount,
+        total_trades:    activeCount + closedCount,
+        active_trades:   activeCount,
+        closed_trades:   closedCount,
+        winning_trades:  winningTrades.length,
+        losing_trades:   losingTrades.length,
         win_rate:        parseFloat(winRate.toFixed(1)),
         total_pnl:       parseFloat(totalPnl.toFixed(1)),
         avg_pnl:         parseFloat(avgPnl.toFixed(2)),
