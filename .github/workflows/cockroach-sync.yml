@@ -19,16 +19,7 @@ on:
         description: 'Days back for data sync'
         required: false
         default: '90'
-      mode:
-        description: 'Sync mode'
-        required: true
-        default: 'full'
-        type: choice
-        options: ['check', 'schema', 'data', 'full', 'reverse']
-      days:
-        description: 'Days back for data sync'
-        required: false
-        default: '90'
+
 
 jobs:
   sync:
