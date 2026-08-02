@@ -6,8 +6,6 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Newspaper, 
-  Globe, 
-  Building2, 
   Clock, 
   TrendingUp, 
   TrendingDown, 
@@ -15,10 +13,9 @@ import {
   Sparkles, 
   ExternalLink,
   Calendar,
-  Layers,
   Search,
-  Filter,
-  Tag
+  ChevronDown,
+  Layers
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -54,6 +51,17 @@ export default function NewsHubPage({ params }: { params: { locale: string } }) 
   const [searchSymbol, setSearchSymbol] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
 
+  const sectorOptions = [
+    { id: 'banking', label: '🏦 قطاع البنوك والخدمات المالية' },
+    { id: 'real_estate', label: '🏗️ قطاع العقارات والإنشاءات' },
+    { id: 'pharma', label: '💊 قطاع الأدوية والصحة' },
+    { id: 'food', label: '🌾 قطاع الأغذية والمشروبات' },
+    { id: 'telecom', label: '📱 قطاع الاتصالات والتكنولوجيا' },
+    { id: 'energy', label: '⚡ قطاع الطاقة والبترول' },
+    { id: 'industrial', label: '🏗️ قطاع المقاولات ومواد البناء' },
+    { id: 'textile', label: '🧵 قطاع المنسوجات والسلع المعمرة' },
+  ];
+
   useEffect(() => {
     setLoading(true);
     let url = `/api/news?category=${activeTab}&limit=100`;
@@ -86,7 +94,7 @@ export default function NewsHubPage({ params }: { params: { locale: string } }) 
     const d = new Date(dateStr);
     const dateFormatted = d.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
     const timeFormatted = d.toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', {
@@ -163,18 +171,7 @@ export default function NewsHubPage({ params }: { params: { locale: string } }) 
     );
   };
 
-  const sectorTabs = [
-    { id: 'all', label: '🌐 جميع الأخبار والإفصاحات' },
-    { id: 'egx_bulletin', label: '🏛️ أخبار وإفصاحات البورصة الرسمية' },
-    { id: 'banking', label: '🏦 قطاع البنوك والخدمات المالية' },
-    { id: 'real_estate', label: '🏗️ قطاع العقارات والإنشاءات' },
-    { id: 'pharma', label: '💊 قطاع الأدوية والصحة' },
-    { id: 'food', label: '🌾 قطاع الأغذية والمشروبات' },
-    { id: 'telecom', label: '📱 قطاع الاتصالات والتكنولوجيا' },
-    { id: 'energy', label: '⚡ قطاع الطاقة والبترول' },
-    { id: 'industrial', label: '🏗️ قطاع المقاولات ومواد البناء' },
-    { id: 'textile', label: '🧵 قطاع المنسوجات والسلع المعمرة' },
-  ];
+  const isSectorActive = sectorOptions.some(s => s.id === activeTab);
 
   return (
     <div className="w-full font-sans text-slate-100 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -193,7 +190,7 @@ export default function NewsHubPage({ params }: { params: { locale: string } }) 
               <span>مركز الأخبار والإفصاحات والتحليل الذكي</span>
             </h1>
             <p className="text-sm text-slate-400 max-w-2xl">
-              متابعة حية وشاملة لإفصاحات البورصة المصرية ومصادر الأخبار المالية الموثوقة مصنفة حسَب كل قطاع مع التوقيت المباشر وشرح الذكاء الاصطناعي.
+              متابعة حية وشاملة لإفصاحات البورصة المصرية ومصادر الأخبار المالية الموثوقة مصنفة حسَب القطاع مع التوقيت المباشر وشرح الذكاء الاصطناعي.
             </p>
           </div>
 
@@ -232,21 +229,57 @@ export default function NewsHubPage({ params }: { params: { locale: string } }) 
           </div>
         </div>
 
-        {/* Sector Tabs Bar */}
-        <div className="flex items-center gap-2 p-2 bg-slate-900/90 border border-white/10 rounded-2xl backdrop-blur-md overflow-x-auto scrollbar-none">
-          {sectorTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-                activeTab === tab.id 
-                  ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/25' 
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+        {/* Clean Filter Tabs + Sector Dropdown */}
+        <div className="flex flex-wrap items-center gap-3 p-2 bg-slate-900/90 border border-white/10 rounded-2xl backdrop-blur-md">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeTab === 'all' ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/25' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            🌐 جميع الأخبار والإفصاحات
+          </button>
+
+          <button
+            onClick={() => setActiveTab('egx_bulletin')}
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeTab === 'egx_bulletin' ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/25' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            🏛️ أخبار وإفصاحات البورصة الرسمية
+          </button>
+
+          <button
+            onClick={() => setActiveTab('corporate')}
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              activeTab === 'corporate' ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/25' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            🏢 إفصاحات وقوائم الشركات
+          </button>
+
+          {/* Sector Dropdown Select */}
+          <div className="relative">
+            <select
+              value={isSectorActive ? activeTab : ''}
+              onChange={(e) => {
+                if (e.target.value) setActiveTab(e.target.value);
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold cursor-pointer focus:outline-none transition-all appearance-none pr-8 ${
+                isSectorActive 
+                  ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 border border-amber-400' 
+                  : 'bg-slate-800 text-slate-300 border border-white/10 hover:border-amber-400/50'
               }`}
             >
-              {tab.label}
-            </button>
-          ))}
+              <option value="" disabled>📂 اختر القطاع للفلترة...</option>
+              {sectorOptions.map(sec => (
+                <option key={sec.id} value={sec.id} className="bg-slate-900 text-white py-1">
+                  {sec.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className={`w-4 h-4 absolute left-2.5 top-2.5 pointer-events-none ${isSectorActive ? 'text-slate-950' : 'text-slate-400'}`} />
+          </div>
         </div>
       </motion.div>
 
