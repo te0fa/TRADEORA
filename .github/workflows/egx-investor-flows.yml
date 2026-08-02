@@ -2,12 +2,13 @@ name: 📊 EGX Investor Flows — Auto Scraper
 
 on:
   schedule:
-    # ── أوقات الجلسة (10:00 AM – 3:30 PM Cairo = 08:00–13:30 UTC) ──────────
-    # كل 30 دقيقة أثناء الجلسة الأحد-الخميس
-    - cron: '0,30 8,9,10,11,12 * * 0,1,2,3,4'   # 10:00 AM → 2:30 PM Cairo
-    - cron: '0,30 13 * * 0,1,2,3,4'              # 3:00 PM → 3:30 PM Cairo (closing)
-    # ── بعد إغلاق الجلسة — PDF الرسمي النهائي (5:30 PM Cairo = 3:30 PM UTC) ──
-    - cron: '30 15 * * 0,1,2,3,4'                # PDF اليومي النهائي
+    # ── الجلسة: 10:00 AM – 3:30 PM Cairo (07:00 – 12:30 UTC) ──────────────
+    # كل 10 دقايق أثناء الجلسة (أحد-خميس)
+    - cron: '0,10,20,30,40,50 7,8,9,10,11 * * 0,1,2,3,4'   # 10:00 → 2:50 PM Cairo
+    - cron: '0,10,20,30 12 * * 0,1,2,3,4'                   # 3:00 → 3:30 PM Cairo
+    # ── بعد الإغلاق: بيانات نهائية رسمية (3:30 PM و 5:00 PM Cairo) ───────────
+    - cron: '35 12 * * 0,1,2,3,4'   # 3:35 PM Cairo — أول تحديث بعد الإغلاق
+    - cron: '0 14 * * 0,1,2,3,4'    # 5:00 PM Cairo — PDF نهائي رسمي
 
   # تشغيل يدوي من GitHub UI في أي وقت
   workflow_dispatch:
@@ -33,7 +34,7 @@ jobs:
   scrape-flows:
     name: 🌍 EGX Investor Flows Scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: 📥 Checkout repository
@@ -66,13 +67,13 @@ jobs:
         run: |
           # Cairo time = UTC + 3
           HOUR_UTC=$(date -u +%-H)
+          MIN_UTC=$(date -u +%-M)
           HOUR_CAIRO=$((HOUR_UTC + 3))
-          DAY_OF_WEEK=$(date -u +%u)  # 1=Mon, 7=Sun (0=Sun in cron but %u=7)
-          
-          echo "UTC hour: $HOUR_UTC | Cairo hour: $HOUR_CAIRO | Day: $DAY_OF_WEEK"
-          
+
+          echo "UTC: ${HOUR_UTC}:${MIN_UTC} | Cairo: ${HOUR_CAIRO}:${MIN_UTC}"
+
           MANUAL_MODE="${{ github.event.inputs.mode }}"
-          
+
           if [ "$MANUAL_MODE" = "intraday" ]; then
             echo "mode=intraday" >> $GITHUB_OUTPUT
           elif [ "$MANUAL_MODE" = "pdf" ]; then
@@ -80,20 +81,28 @@ jobs:
           elif [ "$MANUAL_MODE" = "both" ]; then
             echo "mode=both" >> $GITHUB_OUTPUT
           else
-            # Auto: intraday during session (10:00–15:00 Cairo), PDF after 15:30
-            if [ "$HOUR_CAIRO" -ge 10 ] && [ "$HOUR_CAIRO" -lt 15 ]; then
+            # Auto mode logic:
+            # 10:00 → 15:30 Cairo  →  intraday live scrape
+            # 15:30 → 17:00 Cairo  →  post-session + PDF
+            # else                 →  skip
+            TOTAL_MINS_CAIRO=$(( (HOUR_CAIRO * 60) + MIN_UTC ))
+            SESSION_START=600    # 10:00 = 600 mins
+            SESSION_END=915      # 15:15 = 915 mins  (give 15 min buffer after 3:00 close)
+            POST_END=1020        # 17:00 = 1020 mins
+
+            if [ "$TOTAL_MINS_CAIRO" -ge "$SESSION_START" ] && [ "$TOTAL_MINS_CAIRO" -lt "$SESSION_END" ]; then
               echo "mode=intraday" >> $GITHUB_OUTPUT
-              echo "📡 Intraday mode: session is live"
-            elif [ "$HOUR_CAIRO" -ge 15 ]; then
-              echo "mode=pdf" >> $GITHUB_OUTPUT
-              echo "📄 PDF mode: session closed, fetching official bulletin"
+              echo "📡 INTRADAY mode — session is live (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
+            elif [ "$TOTAL_MINS_CAIRO" -ge "$SESSION_END" ] && [ "$TOTAL_MINS_CAIRO" -lt "$POST_END" ]; then
+              echo "mode=both" >> $GITHUB_OUTPUT
+              echo "📄 POST-SESSION mode — fetching final data + PDF (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
             else
               echo "mode=skip" >> $GITHUB_OUTPUT
-              echo "⏭️ Pre-session, skipping"
+              echo "⏭️ Pre-session or night hours — skipping (Cairo ${HOUR_CAIRO}:${MIN_UTC})"
             fi
           fi
 
-      - name: 📡 Intraday Scrape (live session data)
+      - name: 📡 Intraday Scrape (live session — InvestorsTypeCharts.aspx)
         if: steps.mode.outputs.mode == 'intraday' || steps.mode.outputs.mode == 'both'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -104,13 +113,13 @@ jobs:
           if [ -n "${{ github.event.inputs.date }}" ]; then
             DATE_ARG="--date ${{ github.event.inputs.date }}"
           fi
-          
+
           DRY_RUN=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             DRY_RUN="--dry-run"
           fi
-          
-          echo "📡 Running intraday scraper (InvestorsTypeCharts.aspx)..."
+
+          echo "📡 Running intraday scraper v3 (InvestorsTypeCharts.aspx)..."
           python egx_intraday_flows.py $DATE_ARG $DRY_RUN
 
       - name: 📄 PDF Scrape (official end-of-day bulletin)
@@ -124,18 +133,18 @@ jobs:
           if [ -n "${{ github.event.inputs.date }}" ]; then
             DATE_ARG="--date ${{ github.event.inputs.date }}"
           fi
-          
+
           DRY_RUN=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             DRY_RUN="--dry-run"
           fi
-          
-          echo "📄 Running official PDF bulletin scraper..."
-          python egx_flow_scraper.py $DATE_ARG $DRY_RUN
 
-      - name: ⏭️ Skip (pre-session)
+          echo "📄 Running official PDF bulletin scraper..."
+          python egx_flow_scraper.py $DATE_ARG $DRY_RUN || echo "⚠️ PDF scraper failed (PDF may not be published yet)"
+
+      - name: ⏭️ Skip (pre-session or night)
         if: steps.mode.outputs.mode == 'skip'
-        run: echo "⏭️ Pre-session hours — no scraping needed"
+        run: echo "⏭️ Outside trading hours — no scraping needed"
 
       - name: 📋 Upload logs on failure
         if: failure()
