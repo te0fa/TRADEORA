@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
         recommendation_impact = 'مبيعات أجنبية (-20M ج.م) - خفض التوصيات بنسبة -5%';
       }
 
-      // Check 3-day trend
       if (flowList.length >= 3) {
         const recent3 = flowList.slice(0, 3).map((f: any) => Number(f.foreigners_net_egp || 0));
         if (recent3.every((n: number) => n > 0)) {
@@ -52,12 +51,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 2. Fetch top 5 sector rankings
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // 2. Fetch top sector rankings
     const { data: sectorFlows } = await supabase
       .from('sector_investor_flows')
       .select('sector_name, foreigners_net_egp')
-      .gte('trade_date', thirtyDaysAgo);
+      .limit(200);
 
     const sectorTotals: Record<string, number> = {};
     (sectorFlows || []).forEach((row: any) => {
@@ -67,22 +65,30 @@ export async function GET(req: NextRequest) {
     });
 
     const sector_ranking = Object.entries(sectorTotals)
-      .map(([sector_name, net_egp]: [string, number]) => ({ sector_name, foreigners_net_egp: net_egp }))
+      .map(([sector_name, foreigners_net_egp]: [string, number]) => ({
+        sector_name,
+        foreigners_net_egp
+      }))
       .sort((a, b) => b.foreigners_net_egp - a.foreigners_net_egp)
-      .slice(0, 5);
+      .slice(0, 6);
 
     return NextResponse.json({
       success: true,
       latest: latest ? {
-        date: latest.trade_date,
+        trade_date: latest.trade_date,
         foreigners_net: Number(latest.foreigners_net_egp || 0),
         foreign_inst_net: Number(latest.foreign_inst_net_egp || 0),
         egyptian_inst_net: Number(latest.egyptian_inst_net_egp || 0),
-        arab_net: Number(latest.arab_net_egp || 0),
+        arab_net: Number(latest.arabs_net_egp || 0),
         signal,
         trend
       } : null,
-      history: flowList,
+      history: flowList.map((h: any) => ({
+        trade_date: h.trade_date,
+        foreigners_net_egp: Number(h.foreigners_net_egp || 0),
+        egyptian_inst_net_egp: Number(h.egyptian_inst_net_egp || 0),
+        arab_net_egp: Number(h.arabs_net_egp || 0),
+      })),
       sector_ranking,
       recommendation_impact
     });
