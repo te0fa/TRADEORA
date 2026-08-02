@@ -185,6 +185,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
+        raw_latest: latest,
         latest: exactLatest,
         distribution: {
           by_nationality: pieNationality,
