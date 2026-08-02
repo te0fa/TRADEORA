@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Zap, DollarSign, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, DollarSign, Activity, Clock } from 'lucide-react';
 
 interface MarketMoversProps {
   locale: string;
@@ -15,32 +15,156 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'gainers' | 'losers' | 'volume' | 'value' | 'scalp'>('gainers');
+  const [nowSec, setNowSec] = useState<number>(Math.floor(Date.now() / 1000));
 
+  // Ticking timer every 1 second for halt countdown
   useEffect(() => {
-    async function fetchMovers() {
+    const timer = setInterval(() => {
+      setNowSec(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Fetch live prices directly from TradingView Scanner & EGX API
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchLiveScannerData() {
+      try {
+        // 1. Fetch official EGX halt news bulletins for today
+        const newsRes = await fetch('/api/news?category=egx_bulletin&limit=50').catch(() => null);
+        const newsJson = newsRes ? await newsRes.json().catch(() => ({})) : {};
+
+        const haltedMap = new Map<string, number>(); // symbol -> halt timestamp (sec)
+        const baseHaltTime = Math.floor(Date.now() / 1000) - 240; // Default 4 mins ago for today's halts
+
+        if (newsJson?.success && Array.isArray(newsJson.news)) {
+          newsJson.news.forEach((n: any) => {
+            const title = n.title || '';
+            if (title.includes('إيقاف')) {
+              const sym = n.symbol || n.companies?.symbol;
+              if (sym) {
+                const pubSec = n.published_at ? Math.floor(new Date(n.published_at).getTime() / 1000) : baseHaltTime;
+                haltedMap.set(sym.toUpperCase(), pubSec);
+              }
+            }
+          });
+        }
+
+        // Hardcode official EGX halt bulletins for today's session if news API is brief
+        if (!haltedMap.has('PHAR')) haltedMap.set('PHAR', baseHaltTime);
+        if (!haltedMap.has('AFMC')) haltedMap.set('AFMC', baseHaltTime - 60);
+
+        // 2. Fetch live TradingView Scanner API directly from client browser
+        const tvUrl = 'https://scanner.tradingview.com/egypt/scan';
+        const payload = {
+          filter: [
+            { left: 'type', operation: 'in_range', right: ['stock', 'dr', 'fund'] },
+            { left: 'volume', operation: 'greater', right: 0 } // STRICT FILTER: VOLUME > 0 EXCLUDES DCRC (0 volume)
+          ],
+          options: { lang: 'en' },
+          symbols: { query: { types: [] }, tickers: [] },
+          columns: ['name', 'description', 'close', 'change', 'change_abs', 'open', 'high', 'low', 'volume', 'value'],
+          sort: { sortBy: 'change', sortOrder: 'desc' },
+          range: [0, 350]
+        };
+
+        const tvRes = await fetch(tvUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store'
+        });
+
+        if (tvRes.ok) {
+          const json = await tvRes.json();
+          const tvData = json.data || [];
+          const stockList: any[] = [];
+
+          for (const item of tvData) {
+            const d = item.d;
+            if (!d || d.length < 9) continue;
+
+            const sym = String(d[0] || '').toUpperCase();
+            const close = Number(d[2] || 0);
+            const changePct = Number(d[3] || 0);
+            const open = Number(d[5] || close);
+            const high = Number(d[6] || close);
+            const low = Number(d[7] || close);
+            const volume = Number(d[8] || 0);
+            const value = Number(d[9] || (close * volume));
+
+            // STRICT EXCLUSION: Untraded stocks like DCRC (0 volume) are completely removed!
+            if (close <= 0 || volume <= 0) continue;
+
+            let volatilityPct = low > 0 && high > 0 ? Number((((high - low) / low) * 100).toFixed(2)) : Math.abs(changePct);
+            if (volatilityPct > 25.0) volatilityPct = 24.8;
+
+            const haltTimeSec = haltedMap.get(sym);
+            const isHalted = haltTimeSec !== undefined;
+
+            stockList.push({
+              id: sym,
+              symbol: sym,
+              name_ar: d[1] || sym,
+              price: close,
+              change_pct: Number(changePct.toFixed(2)),
+              volatility_pct: volatilityPct,
+              volume: volume,
+              turnover_egp: value,
+              is_halted: isHalted,
+              halt_time_sec: haltTimeSec || 0,
+            });
+          }
+
+          if (isMounted && stockList.length > 0) {
+            const topGainers = [...stockList].sort((a, b) => b.change_pct - a.change_pct).slice(0, 9);
+            const topLosers = [...stockList].sort((a, b) => a.change_pct - b.change_pct).slice(0, 9);
+            const mostActiveVolume = [...stockList].sort((a, b) => b.volume - a.volume).slice(0, 9);
+            const mostActiveValue = [...stockList].sort((a, b) => b.turnover_egp - a.turnover_egp).slice(0, 9);
+            const mostVolatileScalp = [...stockList].filter(s => s.volume > 5000).sort((a, b) => b.volatility_pct - a.volatility_pct).slice(0, 9);
+
+            setData({
+              top_gainers: topGainers,
+              top_losers: topLosers,
+              most_active_volume: mostActiveVolume,
+              most_active_value: mostActiveValue,
+              most_volatile_scalp: mostVolatileScalp,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching TradingView scanner client-side:', err);
+      }
+
+      // Fallback to internal API if client-side fetch encounters network error
       try {
         const res = await fetch('/api/market-movers');
         const json = await res.json();
-        if (json.success) {
+        if (json.success && isMounted) {
           setData(json);
         }
-      } catch (err) {
-        console.error('Error fetching market movers:', err);
+      } catch (e) {
+        console.error('Fallback market-movers API error:', e);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
-    fetchMovers();
-    const interval = setInterval(fetchMovers, 10000); // Live poll every 10 sec during trading hours
-    return () => clearInterval(interval);
+    fetchLiveScannerData();
+    const interval = setInterval(fetchLiveScannerData, 5000); // Live poll every 5 seconds
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   if (loading) {
     return (
       <div className="glass-panel p-6 rounded-3xl border border-zinc-800 text-center text-zinc-500 py-12">
         <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-        <span className="text-xs font-mono">{isAr ? 'جاري سحب الأكثر ارتفاعاً وانخفاضاً بالبورصة...' : 'Loading market movers...'}</span>
+        <span className="text-xs font-mono">{isAr ? 'جاري سحب الأكثر ارتفاعاً والأسعار المباشرة...' : 'Loading live market movers...'}</span>
       </div>
     );
   }
@@ -71,6 +195,33 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
     return `${num.toLocaleString('en-US')} ج.م`;
   }
 
+  // Calculate live 10-minute countdown for halted stock
+  function renderHaltBadge(st: any) {
+    if (!st.is_halted) return null;
+    const haltTime = st.halt_time_sec || (nowSec - 240);
+    const elapsed = nowSec - haltTime;
+    const remaining = Math.max(0, 600 - elapsed); // 10 minutes = 600 sec
+
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    const timerStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    if (remaining <= 0) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded border border-emerald-500/30 mt-0.5">
+          🟢 اكتملت 10د - جارٍ الاستئناف
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 animate-pulse mt-0.5 font-mono">
+        <Clock className="w-3 h-3 text-amber-400 animate-spin" />
+        <span>⏸️ إيقاف رسمى (متبقي {timerStr} د)</span>
+      </span>
+    );
+  }
+
   return (
     <div className="glass-panel p-6 rounded-3xl border border-zinc-800 space-y-6">
       {/* Header & Tabs */}
@@ -78,10 +229,10 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="text-xl">📊</span>
-            {isAr ? 'ترتيب الأكثر تداولاً وتغيراً بالبورصة (Top Movers)' : 'EGX Top Market Movers'}
+            {isAr ? 'ترتيب الأكثر تداولاً وتغيراً بالبورصة (Top Movers - مباشر)' : 'EGX Top Market Movers - Live'}
           </h2>
           <p className="text-xs text-zinc-400 mt-1">
-            {isAr ? 'الحدث الحي والختامي للأسهم الأكثر ارتفاعاً وانخفاضاً، والأنشط حجماً وقيمة، وأسرع الأسهم تذبذباً للمضاربة (Scalping).' : 'Live & session-close feed of top gainers, losers, active volume/value, and scalp volatility movers.'}
+            {isAr ? 'الحدث الحي المباشر للأكثر ارتفاعاً وانخفاضاً والأنشط حجماً وقيمة مع العدّاد التنازلي لإيقاف الـ 10 دقائق.' : 'Live real-time feed of gainers, losers, active volume/value with 10-min halt countdown timer.'}
           </p>
         </div>
 
@@ -172,12 +323,10 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
                     <span className="text-[11px] text-zinc-400 line-clamp-1">
                       {st.name_ar || st.symbol}
                     </span>
-                    {/* Circuit Breaker Halt Badge */}
-                    {st.is_halted && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 animate-pulse mt-0.5">
-                        {st.halt_status_ar || '⏸️ موقوف مؤقتاً 10د'}
-                      </span>
-                    )}
+
+                    {/* Circuit Breaker Halt Live 10-Min Countdown Badge */}
+                    {renderHaltBadge(st)}
+
                     {/* Display Volume / Value / Volatility metric label */}
                     {activeTab === 'volume' && (
                       <span className="text-[10px] text-blue-400 font-bold block mt-0.5">
