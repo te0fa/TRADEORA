@@ -1,19 +1,19 @@
 """
-egx_intraday_flows.py
-======================
-يسحب بيانات تدفقات المستثمرين اللحظية خلال الجلسة من:
+egx_intraday_flows.py — v3 COMPLETE REWRITE
+=============================================
+يسحب بيانات تدفقات المستثمرين الـ 9 فئات كاملة من:
   https://www.egx.com.eg/ar/InvestorsTypeCharts.aspx
 
-يستخدم Playwright لتخطي F5 WAF ثم يحلل DOM مباشرة
-ويحدث جدول daily_investor_flows في Supabase كل 30 دقيقة.
+الصفحة تحتوي على 3 جداول:
+  Table 1: إجمالي حسب الجنسية (مصريين / عرب / أجانب)
+  Table 2: الأفراد حسب الجنسية (مصريين / عرب / أجانب أفراد)
+  Table 3: المؤسسات حسب الجنسية (مصريين / عرب / أجانب مؤسسات)
 
-الاستخدام:
-    python egx_intraday_flows.py              # اليوم الحالي
-    python egx_intraday_flows.py --date 2026-08-02
-    python egx_intraday_flows.py --dry-run    # بدون حفظ
+كل جدول: بيع | شراء | صافي  × 3 جنسيات = 9 قيم لكل جدول = 27 قيمة إجمالاً
+
 """
 
-import os, sys, re, time, logging, argparse
+import os, sys, re, time, logging, json, argparse
 from datetime import date, datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -43,38 +43,30 @@ INTRADAY_URL = 'https://www.egx.com.eg/ar/InvestorsTypeCharts.aspx'
 HOME_URL     = 'https://www.egx.com.eg/ar/Home.aspx'
 
 
-def parse_number(text: str) -> float | None:
-    """Convert formatted EGP string to float. Handles commas, negatives, Arabic."""
+def parse_egp(text: str) -> float | None:
+    """Convert EGP number string → float. Handles commas, Arabic negatives, brackets."""
     if not text:
         return None
-    cleaned = re.sub(r'[,،\s\u202b\u202c\xa0]', '', text.strip())
+    cleaned = str(text).strip()
+    # Remove Arabic formatting chars, non-breaking spaces, RTL marks
+    cleaned = re.sub(r'[\s\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\xa0،,]', '', cleaned)
+    cleaned = cleaned.replace(',', '').replace('،', '')
+    # Handle bracketed negatives like (300,000)
     if cleaned.startswith('(') and cleaned.endswith(')'):
         cleaned = '-' + cleaned[1:-1]
-    cleaned = cleaned.replace('−', '-').replace('–', '-')
+    # Handle Arabic minus signs
+    cleaned = cleaned.replace('−', '-').replace('–', '-').replace('ـ', '')
     try:
         v = float(cleaned)
-        return v if v != 0 else None
+        return v
     except ValueError:
         return None
 
 
-def extract_all_numbers(html: str) -> list[float]:
-    """Extract all large numeric values (>= 1M EGP) from HTML."""
-    # Match number patterns like 25,168,696,300 or -488,064,796
-    pattern = r'-?[\d]{1,3}(?:,\d{3})+'
-    matches = re.findall(pattern, html)
-    result = []
-    for m in matches:
-        v = parse_number(m)
-        if v is not None and abs(v) >= 1_000_000:
-            result.append(v)
-    return result
-
-
-def scrape_intraday_page(target_date: date) -> dict | None:
+def scrape_egx_flows(target_date: date) -> dict | None:
     """
-    Use Playwright to load InvestorsTypeCharts.aspx and extract live flow data.
-    Returns dict of flow values or None on failure.
+    Use Playwright to load InvestorsTypeCharts.aspx.
+    Extracts all 3 tables completely and returns structured data.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -82,173 +74,371 @@ def scrape_intraday_page(target_date: date) -> dict | None:
         logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
         return None
 
-    logger.info(f"Opening EGX InvestorsTypeCharts page for {target_date}...")
+    logger.info(f"🔄 Opening EGX InvestorsTypeCharts.aspx for {target_date}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox',
-                  '--disable-blink-features=AutomationControlled']
+            args=[
+                '--no-sandbox', '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-web-security',
+            ]
         )
         context = browser.new_context(
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                       '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            user_agent=(
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/124.0.0.0 Safari/537.36'
+            ),
             locale='ar-EG',
-            viewport={'width': 1366, 'height': 768},
+            viewport={'width': 1600, 'height': 900},
         )
         page = context.new_page()
+        extracted = None
 
-        html = None
         try:
-            # Step 1: bypass F5 WAF via home page first
+            # Step 1: Warm up via home page (bypass WAF)
             logger.info("Step 1: Loading home page to bypass WAF...")
-            page.goto(HOME_URL, timeout=30000, wait_until='domcontentloaded')
-            time.sleep(3)
+            page.goto(HOME_URL, timeout=35000, wait_until='domcontentloaded')
+            time.sleep(4)
 
-            # Step 2: load the investor charts page
+            # Step 2: Navigate to the flows page
             logger.info("Step 2: Loading InvestorsTypeCharts.aspx...")
-            page.goto(INTRADAY_URL, timeout=40000, wait_until='networkidle')
-            time.sleep(6)  # wait for AJAX/UpdatePanel to load
+            page.goto(INTRADAY_URL, timeout=50000, wait_until='networkidle')
+            time.sleep(8)  # Wait for AJAX UpdatePanel to load all tables
 
-            # Step 3: try to extract structured table data
-            logger.info("Step 3: Extracting structured data from DOM...")
+            # Step 3: Extract ALL table data via structured JS
+            logger.info("Step 3: Extracting all 3 tables from DOM...")
 
-            # Try GridView / table extraction first
-            rows_data = page.evaluate("""
+            extracted = page.evaluate("""
                 () => {
-                    const results = [];
-                    // Look for all table rows with numbers
-                    const rows = document.querySelectorAll('table tr, .grid-row, [class*="row"]');
-                    rows.forEach(row => {
-                        const text = row.innerText || row.textContent || '';
-                        if (text.trim()) results.push(text.trim());
-                    });
-                    
-                    // Also get all span/label text that looks like numbers
-                    const spans = document.querySelectorAll('span, label, td, th');
-                    const nums = [];
-                    spans.forEach(el => {
-                        const t = (el.innerText || '').trim();
-                        if (/^-?[\\d,،]+$/.test(t.replace(/\\s/g, '')) && t.length > 5) {
-                            nums.push(t);
+                    const result = {
+                        tables: [],
+                        page_title: document.title,
+                        all_text: document.body ? document.body.innerText : ''
+                    };
+
+                    // Find all HTML tables on the page
+                    const tables = document.querySelectorAll('table');
+                    tables.forEach((tbl, tIdx) => {
+                        const tableData = {
+                            index: tIdx,
+                            headers: [],
+                            rows: []
+                        };
+
+                        // Get headers
+                        const ths = tbl.querySelectorAll('th');
+                        ths.forEach(th => {
+                            tableData.headers.push((th.innerText || th.textContent || '').trim());
+                        });
+
+                        // Get data rows
+                        const trs = tbl.querySelectorAll('tr');
+                        trs.forEach(tr => {
+                            const cells = [];
+                            const tds = tr.querySelectorAll('td, th');
+                            tds.forEach(td => {
+                                cells.push((td.innerText || td.textContent || '').trim());
+                            });
+                            if (cells.length >= 2) {
+                                tableData.rows.push(cells);
+                            }
+                        });
+
+                        if (tableData.rows.length > 0) {
+                            result.tables.push(tableData);
                         }
                     });
-                    
-                    return { rows: results, nums: nums };
+
+                    // Also extract GridView-style content (ASP.NET WebForms)
+                    const gridViews = document.querySelectorAll('[id*="GridView"], [id*="grid"], [class*="grid"], [class*="Grid"]');
+                    const gridData = [];
+                    gridViews.forEach((gv, i) => {
+                        gridData.push({
+                            id: gv.id || `grid_${i}`,
+                            text: (gv.innerText || '').substring(0, 2000)
+                        });
+                    });
+                    result.gridViews = gridData;
+
+                    // Extract all repeater / panel text
+                    const panels = document.querySelectorAll('[id*="Panel"], [id*="Update"], [id*="Content"]');
+                    const panelData = [];
+                    panels.forEach(p => {
+                        const txt = (p.innerText || '').trim();
+                        if (txt.length > 50) {
+                            panelData.push({ id: p.id || '', text: txt.substring(0, 3000) });
+                        }
+                    });
+                    result.panels = panelData;
+
+                    return result;
                 }
             """)
 
-            logger.info(f"Found {len(rows_data.get('rows', []))} rows, {len(rows_data.get('nums', []))} numeric spans")
-            for r in rows_data.get('rows', [])[:30]:
-                if r.strip():
-                    logger.debug(f"  Row: {r[:120]}")
-
-            html = page.content()
+            logger.info(f"Found {len(extracted.get('tables', []))} tables on page")
+            for t in extracted.get('tables', []):
+                logger.info(f"  Table[{t['index']}]: {len(t['rows'])} rows, headers={t['headers'][:4]}")
+                for row in t['rows'][:5]:
+                    logger.info(f"    Row: {row[:5]}")
 
         except Exception as e:
-            logger.error(f"Page error: {e}")
+            logger.error(f"Playwright error: {e}", exc_info=True)
         finally:
             browser.close()
 
-    if not html:
+    if not extracted:
+        logger.error("No data extracted from page")
         return None
 
-    # ── Parse extracted data ─────────────────────────────────────────────────
-    return parse_flows_from_html(html, rows_data if rows_data else {}, target_date)
+    return parse_egx_tables(extracted, target_date)
 
 
-def parse_flows_from_html(html: str, dom_data: dict, target_date: date) -> dict | None:
+def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
     """
-    Parse investor flow values from the EGX InvestorsTypeCharts page HTML.
-    Tries structured table rows first, then falls back to all-number extraction.
+    Parse the 3 EGX flow tables from the extracted DOM data.
+
+    Expected table structure (RTL — columns appear in Arabic order):
+    Col 0: Nationality label (مصريين / عرب / أجانب)
+    Col 1: صافي قيمة (Net)
+    Col 2: قيمة شراء (Buy)
+    Col 3: قيمة بيع (Sell)
+
+    OR sometimes reversed:
+    Col 0: Nationality
+    Col 1: Sell
+    Col 2: Buy
+    Col 3: Net
+
+    We detect the column order by looking at headers.
     """
-    result = {}
+    tables = extracted.get('tables', [])
+    all_text = extracted.get('all_text', '')
 
-    # ── Strategy 1: Parse from table rows ─────────────────────────────────────
-    rows = dom_data.get('rows', [])
-    for row in rows:
-        nums = [parse_number(t) for t in re.findall(r'-?[\d,،]+', row)
-                if parse_number(t) is not None and abs(parse_number(t)) >= 1_000_000]
+    result = {
+        'trade_date':  target_date.isoformat(),
+        'source':      'EGX_INTRADAY_LIVE',
+        'scraped_at':  datetime.utcnow().isoformat() + 'Z',
+    }
 
-        if 'أجانب' in row or 'الأجانب' in row:
-            if len(nums) >= 2:
-                result['foreigners_buy_egp']  = nums[0]
-                result['foreigners_sell_egp'] = nums[1]
-                result['foreigners_net_egp']  = nums[2] if len(nums) > 2 else nums[0] - nums[1]
-                logger.info(f"✅ Foreigners: buy={nums[0]:,.0f} sell={nums[1]:,.0f} net={result['foreigners_net_egp']:,.0f}")
+    # ── Try to find the 3 data tables (Total / Retail / Institutional) ──────────
+    # Each table should have ~4 rows (header + 3 nationality rows)
+    data_tables = [t for t in tables if 2 <= len(t['rows']) <= 8]
 
-        elif 'مؤسسات مصرية' in row or 'المؤسسات المصرية' in row:
-            if len(nums) >= 2:
-                result['egyptian_inst_buy_egp']  = nums[0]
-                result['egyptian_inst_sell_egp'] = nums[1]
-                result['egyptian_inst_net_egp']  = nums[2] if len(nums) > 2 else nums[0] - nums[1]
-                logger.info(f"✅ EG Inst: net={result['egyptian_inst_net_egp']:,.0f}")
+    logger.info(f"Candidate data tables: {len(data_tables)}")
 
-        elif 'مؤسسات أجنبية' in row or ('مؤسسات' in row and 'أجنب' in row):
-            if len(nums) >= 2:
-                result['foreign_inst_buy_egp']  = nums[0]
-                result['foreign_inst_sell_egp'] = nums[1]
-                result['foreign_inst_net_egp']  = nums[2] if len(nums) > 2 else nums[0] - nums[1]
+    # Map of keywords for nationality detection
+    NAT_KEYS = {
+        'egyptian': ['مصري', 'مصريين', 'المصري'],
+        'arab':     ['عرب', 'العرب', 'عربي'],
+        'foreign':  ['أجانب', 'الأجانب', 'أجنبي'],
+    }
 
-        elif 'عرب' in row or 'العرب' in row:
-            if len(nums) >= 2:
-                result['arab_buy_egp']  = nums[0]
-                result['arab_sell_egp'] = nums[1]
-                result['arab_net_egp']  = nums[2] if len(nums) > 2 else nums[0] - nums[1]
-
-        elif 'أفراد مصريون' in row or 'الأفراد المصريون' in row or 'الأفراد' in row:
-            if len(nums) >= 2:
-                result['egyptian_ind_buy_egp']  = nums[0]
-                result['egyptian_ind_sell_egp'] = nums[1]
-                result['egyptian_ind_net_egp']  = nums[2] if len(nums) > 2 else nums[0] - nums[1]
-
-        elif 'إجمالي' in row and nums:
-            result['total_volume_egp'] = max(nums)
-
-    # ── Strategy 2: Fallback — extract all large numbers from raw HTML ─────────
-    if not result.get('foreigners_net_egp'):
-        logger.warning("Strategy 1 failed — falling back to raw number extraction")
-        all_nums = extract_all_numbers(html)
-        all_nums_sorted = sorted(set(all_nums), key=abs, reverse=True)
-        logger.info(f"Top 20 numbers found in HTML: {[f'{n:,.0f}' for n in all_nums_sorted[:20]]}")
-
-        # The EGX page renders numbers grouped by category; we can't reliably
-        # assign them without table context — log them for debugging
-        if all_nums_sorted:
-            result['_raw_numbers_debug'] = [int(n) for n in all_nums_sorted[:20]]
-            logger.info("⚠️ Cannot assign raw numbers to categories reliably — need table structure")
-            # Don't return partial/wrong data
-            return None
-
-    if not result:
-        logger.error("No flow data could be extracted from DOM")
+    def detect_nat(cell: str) -> str | None:
+        for nat, keys in NAT_KEYS.items():
+            for k in keys:
+                if k in cell:
+                    return nat
         return None
 
-    result['trade_date'] = target_date.isoformat()
-    result['source']     = 'EGX_INTRADAY_LIVE'
-    result['scraped_at'] = datetime.utcnow().isoformat() + 'Z'
+    def extract_row_numbers(cells: list[str]) -> list[float]:
+        """Extract all valid EGP numbers from a row's cells."""
+        nums = []
+        for c in cells:
+            v = parse_egp(c)
+            if v is not None:
+                nums.append(v)
+        return nums
+
+    def detect_column_order(headers: list[str]) -> str:
+        """
+        Returns 'sell_buy_net' or 'net_buy_sell' based on header text.
+        Default: 'sell_buy_net' (as shown on EGX site in Arabic RTL)
+        """
+        header_text = ' '.join(headers).lower()
+        if 'صافي' in header_text and headers:
+            # Detect which column position صافي is in
+            for i, h in enumerate(headers):
+                if 'صافي' in h:
+                    if i == len(headers) - 1:
+                        return 'sell_buy_net'  # net is last
+                    elif i == 1:
+                        return 'net_buy_sell'  # net is first after label
+        return 'sell_buy_net'  # default based on EGX site structure
+
+    # We expect tables in order: Total → Retail → Institutional
+    # Or we can detect by content (which has "مؤسسات" vs "أفراد" header text)
+    def classify_table(tbl: dict) -> str | None:
+        """Classify table as 'total', 'retail', or 'institutional'."""
+        header_text = ' '.join(str(h) for h in tbl.get('headers', []))
+        row_text    = ' '.join(str(c) for r in tbl.get('rows', []) for c in r)
+        combined    = header_text + ' ' + row_text
+
+        # Look for preceding text context
+        if 'مؤسسات' in combined and 'أفراد' not in combined:
+            return 'institutional'
+        if 'أفراد' in combined and 'مؤسسات' not in combined:
+            return 'retail'
+        if 'إجمالي' in combined or ('مصري' in combined and 'عرب' in combined and 'أجانب' in combined):
+            return 'total'
+        return None
+
+    def parse_single_table(tbl: dict, table_type: str) -> dict:
+        """
+        Parse one table (3 nationality rows) and return field dict.
+        Prefix: 'total' → egyptian_total / arab_total / foreigners_total
+                'retail' → egyptian_ind / arab_ind / foreign_ind
+                'institutional' → egyptian_inst / arab_inst / foreign_inst
+        """
+        prefixes = {
+            'total':         ('egyptian_total', 'arab_total', 'foreigners_total'),
+            'retail':        ('egyptian_ind',   'arab_ind',   'foreign_ind'),
+            'institutional': ('egyptian_inst',  'arab_inst',  'foreign_inst'),
+        }
+        eg_pre, ar_pre, fo_pre = prefixes.get(table_type, ('eg', 'ar', 'fo'))
+
+        col_order = detect_column_order(tbl.get('headers', []))
+        parsed = {}
+
+        for row in tbl.get('rows', []):
+            if not row:
+                continue
+            label = str(row[0])
+            nat = detect_nat(label)
+            if nat is None:
+                continue
+
+            nums = extract_row_numbers(row[1:])  # skip label cell
+            if len(nums) < 2:
+                logger.warning(f"  Skipping row (not enough numbers): {row}")
+                continue
+
+            # Column order detection
+            if col_order == 'sell_buy_net':
+                # EGX Arabic table: Sell | Buy | Net (RTL display)
+                sell = nums[0] if len(nums) > 0 else 0
+                buy  = nums[1] if len(nums) > 1 else 0
+                net  = nums[2] if len(nums) > 2 else (buy - sell)
+            else:
+                # net_buy_sell order
+                net  = nums[0] if len(nums) > 0 else 0
+                buy  = nums[1] if len(nums) > 1 else 0
+                sell = nums[2] if len(nums) > 2 else (buy - net)
+
+            if nat == 'egyptian':
+                pre = eg_pre
+            elif nat == 'arab':
+                pre = ar_pre
+            else:
+                pre = fo_pre
+
+            parsed[f'{pre}_sell_egp'] = sell
+            parsed[f'{pre}_buy_egp']  = buy
+            parsed[f'{pre}_net_egp']  = net
+
+            logger.info(f"  ✅ {table_type}/{nat}: sell={sell:,.0f} buy={buy:,.0f} net={net:,.0f}")
+
+        return parsed
+
+    # ── Try structured table parsing ──────────────────────────────────────────
+    classified = {'total': None, 'retail': None, 'institutional': None}
+
+    for tbl in data_tables:
+        ttype = classify_table(tbl)
+        if ttype and classified[ttype] is None:
+            classified[ttype] = tbl
+            logger.info(f"  Classified Table[{tbl['index']}] as '{ttype}'")
+
+    found_count = sum(1 for v in classified.values() if v is not None)
+    logger.info(f"Classified {found_count}/3 tables")
+
+    if found_count >= 2:
+        for ttype, tbl in classified.items():
+            if tbl:
+                parsed = parse_single_table(tbl, ttype)
+                result.update(parsed)
+    else:
+        # Fallback: assume first 3 data tables are Total, Retail, Institutional in order
+        logger.warning("Could not classify tables by content — assuming positional order")
+        types_order = ['total', 'retail', 'institutional']
+        for i, tbl in enumerate(data_tables[:3]):
+            ttype = types_order[i]
+            parsed = parse_single_table(tbl, ttype)
+            result.update(parsed)
+
+    # ── Compute totals if missing ─────────────────────────────────────────────
+    # egyptian_total = egyptian_ind + egyptian_inst (if individual tables have data)
+    if not result.get('egyptian_total_buy_egp') and result.get('egyptian_ind_buy_egp') and result.get('egyptian_inst_buy_egp'):
+        result['egyptian_total_buy_egp']  = result['egyptian_ind_buy_egp']  + result['egyptian_inst_buy_egp']
+        result['egyptian_total_sell_egp'] = result.get('egyptian_ind_sell_egp', 0) + result.get('egyptian_inst_sell_egp', 0)
+        result['egyptian_total_net_egp']  = result.get('egyptian_ind_net_egp', 0)  + result.get('egyptian_inst_net_egp', 0)
+        logger.info("  📐 Computed egyptian_total from ind+inst")
+
+    if not result.get('arab_total_buy_egp') and result.get('arab_ind_buy_egp') and result.get('arab_inst_buy_egp'):
+        result['arab_total_buy_egp']  = result['arab_ind_buy_egp']  + result['arab_inst_buy_egp']
+        result['arab_total_sell_egp'] = result.get('arab_ind_sell_egp', 0) + result.get('arab_inst_sell_egp', 0)
+        result['arab_total_net_egp']  = result.get('arab_ind_net_egp', 0)  + result.get('arab_inst_net_egp', 0)
+        logger.info("  📐 Computed arab_total from ind+inst")
+
+    if not result.get('foreigners_total_buy_egp') and result.get('foreign_ind_buy_egp') and result.get('foreign_inst_buy_egp'):
+        result['foreigners_total_buy_egp']  = result['foreign_ind_buy_egp']  + result['foreign_inst_buy_egp']
+        result['foreigners_total_sell_egp'] = result.get('foreign_ind_sell_egp', 0) + result.get('foreign_inst_sell_egp', 0)
+        result['foreigners_total_net_egp']  = result.get('foreign_ind_net_egp', 0)  + result.get('foreign_inst_net_egp', 0)
+        logger.info("  📐 Computed foreigners_total from ind+inst")
+
+    # Validate we have at least some real data
+    has_data = any(
+        isinstance(v, (int, float)) and abs(v) > 1_000_000
+        for k, v in result.items()
+        if k.endswith('_egp')
+    )
+
+    if not has_data:
+        logger.error("❌ No valid EGP values extracted — page may not have loaded correctly")
+        logger.error(f"All-text sample: {all_text[:500]}")
+        return None
+
+    # ── Log summary ───────────────────────────────────────────────────────────
+    logger.info("=" * 60)
+    logger.info("📊 EXTRACTED FLOWS SUMMARY:")
+    logger.info(f"  Total Egyptians:  buy={result.get('egyptian_total_buy_egp',0):>20,.0f}  sell={result.get('egyptian_total_sell_egp',0):>20,.0f}  net={result.get('egyptian_total_net_egp',0):>+20,.0f}")
+    logger.info(f"  Total Arabs:      buy={result.get('arab_total_buy_egp',0):>20,.0f}  sell={result.get('arab_total_sell_egp',0):>20,.0f}  net={result.get('arab_total_net_egp',0):>+20,.0f}")
+    logger.info(f"  Total Foreigners: buy={result.get('foreigners_total_buy_egp',0):>20,.0f}  sell={result.get('foreigners_total_sell_egp',0):>20,.0f}  net={result.get('foreigners_total_net_egp',0):>+20,.0f}")
+    logger.info(f"  Retail EG:        buy={result.get('egyptian_ind_buy_egp',0):>20,.0f}  sell={result.get('egyptian_ind_sell_egp',0):>20,.0f}  net={result.get('egyptian_ind_net_egp',0):>+20,.0f}")
+    logger.info(f"  Retail Arabs:     buy={result.get('arab_ind_buy_egp',0):>20,.0f}  sell={result.get('arab_ind_sell_egp',0):>20,.0f}  net={result.get('arab_ind_net_egp',0):>+20,.0f}")
+    logger.info(f"  Retail Foreigners:buy={result.get('foreign_ind_buy_egp',0):>20,.0f}  sell={result.get('foreign_ind_sell_egp',0):>20,.0f}  net={result.get('foreign_ind_net_egp',0):>+20,.0f}")
+    logger.info(f"  Inst EG:          buy={result.get('egyptian_inst_buy_egp',0):>20,.0f}  sell={result.get('egyptian_inst_sell_egp',0):>20,.0f}  net={result.get('egyptian_inst_net_egp',0):>+20,.0f}")
+    logger.info(f"  Inst Arabs:       buy={result.get('arab_inst_buy_egp',0):>20,.0f}  sell={result.get('arab_inst_sell_egp',0):>20,.0f}  net={result.get('arab_inst_net_egp',0):>+20,.0f}")
+    logger.info(f"  Inst Foreigners:  buy={result.get('foreign_inst_buy_egp',0):>20,.0f}  sell={result.get('foreign_inst_sell_egp',0):>20,.0f}  net={result.get('foreign_inst_net_egp',0):>+20,.0f}")
+    logger.info("=" * 60)
+
     return result
 
 
 def save_to_db(flows: dict) -> bool:
-    """Upsert flows into Supabase daily_investor_flows."""
+    """Upsert all 27 flow values into Supabase daily_investor_flows."""
     try:
-        clean = {k: v for k, v in flows.items()
-                 if not k.startswith('_') and v is not None}
+        clean = {
+            k: (int(v) if isinstance(v, float) and v == int(v) else v)
+            for k, v in flows.items()
+            if not k.startswith('_') and v is not None
+        }
         sb.table('daily_investor_flows') \
           .upsert(clean, on_conflict='trade_date') \
           .execute()
-        logger.info(f"✅ Saved intraday flows to DB for {flows['trade_date']}")
+        logger.info(f"✅ Saved {len(clean)} fields to DB for {flows['trade_date']}")
         return True
     except Exception as e:
-        logger.error(f"DB save error: {e}")
+        logger.error(f"DB save error: {e}", exc_info=True)
         return False
 
 
 def main():
-    parser = argparse.ArgumentParser(description='EGX Intraday Investor Flows Scraper')
-    parser.add_argument('--date',    type=str, default=None, help='YYYY-MM-DD')
-    parser.add_argument('--dry-run', action='store_true',    help='No DB save')
+    parser = argparse.ArgumentParser(description='EGX Complete Investor Flows Scraper v3')
+    parser.add_argument('--date',    type=str, default=None, help='Target date YYYY-MM-DD')
+    parser.add_argument('--dry-run', action='store_true',    help='Print data without saving')
     args = parser.parse_args()
 
     target_date = date.today()
@@ -256,33 +446,28 @@ def main():
         try:
             target_date = datetime.strptime(args.date, '%Y-%m-%d').date()
         except ValueError:
-            logger.error(f"Invalid date: {args.date}")
+            logger.error(f"Invalid date format: {args.date}")
             sys.exit(1)
 
     logger.info('=' * 60)
-    logger.info(f'EGX Intraday Flows Scraper — {target_date}')
+    logger.info(f'EGX Complete Flows Scraper v3 — {target_date}')
     logger.info('=' * 60)
 
-    flows = scrape_intraday_page(target_date)
+    flows = scrape_egx_flows(target_date)
 
     if not flows:
-        logger.error("Failed to extract flows. Exiting.")
+        logger.error("❌ Failed to extract flow data. Exiting.")
         sys.exit(1)
 
-    logger.info('─' * 40)
-    logger.info('📊 Extracted Live Investor Flows:')
-    logger.info(f"  🌍 Foreigners NET:      {flows.get('foreigners_net_egp', 'N/A'):>15}")
-    logger.info(f"  🏢 EG Institutions NET: {flows.get('egyptian_inst_net_egp', 'N/A'):>15}")
-    logger.info(f"  🇸🇦 Arab NET:            {flows.get('arab_net_egp', 'N/A'):>15}")
-    logger.info(f"  👤 EG Individuals NET:  {flows.get('egyptian_ind_net_egp', 'N/A'):>15}")
-    logger.info(f"  📈 Total Volume:        {flows.get('total_volume_egp', 'N/A'):>15}")
-    logger.info('─' * 40)
-
     if args.dry_run:
-        logger.info('[DRY RUN] Not saving to database.')
+        logger.info('[DRY RUN] Extracted data (not saving):')
+        for k, v in sorted(flows.items()):
+            if not k.startswith('_'):
+                logger.info(f"  {k}: {v:,.0f}" if isinstance(v, (int, float)) else f"  {k}: {v}")
         return
 
-    save_to_db(flows)
+    success = save_to_db(flows)
+    sys.exit(0 if success else 1)
 
 
 if __name__ == '__main__':

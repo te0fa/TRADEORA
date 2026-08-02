@@ -10,6 +10,17 @@ const NO_CACHE = {
   'Expires': '0',
 };
 
+// ── Helper: safely read a numeric DB field ──────────────────────────────────
+function n(row: any, ...fields: string[]): number {
+  for (const f of fields) {
+    const v = row?.[f];
+    if (v !== null && v !== undefined && v !== '' && !isNaN(Number(v))) {
+      return Number(v);
+    }
+  }
+  return 0;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -29,107 +40,129 @@ export async function GET(req: NextRequest) {
 
     if (flowsErr) {
       console.error('Error fetching daily_investor_flows:', flowsErr.message);
-      return NextResponse.json({ success: false, error: flowsErr.message }, { status: 500 }, );
+      return NextResponse.json({ success: false, error: flowsErr.message }, { status: 500 });
     }
 
     const flowList = flows || [];
-    // Use today's record if available, else most recent
-    const latest = todayFlow || flowList[0] || null;
+    const latest   = todayFlow || flowList[0] || null;
 
-    // ── Build "latest" object from REAL DB values ──────────────────────
-    // All field names map directly from Supabase columns
-    // We never hardcode — if the column is null, we return null and the UI shows ---
-    const exactLatest = latest ? {
-      trade_date: latest.trade_date,
-      source: latest.source,
-      is_today: latest.trade_date === todayStr,
-
-      // Total by Nationality (from scraper columns)
-      egyptian_total_buy:  Number(latest.egyptians_total_buy_egp  || latest.egyptian_total_buy_egp  || 0),
-      egyptian_total_sell: Number(latest.egyptians_total_sell_egp || latest.egyptian_total_sell_egp || 0),
-      egyptian_total_net:  Number(latest.egyptians_total_net_egp  || latest.egyptian_total_net_egp  || 0),
-
-      arab_total_buy:  Number(latest.arab_buy_egp  || 0),
-      arab_total_sell: Number(latest.arab_sell_egp || 0),
-      arab_total_net:  Number(latest.arab_net_egp  || 0),
-
-      foreigners_total_buy:  Number(latest.foreigners_buy_egp  || 0),
-      foreigners_total_sell: Number(latest.foreigners_sell_egp || 0),
-      foreigners_net:        Number(latest.foreigners_net_egp  || 0),
-
-      // Retail breakdown
-      egyptian_ind_buy:  Number(latest.egyptian_ind_buy_egp  || 0),
-      egyptian_ind_sell: Number(latest.egyptian_ind_sell_egp || 0),
-      egyptian_ind_net:  Number(latest.egyptian_ind_net_egp  || 0),
-
-      arab_ind_buy:  Number(latest.arab_ind_buy_egp  || 0),
-      arab_ind_sell: Number(latest.arab_ind_sell_egp || 0),
-      arab_ind_net:  Number(latest.arab_ind_net_egp  || 0),
-
-      foreign_ind_buy:  Number(latest.foreign_ind_buy_egp  || 0),
-      foreign_ind_sell: Number(latest.foreign_ind_sell_egp || 0),
-      foreign_ind_net:  Number(latest.foreign_ind_net_egp  || 0),
-
-      // Institutional breakdown
-      egyptian_inst_buy:  Number(latest.egyptian_inst_buy_egp  || 0),
-      egyptian_inst_sell: Number(latest.egyptian_inst_sell_egp || 0),
-      egyptian_inst_net:  Number(latest.egyptian_inst_net_egp  || 0),
-
-      arab_inst_buy:  Number(latest.arab_inst_buy_egp  || 0),
-      arab_inst_sell: Number(latest.arab_inst_sell_egp || 0),
-      arab_inst_net:  Number(latest.arab_inst_net_egp  || 0),
-
-      foreign_inst_buy:  Number(latest.foreign_inst_buy_egp  || 0),
-      foreign_inst_sell: Number(latest.foreign_inst_sell_egp || 0),
-      foreign_inst_net:  Number(latest.foreign_inst_net_egp  || 0),
-
-      total_volume: Number(latest.total_volume_egp || 0),
-    } : null;
-
-    // ── Calculate pie distribution from REAL values ────────────────────
-    let pieNationality = null;
-    let pieCategory = null;
-
-    if (exactLatest) {
-      const totalNat = exactLatest.egyptian_total_buy + exactLatest.arab_total_buy + exactLatest.foreigners_total_buy;
-      const totalCat = exactLatest.egyptian_inst_buy + exactLatest.arab_inst_buy + exactLatest.foreign_inst_buy +
-                       exactLatest.egyptian_ind_buy  + exactLatest.arab_ind_buy  + exactLatest.foreign_ind_buy;
-
-      if (totalNat > 0) {
-        pieNationality = [
-          { name: 'مصريين', name_en: 'Egyptians', value: parseFloat(((exactLatest.egyptian_total_buy / totalNat) * 100).toFixed(2)), color: '#3B82F6' },
-          { name: 'عرب',    name_en: 'Arabs',      value: parseFloat(((exactLatest.arab_total_buy    / totalNat) * 100).toFixed(2)), color: '#EAB308' },
-          { name: 'أجانب', name_en: 'Foreigners',  value: parseFloat(((exactLatest.foreigners_total_buy / totalNat) * 100).toFixed(2)), color: '#10B981' },
-        ];
-      }
-
-      const instTotal = exactLatest.egyptian_inst_buy + exactLatest.arab_inst_buy + exactLatest.foreign_inst_buy;
-      const indTotal  = exactLatest.egyptian_ind_buy  + exactLatest.arab_ind_buy  + exactLatest.foreign_ind_buy;
-      const catTotal  = instTotal + indTotal;
-
-      if (catTotal > 0) {
-        pieCategory = [
-          { name: 'مؤسسات', name_en: 'Institutions', value: parseFloat(((instTotal / catTotal) * 100).toFixed(2)), color: '#EAB308' },
-          { name: 'أفراد',  name_en: 'Retail',        value: parseFloat(((indTotal  / catTotal) * 100).toFixed(2)), color: '#3B82F6' },
-        ];
-      }
+    if (!latest) {
+      return NextResponse.json(
+        { success: true, latest: null, distribution: { by_nationality: null, by_category: null },
+          history: [], signal: 'neutral', trend: 'neutral',
+          recommendation_impact: 'لا توجد بيانات', data_date: null, is_live_today: false,
+          fetched_at: new Date().toISOString() },
+        { headers: NO_CACHE }
+      );
     }
 
-    // Signal based on foreign net flow
-    const foreignNet = exactLatest?.foreigners_net || 0;
-    const signal = foreignNet >= 0 ? 'buy' : 'sell';
-    const trend  = foreignNet >= 0 ? 'positive' : 'negative';
+    // ── Map DB columns → structured object ─────────────────────────────────
+    // Scraper v3 field naming convention:
+    //   Total:         egyptian_total_{buy/sell/net}_egp  |  arab_total_*  |  foreigners_total_*
+    //   Retail:        egyptian_ind_{buy/sell/net}_egp    |  arab_ind_*    |  foreign_ind_*
+    //   Institutional: egyptian_inst_{buy/sell/net}_egp  |  arab_inst_*   |  foreign_inst_*
+    //
+    // Legacy v1/v2 names are listed as fallbacks.
+
+    const exactLatest = {
+      trade_date: latest.trade_date,
+      source:     latest.source,
+      is_today:   latest.trade_date === todayStr,
+
+      // ── TABLE 1: Total by Nationality ──────────────────────────────────
+      egyptian_total_buy:  n(latest, 'egyptian_total_buy_egp',  'egyptians_total_buy_egp'),
+      egyptian_total_sell: n(latest, 'egyptian_total_sell_egp', 'egyptians_total_sell_egp'),
+      egyptian_total_net:  n(latest, 'egyptian_total_net_egp',  'egyptians_total_net_egp'),
+
+      arab_total_buy:  n(latest, 'arab_total_buy_egp'),
+      arab_total_sell: n(latest, 'arab_total_sell_egp'),
+      arab_total_net:  n(latest, 'arab_total_net_egp'),
+
+      foreigners_total_buy:  n(latest, 'foreigners_total_buy_egp', 'foreigners_buy_egp'),
+      foreigners_total_sell: n(latest, 'foreigners_total_sell_egp','foreigners_sell_egp'),
+      foreigners_net:        n(latest, 'foreigners_total_net_egp', 'foreigners_net_egp'),
+
+      // ── TABLE 2: Retail Investors ─────────────────────────────────────
+      egyptian_ind_buy:  n(latest, 'egyptian_ind_buy_egp'),
+      egyptian_ind_sell: n(latest, 'egyptian_ind_sell_egp'),
+      egyptian_ind_net:  n(latest, 'egyptian_ind_net_egp'),
+
+      arab_ind_buy:  n(latest, 'arab_ind_buy_egp'),
+      arab_ind_sell: n(latest, 'arab_ind_sell_egp'),
+      arab_ind_net:  n(latest, 'arab_ind_net_egp'),
+
+      foreign_ind_buy:  n(latest, 'foreign_ind_buy_egp'),
+      foreign_ind_sell: n(latest, 'foreign_ind_sell_egp'),
+      foreign_ind_net:  n(latest, 'foreign_ind_net_egp'),
+
+      // ── TABLE 3: Institutional Investors ──────────────────────────────
+      egyptian_inst_buy:  n(latest, 'egyptian_inst_buy_egp'),
+      egyptian_inst_sell: n(latest, 'egyptian_inst_sell_egp'),
+      egyptian_inst_net:  n(latest, 'egyptian_inst_net_egp'),
+
+      arab_inst_buy:  n(latest, 'arab_inst_buy_egp'),
+      arab_inst_sell: n(latest, 'arab_inst_sell_egp'),
+      arab_inst_net:  n(latest, 'arab_inst_net_egp'),
+
+      foreign_inst_buy:  n(latest, 'foreign_inst_buy_egp'),
+      foreign_inst_sell: n(latest, 'foreign_inst_sell_egp'),
+      foreign_inst_net:  n(latest, 'foreign_inst_net_egp'),
+
+      total_volume: n(latest, 'total_volume_egp'),
+    };
+
+    // ── Derive totals if individual tables have data but total is missing ──
+    // (handles edge case where only Retail + Inst tables were scraped)
+    if (exactLatest.egyptian_total_buy === 0 && exactLatest.egyptian_ind_buy > 0) {
+      exactLatest.egyptian_total_buy  = exactLatest.egyptian_ind_buy  + exactLatest.egyptian_inst_buy;
+      exactLatest.egyptian_total_sell = exactLatest.egyptian_ind_sell + exactLatest.egyptian_inst_sell;
+      exactLatest.egyptian_total_net  = exactLatest.egyptian_ind_net  + exactLatest.egyptian_inst_net;
+    }
+    if (exactLatest.arab_total_buy === 0 && exactLatest.arab_ind_buy > 0) {
+      exactLatest.arab_total_buy  = exactLatest.arab_ind_buy  + exactLatest.arab_inst_buy;
+      exactLatest.arab_total_sell = exactLatest.arab_ind_sell + exactLatest.arab_inst_sell;
+      exactLatest.arab_total_net  = exactLatest.arab_ind_net  + exactLatest.arab_inst_net;
+    }
+    if (exactLatest.foreigners_total_buy === 0 && exactLatest.foreign_ind_buy > 0) {
+      exactLatest.foreigners_total_buy  = exactLatest.foreign_ind_buy  + exactLatest.foreign_inst_buy;
+      exactLatest.foreigners_total_sell = exactLatest.foreign_ind_sell + exactLatest.foreign_inst_sell;
+      exactLatest.foreigners_net        = exactLatest.foreign_ind_net  + exactLatest.foreign_inst_net;
+    }
+
+    // ── Pie charts from REAL values ────────────────────────────────────────
+    const totalNat = exactLatest.egyptian_total_buy + exactLatest.arab_total_buy + exactLatest.foreigners_total_buy;
+    const pieNationality = totalNat > 0 ? [
+      { name: 'مصريين', name_en: 'Egyptians', color: '#3B82F6',
+        value: parseFloat(((exactLatest.egyptian_total_buy   / totalNat) * 100).toFixed(2)) },
+      { name: 'عرب',    name_en: 'Arabs',      color: '#EAB308',
+        value: parseFloat(((exactLatest.arab_total_buy       / totalNat) * 100).toFixed(2)) },
+      { name: 'أجانب', name_en: 'Foreigners',  color: '#10B981',
+        value: parseFloat(((exactLatest.foreigners_total_buy / totalNat) * 100).toFixed(2)) },
+    ] : null;
+
+    const instTotal = exactLatest.egyptian_inst_buy + exactLatest.arab_inst_buy + exactLatest.foreign_inst_buy;
+    const indTotal  = exactLatest.egyptian_ind_buy  + exactLatest.arab_ind_buy  + exactLatest.foreign_ind_buy;
+    const catTotal  = instTotal + indTotal;
+    const pieCategory = catTotal > 0 ? [
+      { name: 'مؤسسات', name_en: 'Institutions', color: '#EAB308',
+        value: parseFloat(((instTotal / catTotal) * 100).toFixed(2)) },
+      { name: 'أفراد',  name_en: 'Retail',        color: '#3B82F6',
+        value: parseFloat(((indTotal  / catTotal) * 100).toFixed(2)) },
+    ] : null;
+
+    // ── Signal ────────────────────────────────────────────────────────────
+    const foreignNet = exactLatest.foreigners_net;
+    const signal     = foreignNet >= 0 ? 'buy' : 'sell';
+    const trend      = foreignNet >= 0 ? 'positive' : 'negative';
 
     const formatM = (v: number) => {
       const abs = Math.abs(v);
       if (abs >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)} مليار`;
       if (abs >= 1_000_000)     return `${(v / 1_000_000).toFixed(1)} مليون`;
-      return `${v.toLocaleString('ar-EG')}`;
+      return v.toLocaleString('ar-EG');
     };
 
-    const recommendation_impact = exactLatest
-      ? `${foreignNet >= 0 ? '🟢' : '🔴'} صافي ${foreignNet >= 0 ? 'شراء' : 'بيع'} أجنبي (${foreignNet >= 0 ? '+' : ''}${formatM(foreignNet)} ج.م)`
-      : 'لا توجد بيانات';
+    const recommendation_impact = `${foreignNet >= 0 ? '🟢' : '🔴'} صافي ${foreignNet >= 0 ? 'شراء' : 'بيع'} أجنبي (${foreignNet >= 0 ? '+' : ''}${formatM(foreignNet)} ج.م)`;
 
     return NextResponse.json(
       {
@@ -137,22 +170,22 @@ export async function GET(req: NextRequest) {
         latest: exactLatest,
         distribution: {
           by_nationality: pieNationality,
-          by_category: pieCategory,
+          by_category:    pieCategory,
         },
         history: flowList.map((h: any) => ({
-          trade_date:           h.trade_date,
-          foreigners_net_egp:       Number(h.foreigners_net_egp        || 0),
-          egyptian_inst_net_egp:    Number(h.egyptian_inst_net_egp     || 0),
-          egyptian_ind_net_egp:     Number(h.egyptian_ind_net_egp      || 0),
-          arab_net_egp:             Number(h.arab_net_egp              || 0),
-          total_volume_egp:         Number(h.total_volume_egp          || 0),
+          trade_date:            h.trade_date,
+          foreigners_net_egp:    n(h, 'foreigners_total_net_egp', 'foreigners_net_egp'),
+          egyptian_inst_net_egp: n(h, 'egyptian_inst_net_egp'),
+          egyptian_ind_net_egp:  n(h, 'egyptian_ind_net_egp'),
+          arab_total_net_egp:    n(h, 'arab_total_net_egp', 'arab_net_egp'),
+          total_volume_egp:      n(h, 'total_volume_egp'),
         })),
         signal,
         trend,
         recommendation_impact,
-        data_date: latest?.trade_date || null,
+        data_date:    latest?.trade_date || null,
         is_live_today: latest?.trade_date === todayStr,
-        fetched_at: new Date().toISOString(),
+        fetched_at:   new Date().toISOString(),
       },
       { headers: NO_CACHE }
     );
