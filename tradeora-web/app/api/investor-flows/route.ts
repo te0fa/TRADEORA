@@ -28,17 +28,12 @@ export async function GET(req: NextRequest) {
   try {
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Fetch today's record first, fallback to latest available
-    const { data: todayFlow } = await supabase
-      .from('daily_investor_flows')
-      .select('*')
-      .eq('trade_date', todayStr)
-      .maybeSingle();
-
+    // 1. Fetch latest available record ordered by trade_date desc, created_at desc
     const { data: flows, error: flowsErr } = await supabase
       .from('daily_investor_flows')
       .select('*')
       .order('trade_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(30);
 
     if (flowsErr) {
@@ -47,7 +42,7 @@ export async function GET(req: NextRequest) {
     }
 
     const flowList = flows || [];
-    const latest   = todayFlow || flowList[0] || null;
+    const latest   = flowList[0] || null;
 
     if (!latest) {
       return NextResponse.json(
