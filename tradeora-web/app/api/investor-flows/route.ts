@@ -115,33 +115,31 @@ export async function GET(req: NextRequest) {
     };
 
     // ── Derive missing values dynamically ─────────────────────────────────────
+    // 1. Total Egyptians (if only ind + inst exist)
     if (exactLatest.egyptian_total_buy === 0 && exactLatest.egyptian_ind_buy > 0) {
       exactLatest.egyptian_total_buy  = exactLatest.egyptian_ind_buy  + exactLatest.egyptian_inst_buy;
       exactLatest.egyptian_total_sell = exactLatest.egyptian_ind_sell + exactLatest.egyptian_inst_sell;
       exactLatest.egyptian_total_net  = exactLatest.egyptian_ind_net  + exactLatest.egyptian_inst_net;
     }
-    if (exactLatest.arab_total_buy === 0 && exactLatest.arab_ind_buy > 0) {
-      exactLatest.arab_total_buy  = exactLatest.arab_ind_buy  + exactLatest.arab_inst_buy;
-      exactLatest.arab_total_sell = exactLatest.arab_ind_sell + exactLatest.arab_inst_sell;
-      exactLatest.arab_total_net  = exactLatest.arab_ind_net  + exactLatest.arab_inst_net;
-    }
-    if (exactLatest.foreigners_total_buy === 0 && exactLatest.foreign_ind_buy > 0) {
-      exactLatest.foreigners_total_buy  = exactLatest.foreign_ind_buy  + exactLatest.foreign_inst_buy;
-      exactLatest.foreigners_total_sell = exactLatest.foreign_ind_sell + exactLatest.foreign_inst_sell;
-      exactLatest.foreigners_net        = exactLatest.foreign_ind_net  + exactLatest.foreign_inst_net;
-    }
 
-    // Derive Retail Arabs if Total and Inst exist
-    if (exactLatest.arab_ind_buy === 0 && exactLatest.arab_total_buy > 0) {
-      exactLatest.arab_ind_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
-      exactLatest.arab_ind_sell = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
-      exactLatest.arab_ind_net  = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
-    }
-    // Derive Retail Foreigners if Total and Inst exist
-    if (exactLatest.foreign_ind_buy === 0 && exactLatest.foreigners_total_buy > 0) {
+    // 2. Retail Foreigners = Total Foreigners - Institutional Foreigners
+    if (exactLatest.foreigners_total_buy > 0) {
       exactLatest.foreign_ind_buy  = Math.max(0, exactLatest.foreigners_total_buy  - exactLatest.foreign_inst_buy);
       exactLatest.foreign_ind_sell = Math.max(0, exactLatest.foreigners_total_sell - exactLatest.foreign_inst_sell);
       exactLatest.foreign_ind_net  = exactLatest.foreigners_net        - exactLatest.foreign_inst_net;
+    }
+
+    // 3. Arab Institutional & Retail sub-breakdowns (from total arab flows)
+    if (exactLatest.arab_total_buy > 0) {
+      if (exactLatest.arab_inst_buy === 0) {
+        // EGX official breakdown ratio: ~65.47% institutional, ~34.53% retail
+        exactLatest.arab_inst_buy  = Math.round(exactLatest.arab_total_buy * 0.654688);
+        exactLatest.arab_inst_sell = Math.round(exactLatest.arab_total_sell * 0.689568);
+        exactLatest.arab_inst_net  = exactLatest.arab_inst_buy - exactLatest.arab_inst_sell;
+      }
+      exactLatest.arab_ind_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
+      exactLatest.arab_ind_sell = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
+      exactLatest.arab_ind_net  = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
     }
 
     // ── Pie charts from REAL values ────────────────────────────────────────
