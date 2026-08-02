@@ -1,17 +1,27 @@
-name: 📊 EGX Daily Investor Flows
+name: 📊 EGX Investor Flows — Auto Scraper
 
 on:
   schedule:
-    # كل يوم الساعة 5:30 PM Cairo (2:30 PM UTC) الأحد-الخميس
-    # بعد إغلاق الجلسة (3 PM) وبعد نشر النشرة الرسمية
-    - cron: '30 14 * * 0,1,2,3,4'
+    # ── أوقات الجلسة (10:00 AM – 3:30 PM Cairo = 08:00–13:30 UTC) ──────────
+    # كل 30 دقيقة أثناء الجلسة الأحد-الخميس
+    - cron: '0,30 8,9,10,11,12 * * 0,1,2,3,4'   # 10:00 AM → 2:30 PM Cairo
+    - cron: '0,30 13 * * 0,1,2,3,4'              # 3:00 PM → 3:30 PM Cairo (closing)
+    # ── بعد إغلاق الجلسة — PDF الرسمي النهائي (5:30 PM Cairo = 3:30 PM UTC) ──
+    - cron: '30 15 * * 0,1,2,3,4'                # PDF اليومي النهائي
 
+  # تشغيل يدوي من GitHub UI في أي وقت
   workflow_dispatch:
     inputs:
       date:
         description: 'Target date YYYY-MM-DD (default: today)'
         required: false
         default: ''
+      mode:
+        description: 'Scrape mode'
+        required: false
+        default: 'auto'
+        type: choice
+        options: ['auto', 'intraday', 'pdf', 'both']
       dry_run:
         description: 'Dry run (parse only, no DB save)'
         required: false
@@ -21,7 +31,7 @@ on:
 
 jobs:
   scrape-flows:
-    name: 🌍 Scrape EGX Investor Flows
+    name: 🌍 EGX Investor Flows Scraper
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -35,7 +45,7 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install \
@@ -44,33 +54,95 @@ jobs:
             supabase \
             python-dotenv \
             httpx \
-            pypdf
+            pypdf \
+            beautifulsoup4 \
+            lxml
 
-      - name: 🌐 Install Playwright Chromium
+      - name: 🌐 Install Playwright Chromium + system deps
         run: playwright install chromium --with-deps
 
-      - name: 📊 Scrape EGX Daily Bulletin
+      - name: 🕐 Determine scrape mode (intraday vs PDF)
+        id: mode
+        run: |
+          # Cairo time = UTC + 3
+          HOUR_UTC=$(date -u +%-H)
+          HOUR_CAIRO=$((HOUR_UTC + 3))
+          DAY_OF_WEEK=$(date -u +%u)  # 1=Mon, 7=Sun (0=Sun in cron but %u=7)
+          
+          echo "UTC hour: $HOUR_UTC | Cairo hour: $HOUR_CAIRO | Day: $DAY_OF_WEEK"
+          
+          MANUAL_MODE="${{ github.event.inputs.mode }}"
+          
+          if [ "$MANUAL_MODE" = "intraday" ]; then
+            echo "mode=intraday" >> $GITHUB_OUTPUT
+          elif [ "$MANUAL_MODE" = "pdf" ]; then
+            echo "mode=pdf" >> $GITHUB_OUTPUT
+          elif [ "$MANUAL_MODE" = "both" ]; then
+            echo "mode=both" >> $GITHUB_OUTPUT
+          else
+            # Auto: intraday during session (10:00–15:00 Cairo), PDF after 15:30
+            if [ "$HOUR_CAIRO" -ge 10 ] && [ "$HOUR_CAIRO" -lt 15 ]; then
+              echo "mode=intraday" >> $GITHUB_OUTPUT
+              echo "📡 Intraday mode: session is live"
+            elif [ "$HOUR_CAIRO" -ge 15 ]; then
+              echo "mode=pdf" >> $GITHUB_OUTPUT
+              echo "📄 PDF mode: session closed, fetching official bulletin"
+            else
+              echo "mode=skip" >> $GITHUB_OUTPUT
+              echo "⏭️ Pre-session, skipping"
+            fi
+          fi
+
+      - name: 📡 Intraday Scrape (live session data)
+        if: steps.mode.outputs.mode == 'intraday' || steps.mode.outputs.mode == 'both'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         run: |
           DATE_ARG=""
           if [ -n "${{ github.event.inputs.date }}" ]; then
             DATE_ARG="--date ${{ github.event.inputs.date }}"
           fi
-
+          
           DRY_RUN=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             DRY_RUN="--dry-run"
           fi
+          
+          echo "📡 Running intraday scraper (InvestorsTypeCharts.aspx)..."
+          python egx_intraday_flows.py $DATE_ARG $DRY_RUN
 
-          echo "📊 Scraping EGX investor flows..."
+      - name: 📄 PDF Scrape (official end-of-day bulletin)
+        if: steps.mode.outputs.mode == 'pdf' || steps.mode.outputs.mode == 'both'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          DATE_ARG=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            DATE_ARG="--date ${{ github.event.inputs.date }}"
+          fi
+          
+          DRY_RUN=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN="--dry-run"
+          fi
+          
+          echo "📄 Running official PDF bulletin scraper..."
           python egx_flow_scraper.py $DATE_ARG $DRY_RUN
+
+      - name: ⏭️ Skip (pre-session)
+        if: steps.mode.outputs.mode == 'skip'
+        run: echo "⏭️ Pre-session hours — no scraping needed"
 
       - name: 📋 Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: egx-flow-logs-${{ github.run_id }}
-          path: logs/egx_flow_scraper.log
+          path: |
+            logs/egx_flow_scraper.log
+            logs/egx_intraday_flows.log
           retention-days: 7
