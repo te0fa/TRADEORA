@@ -12,13 +12,16 @@ const NO_CACHE = {
 
 // ── Helper: safely read a numeric DB field ──────────────────────────────────
 function n(row: any, ...fields: string[]): number {
+  let firstVal = 0;
   for (const f of fields) {
     const v = row?.[f];
     if (v !== null && v !== undefined && v !== '' && !isNaN(Number(v))) {
-      return Number(v);
+      const num = Number(v);
+      if (num !== 0) return num;
+      firstVal = num;
     }
   }
-  return 0;
+  return firstVal;
 }
 
 export async function GET(req: NextRequest) {
