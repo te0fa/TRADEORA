@@ -9,15 +9,23 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
   const isAr = params.locale === 'ar';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchedAt, setFetchedAt] = useState<string>('');
+  const [isToday, setIsToday] = useState<boolean>(false);
 
   useEffect(() => {
     async function fetchFlows() {
-      setLoading(true);
       try {
-        const res = await fetch('/api/investor-flows');
+        const res = await fetch('/api/investor-flows', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         const json = await res.json();
         if (json.success) {
           setData(json);
+          setIsToday(json.is_live_today === true);
+          setFetchedAt(new Date().toLocaleTimeString('ar-EG', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+          }));
         }
       } catch (err) {
         console.error('Error fetching investor flows:', err);
@@ -26,62 +34,26 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
       }
     }
     fetchFlows();
+    // Refresh every 5 minutes during trading session
+    const interval = setInterval(fetchFlows, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const latest = data?.latest || {
-    // 1. Total by Nationality
-    egyptian_total_buy: 25348536123,
-    egyptian_total_sell: 25168696300,
-    egyptian_total_net: 179839823,
+  // Values come from REAL DB — no hardcoded fallback
+  const latest = data?.latest || null;
 
-    arab_total_buy: 303150344,
-    arab_total_sell: 497175091,
-    arab_total_net: -194024747,
-
-    foreigners_total_buy: 97547652,
-    foreigners_total_sell: 83362728,
-    foreigners_net: 14184924,
-
-    // 2. Retail Breakdown
-    egyptian_ind_buy: 7620537060,
-    egyptian_ind_sell: 6952632441,
-    egyptian_ind_net: 667904619,
-
-    arab_ind_buy: 187720213,
-    arab_ind_sell: 261436919,
-    arab_ind_net: -73716706,
-
-    foreign_ind_buy: 10498304,
-    foreign_ind_sell: 4748077,
-    foreign_ind_net: 5750228,
-
-    // 3. Institutional Breakdown
-    egyptian_inst_buy: 17727999063,
-    egyptian_inst_sell: 18216063860,
-    egyptian_inst_net: -488064796,
-
-    arab_inst_buy: 115430131,
-    arab_inst_sell: 235738172,
-    arab_inst_net: -120308041,
-
-    foreign_inst_buy: 87049347,
-    foreign_inst_sell: 78614651,
-    foreign_inst_net: 8434697,
-
-    total_volume: 25749234119
-  };
-
-  // Pie chart distributions matching EGX official live statistics (13:58 Cairo screenshot)
-  const pieNationality = [
-    { name: isAr ? 'مصريين' : 'Egyptians', value: 98.09, color: '#3B82F6' },
-    { name: isAr ? 'عرب' : 'Arabs', value: 1.55, color: '#EAB308' },
-    { name: isAr ? 'أجانب' : 'Foreigners', value: 0.35, color: '#10B981' },
+  // Pie data: use API-computed values or fallback to zeros
+  const pieNationality = data?.distribution?.by_nationality || [
+    { name: isAr ? 'مصريين' : 'Egyptians', value: 0, color: '#3B82F6' },
+    { name: isAr ? 'عرب' : 'Arabs',         value: 0, color: '#EAB308' },
+    { name: isAr ? 'أجانب' : 'Foreigners',  value: 0, color: '#10B981' },
   ];
 
-  const pieCategory = [
-    { name: isAr ? 'مؤسسات' : 'Institutions', value: 70.79, color: '#EAB308' },
-    { name: isAr ? 'أفراد' : 'Retail', value: 29.21, color: '#3B82F6' },
+  const pieCategory = data?.distribution?.by_category || [
+    { name: isAr ? 'مؤسسات' : 'Institutions', value: 0, color: '#EAB308' },
+    { name: isAr ? 'أفراد' : 'Retail',          value: 0, color: '#3B82F6' },
   ];
+
 
   function formatEGP(val: number): string {
     if (val === undefined || val === null) return '0';
@@ -113,14 +85,38 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
             </p>
           </div>
 
-          <div className="bg-zinc-900/90 border border-emerald-500/30 px-5 py-3.5 rounded-2xl text-right font-mono">
-            <span className="text-xs text-zinc-400 block mb-1">{isAr ? 'إشارة صافي التدفقات' : 'Current Flow Signal'}</span>
-            <span className="text-sm font-bold px-3 py-1 rounded-md inline-block bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              🟢 صافي شراء أجنبي وسيطرة مشتريات الأفراد
+          <div className="bg-zinc-900/90 border border-emerald-500/30 px-5 py-3.5 rounded-2xl text-right font-mono space-y-2">
+            <span className="text-xs text-zinc-400 block">{isAr ? 'إشارة صافي التدفقات' : 'Current Flow Signal'}</span>
+            <span className={`text-sm font-bold px-3 py-1 rounded-md inline-block border ${
+              data?.signal === 'buy'
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                : data?.signal === 'sell'
+                ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+            }`}>
+              {data?.recommendation_impact || (loading ? '...' : '⏳ جاري التحميل')}
             </span>
+
+            {/* Data freshness badge */}
+            <div className="flex items-center gap-2 justify-end mt-1">
+              {isToday ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  بيانات اليوم
+                </span>
+              ) : data?.data_date ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  ⚠️ آخر جلسة: {data.data_date}
+                </span>
+              ) : null}
+              {fetchedAt && (
+                <span className="text-[10px] text-zinc-500 font-mono">آخر تحديث: {fetchedAt}</span>
+              )}
+            </div>
           </div>
         </div>
       </motion.div>
+
 
       {/* Interactive Pie Charts Section (Matching EGX Official Visual Charts) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -146,7 +142,7 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
                   paddingAngle={4}
                   dataKey="value"
                 >
-                  {pieNationality.map((entry, index) => (
+                  {pieNationality.map((entry: { name: string; value: number; color: string }, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -156,23 +152,19 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
 
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none font-mono">
               <span className="text-[11px] text-zinc-400">{isAr ? 'مصريين' : 'Egyptians'}</span>
-              <span className="text-xl font-black text-blue-400">98.09%</span>
+              <span className="text-xl font-black text-blue-400">
+                {pieNationality[0]?.value ? `${pieNationality[0].value}%` : '---'}
+              </span>
             </div>
           </div>
 
           <div className="flex items-center justify-around text-xs font-mono pt-2 border-t border-zinc-800/80">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
-              <span className="text-zinc-300">{isAr ? 'مصريين: 98.09%' : 'Egyptians: 98.09%'}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-yellow-500 inline-block" />
-              <span className="text-zinc-300">{isAr ? 'عرب: 1.55%' : 'Arabs: 1.55%'}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
-              <span className="text-zinc-300">{isAr ? 'أجانب: 0.35%' : 'Foreigners: 0.35%'}</span>
-            </div>
+            {pieNationality.map((p: { name: string; value: number; color: string }, i: number) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: p.color }} />
+                <span className="text-zinc-300">{p.name}: {p.value ? `${p.value}%` : '---'}</span>
+              </div>
+            ))}
           </div>
         </motion.div>
 
@@ -198,7 +190,7 @@ export default function InvestorFlowsPage({ params }: { params: { locale: string
                   paddingAngle={4}
                   dataKey="value"
                 >
-                  {pieCategory.map((entry, index) => (
+                  {pieCategory.map((entry: { name: string; value: number; color: string }, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
