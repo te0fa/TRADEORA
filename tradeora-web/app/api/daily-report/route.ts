@@ -117,10 +117,8 @@ export async function GET(req: Request) {
       else unchanged++;
     });
 
-    // Fallback realistic market stats if no price data
-    if (gaining === 0 && losing === 0) {
-      gaining = 87; losing = 64; unchanged = 22;
-    }
+    // If no price data, leave at 0 — don't fabricate numbers
+    // gaining/losing/unchanged = 0 means data not yet loaded for this session
 
     // Fetch EGX30 index live value
     let egx30Value = 30850;
@@ -146,7 +144,7 @@ export async function GET(req: Request) {
         gaining_companies: gaining,
         losing_companies: losing,
         unchanged_companies: unchanged,
-        total_analyzed: (priceData || []).length || 173
+        total_analyzed: (priceData || []).length,
       },
       buy_opportunities: buyTrades,
       sell_caution_opportunities: sellTrades,
