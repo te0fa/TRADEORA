@@ -364,7 +364,7 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
                         </td>
 
                         <td className="py-4 px-4 font-mono font-bold text-zinc-300 text-end">
-                          {shares.toLocaleString()}
+                          {(shares || 0).toLocaleString()}
                         </td>
 
                         <td className="py-4 px-4 font-mono font-bold text-white text-end">
@@ -397,7 +397,7 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
                                 <span>{pnlPct.toFixed(2)}%</span>
                               </div>
                               <div className="text-[10px] text-zinc-500 font-sans mt-0.5">
-                                {pnlPct >= 0 ? '+' : ''}{pnlAmt.toLocaleString(undefined, { maximumFractionDigits: 1 })} EGP
+                                {pnlPct >= 0 ? '+' : ''}{(pnlAmt || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} EGP
                               </div>
                             </div>
                           ) : (

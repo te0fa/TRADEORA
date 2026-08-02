@@ -544,8 +544,8 @@ export default function PerformancePage() {
                         <TrendingUp className="w-4 h-4 text-accent-gold" />
                       </div>
                       <div>
-                        <div className={`text-2xl font-black font-mono ${personalStats.total_pnl_amount >= 0 ? 'text-accent-gold' : 'text-down-red'}`}>
-                          {personalStats.total_pnl_amount > 0 ? '+' : ''}{personalStats.total_pnl_amount.toLocaleString()} EGP
+                        <div className={`text-2xl font-black font-mono ${(personalStats?.total_pnl_amount ?? 0) >= 0 ? 'text-accent-gold' : 'text-down-red'}`}>
+                          {(personalStats?.total_pnl_amount ?? 0) > 0 ? '+' : ''}{(personalStats?.total_pnl_amount ?? 0).toLocaleString()} EGP
                         </div>
                         <p className="text-[10px] text-zinc-500 mt-1 font-medium">
                           Realized EGP profit

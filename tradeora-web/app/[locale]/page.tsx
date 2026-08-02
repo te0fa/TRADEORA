@@ -388,8 +388,8 @@ export default function DashboardPage({ params }: Props) {
           ].map((idx, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="text-zinc-400 font-bold">{idx.label}</span>
-              <span className="text-white font-mono font-extrabold">{idx.data.value !== null ? idx.data.value.toLocaleString('en-US') : '---'}</span>
-              {idx.data.change !== null ? (
+              <span className="text-white font-mono font-extrabold">{idx.data?.value != null ? Number(idx.data.value).toLocaleString('en-US') : '---'}</span>
+              {idx.data?.change != null ? (
                 <span className={`font-mono font-bold flex items-center ${idx.data.change >= 0 ? 'text-up-green' : 'text-down-red'}`} dir="ltr">
                   {idx.data.change >= 0 ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
                   {idx.data.change >= 0 ? '+' : ''}{idx.data.change}%

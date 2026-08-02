@@ -55,18 +55,20 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
     ? data?.most_active_value || []
     : data?.most_volatile_scalp || [];
 
-  function formatVolume(val: number): string {
-    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B`;
-    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(2)}M`;
-    if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
-    return `${val.toLocaleString('en-US')}`;
+  function formatVolume(val?: number): string {
+    const num = Number(val || 0);
+    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
+    if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+    return `${num.toLocaleString('en-US')}`;
   }
 
-  function formatTurnover(val: number): string {
-    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(2)}B ج.م`;
-    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M ج.م`;
-    if (val >= 1_000) return `${(val / 1_000).toFixed(0)}K ج.م`;
-    return `${val.toLocaleString('en-US')} ج.م`;
+  function formatTurnover(val?: number): string {
+    const num = Number(val || 0);
+    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B ج.م`;
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M ج.م`;
+    if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K ج.م`;
+    return `${num.toLocaleString('en-US')} ج.م`;
   }
 
   return (
