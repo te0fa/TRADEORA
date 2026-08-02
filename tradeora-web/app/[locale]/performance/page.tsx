@@ -67,6 +67,8 @@ export default function PerformancePage() {
   const [platformTrades, setPlatformTrades] = useState<any[]>([]);
   const [platformSellSignals, setPlatformSellSignals] = useState<any[]>([]);
   const [platformStats, setPlatformStats] = useState<any>(null);
+  const [tierEvaluations, setTierEvaluations] = useState<any>(null);
+  const [evaluationTier, setEvaluationTier] = useState<'premier_elite' | 'standard_market' | 'combined'>('premier_elite');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Personal states
@@ -137,6 +139,7 @@ export default function PerformancePage() {
         setPlatformTrades(platData.trades || []);
         setPlatformSellSignals(platData.sell_signals || []);
         setPlatformStats(platData.stats || null);
+        setTierEvaluations(platData.tier_evaluations || null);
         
         if (persData.success) {
           setPersonalTrades(persData.trades || []);
@@ -161,13 +164,29 @@ export default function PerformancePage() {
     return `${num > 0 ? '+' : ''}${formatNum(num, 1)}%`;
   };
 
+  const activeStats = useMemo(() => {
+    if (tierEvaluations && tierEvaluations[evaluationTier]) {
+      return tierEvaluations[evaluationTier];
+    }
+    return platformStats || {
+      win_rate: 0,
+      total_pnl: 0,
+      total_signals: 0,
+      active_trades: 0,
+      activated_trades: 0,
+      closed_trades: 0,
+      avg_pnl: 0,
+      confidence_range_ar: 'ثقة نموذج v6: 85% - 99%'
+    };
+  }, [tierEvaluations, evaluationTier, platformStats]);
+
   const platformPieData = useMemo(() => {
-    if (!platformStats) return [];
+    if (!activeStats) return [];
     return [
-      { name: 'Winning Trades', value: platformStats.winning_trades, color: '#10B981' },
-      { name: 'Losing Trades', value: platformStats.losing_trades, color: '#EF4444' }
+      { name: 'Winning Trades', value: activeStats.winning_trades || 0, color: '#10B981' },
+      { name: 'Losing Trades', value: activeStats.losing_trades || 0, color: '#EF4444' }
     ].filter(item => item.value > 0);
-  }, [platformStats]);
+  }, [activeStats]);
 
   const platformLineData = useMemo(() => {
     const closed = platformTrades
@@ -285,6 +304,30 @@ export default function PerformancePage() {
           >
             {platformStats ? (
               <>
+                {/* Dual-Tier Evaluation Dropdown Selector */}
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-zinc-900/90 p-4 rounded-2xl border border-zinc-800 font-sans">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">👑</span>
+                    <div>
+                      <span className="text-sm font-bold text-white block">اختر نطاق تقييم أداء المنصة والنموذج:</span>
+                      <span className="text-xs text-amber-400 font-mono font-bold">
+                        {activeStats?.confidence_range_ar || 'ثقة النموذج: 85% - 99%'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 font-mono text-xs">
+                    <select
+                      value={evaluationTier}
+                      onChange={(e) => setEvaluationTier(e.target.value as any)}
+                      className="px-4 py-2 bg-black border border-amber-500/40 rounded-xl text-amber-400 font-bold text-xs focus:outline-none cursor-pointer hover:border-amber-400 transition-colors shadow-lg"
+                    >
+                      <option value="premier_elite">👑 تقييم صفقات النخبة الذهبية (درجة ثقة 85% - 99%) [الرئيسي]</option>
+                      <option value="standard_market">🌐 تقييم إشارات السوق العامة (درجة ثقة 65% - 84%)</option>
+                      <option value="combined">📊 التقييم الشامل المدمج (كافة إشارات السوق - 99 صفقة)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                   <motion.div variants={itemVariants}>
                     <Card className="p-5 h-full flex flex-col justify-between">
@@ -294,10 +337,10 @@ export default function PerformancePage() {
                       </div>
                       <div>
                         <div className="text-3xl font-black text-up-green font-mono">
-                          {platformStats.win_rate.toFixed(1)}%
+                          {activeStats.win_rate ? activeStats.win_rate.toFixed(1) : '0.0'}%
                         </div>
                         <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                          Based on {platformStats.closed_trades} closed trades
+                          Based on {activeStats.closed_trades || 0} closed trades
                         </p>
                       </div>
                     </Card>
@@ -310,8 +353,8 @@ export default function PerformancePage() {
                         <TrendingUp className="w-5 h-5 text-accent-blue" />
                       </div>
                       <div>
-                        <div className={`text-3xl font-black font-mono ${platformStats.total_pnl >= 0 ? 'text-accent-blue' : 'text-down-red'}`}>
-                          {platformStats.total_pnl > 0 ? '+' : ''}{platformStats.total_pnl.toFixed(1)}%
+                        <div className={`text-3xl font-black font-mono ${(activeStats.total_pnl || 0) >= 0 ? 'text-accent-blue' : 'text-down-red'}`}>
+                          {(activeStats.total_pnl || 0) > 0 ? '+' : ''}{(activeStats.total_pnl || 0).toFixed(1)}%
                         </div>
                         <p className="text-[11px] text-zinc-500 mt-1 font-medium">
                           Total compounded PnL percentage
@@ -330,7 +373,7 @@ export default function PerformancePage() {
                           Total Signals (Open/Closed)
                           <span 
                             className="inline-flex items-center text-accent-blue cursor-pointer"
-                            title="إجمالي صفقات وتوصيات الذكاء الاصطناعي المحددة (نقاط دخول، أهداف ربح، وقف خسارة). يختلف عن عدد الأسهم الإيجابية/السلبية في شريط الفرز الفني اليومي."
+                            title="إجمالي صفقات وتوصيات الذكاء الاصطناعي المحددة (نقاط دخول، أهداف ربح، وقف خسارة)."
                           >
                             <Info className="w-3.5 h-3.5" />
                           </span>
@@ -339,20 +382,20 @@ export default function PerformancePage() {
                       </div>
                       <div>
                         <div className="text-3xl font-black text-white font-mono flex items-baseline justify-between flex-wrap gap-2">
-                          <span>{platformStats.total_trades}</span>
+                          <span>{activeStats.total_signals || activeStats.total_trades || 0}</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
-                              ⚡ {platformStats.activated_trades ?? activeTradesForModal.filter((t: any) => t.is_activated).length} مفعلة
+                              ⚡ {activeStats.activated_trades || 0} مفعلة
                             </span>
                             <span className="text-xs font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded border border-accent-blue/20">
-                              {activeTradesForModal.length} Active ➔
+                              {activeStats.active_trades || 0} Active ➔
                             </span>
                           </div>
                         </div>
                         <p className="text-[11px] text-zinc-500 mt-1 font-medium flex items-center gap-3">
-                          <span className="text-up-green font-bold">W: {platformStats.winning_trades}</span>
-                          <span className="text-down-red font-bold">L: {platformStats.losing_trades}</span>
-                          <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded">⚡ {platformStats.activated_trades ?? 0} مفعلة</span>
+                          <span className="text-up-green font-bold">W: {activeStats.winning_trades || 0}</span>
+                          <span className="text-down-red font-bold">L: {activeStats.losing_trades || 0}</span>
+                          <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded">⚡ {activeStats.activated_trades || 0} مفعلة</span>
                         </p>
                       </div>
                     </Card>

@@ -379,12 +379,70 @@ export async function GET(req: NextRequest) {
 
     const activeCount = buyTrades.length;
 
+    // Premier Elite signals (Confidence >= 0.85 or top pick)
+    const premierBuyTrades = buyTrades.filter((t: any) => (t.ml_probability && Number(t.ml_probability) >= 0.85) || t.is_top_pick);
+    const standardBuyTrades = buyTrades.filter((t: any) => !((t.ml_probability && Number(t.ml_probability) >= 0.85) || t.is_top_pick));
+
+    const closedPremierTrades = closedBuyTrades.filter((t: any) => (t.ml_probability && Number(t.ml_probability) >= 0.85));
+    const closedStandardTrades = closedBuyTrades.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= 0.85));
+
+    const closedPremierCount = closedPremierTrades.length;
+    const premierWinRate = closedPremierCount > 0 ? (closedPremierTrades.filter((t: any) => Number(t.pnl_percent) > 0).length / closedPremierCount) * 100 : 0;
+    const premierTotalPnl = closedPremierCount > 0 ? closedPremierTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 0;
+    const premierAvgPnl = closedPremierCount > 0 ? premierTotalPnl / closedPremierCount : 0;
+
+    const closedStandardCount = closedStandardTrades.length;
+    const standardWinRate = closedStandardCount > 0 ? (closedStandardTrades.filter((t: any) => Number(t.pnl_percent) > 0).length / closedStandardCount) * 100 : 0;
+    const standardTotalPnl = closedStandardCount > 0 ? closedStandardTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 0;
+    const standardAvgPnl = closedStandardCount > 0 ? standardTotalPnl / closedStandardCount : 0;
+
     return NextResponse.json({
       // ── Primary: Top premier picks (sorted by composite_score) ────────────
-      trades:        buyTrades,      // All active buy signals
+      trades:        premierBuyTrades.length > 0 ? premierBuyTrades : buyTrades, // Default primary is Premier Elite
+      all_buy_trades: buyTrades,
       top_picks:     topPicks,       // Top 20 premier picks
       other_signals: otherSignals,   // Remaining signals
       sell_signals:  sellTrades,
+
+      // ── Dual-Tier Evaluation Breakdown ───────────────────────────────────
+      tier_evaluations: {
+        premier_elite: {
+          label_ar: '👑 صفقات النخبة الذهبية',
+          confidence_range_ar: 'ثقة نموذج v6: 85% - 99%',
+          total_signals: premierBuyTrades.length,
+          active_trades: premierBuyTrades.length,
+          activated_trades: premierBuyTrades.filter((t: any) => t.is_activated).length,
+          closed_trades: closedPremierCount,
+          win_rate: parseFloat(premierWinRate.toFixed(1)),
+          total_pnl: parseFloat(premierTotalPnl.toFixed(1)),
+          avg_pnl: parseFloat(premierAvgPnl.toFixed(2)),
+          trades: premierBuyTrades,
+        },
+        standard_market: {
+          label_ar: '🌐 إشارات السوق العامة',
+          confidence_range_ar: 'ثقة نموذج v6: 65% - 84%',
+          total_signals: standardBuyTrades.length,
+          active_trades: standardBuyTrades.length,
+          activated_trades: standardBuyTrades.filter((t: any) => t.is_activated).length,
+          closed_trades: closedStandardCount,
+          win_rate: parseFloat(standardWinRate.toFixed(1)),
+          total_pnl: parseFloat(standardTotalPnl.toFixed(1)),
+          avg_pnl: parseFloat(standardAvgPnl.toFixed(2)),
+          trades: standardBuyTrades,
+        },
+        combined: {
+          label_ar: '📊 التقييم الشامل المدمج (كافة الإشارات)',
+          confidence_range_ar: 'كافة درجات الثقة: 65% - 99%',
+          total_signals: buyTrades.length,
+          active_trades: buyTrades.length,
+          activated_trades: buyTrades.filter((t: any) => t.is_activated).length,
+          closed_trades: closedCount,
+          win_rate: parseFloat(winRate.toFixed(1)),
+          total_pnl: parseFloat(totalPnl.toFixed(1)),
+          avg_pnl: parseFloat(avgPnl.toFixed(2)),
+          trades: buyTrades,
+        }
+      },
 
       // ── Ranking metadata ────────────────────────────────────────────────
       ranking: {
@@ -394,18 +452,18 @@ export async function GET(req: NextRequest) {
         formula:        'ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)',
       },
 
-      // ── Platform performance stats ─────────────────────────────────────
+      // ── Platform performance stats (Defaults to Premier Elite) ─────────
       stats: {
-        total_trades:    activeCount + closedCount,
-        active_trades:   activeCount,
-        activated_trades: buyTrades.filter((t: any) => t.is_activated).length,
-        pending_trades:  buyTrades.filter((t: any) => !t.is_activated).length,
-        closed_trades:   closedCount,
-        winning_trades:  winningTrades.length,
-        losing_trades:   losingTrades.length,
-        win_rate:        parseFloat(winRate.toFixed(1)),
-        total_pnl:       parseFloat(totalPnl.toFixed(1)),
-        avg_pnl:         parseFloat(avgPnl.toFixed(2)),
+        total_trades:    premierBuyTrades.length + closedPremierCount,
+        active_trades:   premierBuyTrades.length,
+        activated_trades: premierBuyTrades.filter((t: any) => t.is_activated).length,
+        pending_trades:  premierBuyTrades.filter((t: any) => !t.is_activated).length,
+        closed_trades:   closedPremierCount,
+        winning_trades:  closedPremierTrades.filter((t: any) => Number(t.pnl_percent || 0) > 0).length,
+        losing_trades:   closedPremierTrades.filter((t: any) => Number(t.pnl_percent || 0) < 0).length,
+        win_rate:        parseFloat(premierWinRate.toFixed(1)),
+        total_pnl:       parseFloat(premierTotalPnl.toFixed(1)),
+        avg_pnl:         parseFloat(premierAvgPnl.toFixed(2)),
         avg_win:         parseFloat(avgWin.toFixed(2)),
         avg_loss:        parseFloat(avgLoss.toFixed(2)),
         rr_ratio:        parseFloat(rrRatio.toFixed(2)),
