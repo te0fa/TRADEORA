@@ -73,17 +73,17 @@ export async function GET(req: NextRequest) {
       is_today:   latest.trade_date === todayStr,
 
       // ── TABLE 1: Total by Nationality ──────────────────────────────────
-      egyptian_total_buy:  n(latest, 'egyptian_total_buy_egp',  'egyptians_total_buy_egp'),
-      egyptian_total_sell: n(latest, 'egyptian_total_sell_egp', 'egyptians_total_sell_egp'),
-      egyptian_total_net:  n(latest, 'egyptian_total_net_egp',  'egyptians_total_net_egp'),
+      egyptian_total_buy:  n(latest, 'egyptians_total_buy_egp', 'egyptian_total_buy_egp'),
+      egyptian_total_sell: n(latest, 'egyptians_total_sell_egp', 'egyptian_total_sell_egp'),
+      egyptian_total_net:  n(latest, 'egyptians_total_net_egp', 'egyptian_total_net_egp'),
 
-      arab_total_buy:  n(latest, 'arab_total_buy_egp', 'arab_buy_egp'),
-      arab_total_sell: n(latest, 'arab_total_sell_egp', 'arab_sell_egp'),
-      arab_total_net:  n(latest, 'arab_total_net_egp', 'arab_net_egp'),
+      arab_total_buy:  n(latest, 'arab_buy_egp', 'arab_total_buy_egp'),
+      arab_total_sell: n(latest, 'arab_sell_egp', 'arab_total_sell_egp'),
+      arab_total_net:  n(latest, 'arab_net_egp', 'arab_total_net_egp'),
 
-      foreigners_total_buy:  n(latest, 'foreigners_total_buy_egp', 'foreigners_buy_egp'),
-      foreigners_total_sell: n(latest, 'foreigners_total_sell_egp','foreigners_sell_egp'),
-      foreigners_net:        n(latest, 'foreigners_total_net_egp', 'foreigners_net_egp'),
+      foreigners_total_buy:  n(latest, 'foreigners_buy_egp', 'foreigners_total_buy_egp'),
+      foreigners_total_sell: n(latest, 'foreigners_sell_egp', 'foreigners_total_sell_egp'),
+      foreigners_net:        n(latest, 'foreigners_net_egp', 'foreigners_total_net_egp'),
 
       // ── TABLE 2: Retail Investors ─────────────────────────────────────
       egyptian_ind_buy:  n(latest, 'egyptian_ind_buy_egp'),
