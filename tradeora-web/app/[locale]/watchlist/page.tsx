@@ -24,26 +24,45 @@ export default function WatchlistPage() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push(`/${locale}/auth`);
-        return;
+      let rawWatchlist: any[] = [];
+
+      if (user) {
+        const { data, error } = await supabase
+          .from('watchlists')
+          .select(`
+            id, symbol, added_at,
+            companies (
+              id, name_ar, name_en, sector
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('added_at', { ascending: false });
+        if (!error && data) {
+          rawWatchlist = data;
+        }
       }
 
-      const { data, error } = await supabase
-        .from('watchlists')
-        .select(`
-          id, symbol, added_at,
-          companies (
-            id, name_ar, name_en, sector
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('added_at', { ascending: false });
+      // Guest fallback using localStorage if no user or empty DB watchlist
+      if (rawWatchlist.length === 0 && typeof window !== 'undefined') {
+        const stored = localStorage.getItem('tradeora_watchlist');
+        const localSymbols: string[] = stored ? JSON.parse(stored) : [];
+        if (localSymbols.length > 0) {
+          const { data: localCompanies } = await supabase
+            .from('companies')
+            .select('id, symbol, name_ar, name_en, sector')
+            .in('symbol', localSymbols);
 
-      if (error) throw error;
+          rawWatchlist = (localCompanies || []).map((c: any) => ({
+            id: c.id,
+            symbol: c.symbol,
+            added_at: new Date().toISOString(),
+            companies: c
+          }));
+        }
+      }
 
       const enriched = await Promise.all(
-        (data ?? []).map(async (w: any) => {
+        (rawWatchlist ?? []).map(async (w: any) => {
           if (!w.companies?.id) return { ...w, close: 0, change: 0 };
           
           const { data: price } = await supabase

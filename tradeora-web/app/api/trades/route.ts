@@ -95,12 +95,9 @@ export async function GET(req: NextRequest) {
 
       const entry = Number(t.entry_price || 0);
 
-      // Balanced direction distribution (75% BUY, 25% SELL for active trading market)
       const hashIdx = (t.symbol || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-      const isExplicitSell = (t.direction || '').toLowerCase() === 'sell' && t.tp1 && Number(t.tp1) < entry;
-      const isSellSignal = isExplicitSell || (hashIdx % 4 === 3);
-      const isBuy = !isSellSignal;
-      const normalizedDirection = isBuy ? 'buy' : 'sell';
+      const normalizedDirection = (t.direction || 'buy').toLowerCase();
+      const isBuy = normalizedDirection === 'buy';
 
       const snap = t.features_snapshot || {};
       let orderType = 'MARKET';
@@ -360,8 +357,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       // ── Primary: Top premier picks (sorted by composite_score) ────────────
-      trades:        topPicks,       // Top picks by composite_score
-      top_picks:     topPicks,       // Alias
+      trades:        buyTrades,      // All active buy signals
+      top_picks:     topPicks,       // Top 20 premier picks
       other_signals: otherSignals,   // Remaining signals
       sell_signals:  sellTrades,
 

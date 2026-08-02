@@ -116,12 +116,17 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }: any) => {
-      if (!user) {
-        router.replace(`/${locale}/auth`);
-        return;
+      if (user) {
+        setUser(user);
+        fetchUserTrades(user.id);
+      } else {
+        // Guest mode using localStorage for portfolio tracking
+        setUser({ id: 'guest_user' });
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('tradeora_user_trades') : null;
+        const localTrades = stored ? JSON.parse(stored) : [];
+        setTrades(localTrades);
+        setLoading(false);
       }
-      setUser(user);
-      fetchUserTrades(user.id);
     });
   }, [router, locale]);
 
