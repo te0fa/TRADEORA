@@ -74,9 +74,9 @@ export async function GET(req: NextRequest) {
       egyptian_total_sell: n(latest, 'egyptian_total_sell_egp', 'egyptians_total_sell_egp'),
       egyptian_total_net:  n(latest, 'egyptian_total_net_egp',  'egyptians_total_net_egp'),
 
-      arab_total_buy:  n(latest, 'arab_total_buy_egp'),
-      arab_total_sell: n(latest, 'arab_total_sell_egp'),
-      arab_total_net:  n(latest, 'arab_total_net_egp'),
+      arab_total_buy:  n(latest, 'arab_total_buy_egp', 'arab_buy_egp'),
+      arab_total_sell: n(latest, 'arab_total_sell_egp', 'arab_sell_egp'),
+      arab_total_net:  n(latest, 'arab_total_net_egp', 'arab_net_egp'),
 
       foreigners_total_buy:  n(latest, 'foreigners_total_buy_egp', 'foreigners_buy_egp'),
       foreigners_total_sell: n(latest, 'foreigners_total_sell_egp','foreigners_sell_egp'),
@@ -111,8 +111,7 @@ export async function GET(req: NextRequest) {
       total_volume: n(latest, 'total_volume_egp'),
     };
 
-    // ── Derive totals if individual tables have data but total is missing ──
-    // (handles edge case where only Retail + Inst tables were scraped)
+    // ── Derive missing values dynamically ─────────────────────────────────────
     if (exactLatest.egyptian_total_buy === 0 && exactLatest.egyptian_ind_buy > 0) {
       exactLatest.egyptian_total_buy  = exactLatest.egyptian_ind_buy  + exactLatest.egyptian_inst_buy;
       exactLatest.egyptian_total_sell = exactLatest.egyptian_ind_sell + exactLatest.egyptian_inst_sell;
@@ -127,6 +126,19 @@ export async function GET(req: NextRequest) {
       exactLatest.foreigners_total_buy  = exactLatest.foreign_ind_buy  + exactLatest.foreign_inst_buy;
       exactLatest.foreigners_total_sell = exactLatest.foreign_ind_sell + exactLatest.foreign_inst_sell;
       exactLatest.foreigners_net        = exactLatest.foreign_ind_net  + exactLatest.foreign_inst_net;
+    }
+
+    // Derive Retail Arabs if Total and Inst exist
+    if (exactLatest.arab_ind_buy === 0 && exactLatest.arab_total_buy > 0) {
+      exactLatest.arab_ind_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
+      exactLatest.arab_ind_sell = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
+      exactLatest.arab_ind_net  = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
+    }
+    // Derive Retail Foreigners if Total and Inst exist
+    if (exactLatest.foreign_ind_buy === 0 && exactLatest.foreigners_total_buy > 0) {
+      exactLatest.foreign_ind_buy  = Math.max(0, exactLatest.foreigners_total_buy  - exactLatest.foreign_inst_buy);
+      exactLatest.foreign_ind_sell = Math.max(0, exactLatest.foreigners_total_sell - exactLatest.foreign_inst_sell);
+      exactLatest.foreign_ind_net  = exactLatest.foreigners_net        - exactLatest.foreign_inst_net;
     }
 
     // ── Pie charts from REAL values ────────────────────────────────────────
