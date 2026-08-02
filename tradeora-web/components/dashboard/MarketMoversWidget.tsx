@@ -157,10 +157,10 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
   }
 
   // ── Live 10-minute countdown for official halt ───────────────────────────
-  function HaltBadge({ st }: { st: StockMover }) {
+  function HaltBadge({ st }: { st: StockMover & { halt_source?: string } }) {
     if (!st.is_halted) return null;
 
-    // halt_time_sec: exact Unix time of EGX halt announcement
+    // halt_time_sec: exact Unix time of halt (from TV flag or EGX bulletin DB)
     const haltTime = st.halt_time_sec || (nowSec - 300);
     const elapsed = nowSec - haltTime;
     const remaining = Math.max(0, 600 - elapsed); // 600s = 10 minutes
@@ -168,6 +168,13 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
     const mins = Math.floor(remaining / 60);
     const secs = remaining % 60;
     const pad = (n: number) => String(n).padStart(2, '0');
+
+    // Source label shown in badge
+    const sourceTag = st.halt_source === 'tradingview_official'
+      ? '📡 TradingView'
+      : st.halt_source === 'egx_bulletin_db'
+      ? '🏛️ بيان البورصة'
+      : '⏸️';
 
     if (remaining <= 0) {
       return (
@@ -180,7 +187,7 @@ export function MarketMoversWidget({ locale }: MarketMoversProps) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 mt-0.5 font-mono">
         <Clock className="w-3 h-3 shrink-0 animate-pulse" />
-        ⏸️ إيقاف رسمى · متبقي {pad(mins)}:{pad(secs)}
+        {sourceTag} إيقاف · متبقي {pad(mins)}:{pad(secs)}
       </span>
     );
   }

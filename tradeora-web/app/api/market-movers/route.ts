@@ -15,6 +15,7 @@ async function fetchTVScannerLive(): Promise<{
   low: number;
   open: number;
   nameEn: string;
+  isTradingHalted: boolean;
 }[]> {
   const payload = {
     filter: [
@@ -24,7 +25,19 @@ async function fetchTVScannerLive(): Promise<{
     ],
     options: { lang: 'en' },
     symbols: { query: { types: [] }, tickers: [] },
-    columns: ['name', 'description', 'close', 'change', 'change_abs', 'open', 'high', 'low', 'volume', 'value'],
+    columns: [
+      'name',              // d[0]
+      'description',       // d[1]
+      'close',             // d[2]
+      'change',            // d[3] change %
+      'change_abs',        // d[4]
+      'open',              // d[5]
+      'high',              // d[6]
+      'low',               // d[7]
+      'volume',            // d[8]
+      'value',             // d[9]
+      'is_trading_halted', // d[10] ← REAL halt flag from TradingView (official EGX halt)
+    ],
     sort: { sortBy: 'change', sortOrder: 'desc' },
     range: [0, 500]
   };
@@ -77,9 +90,11 @@ async function fetchTVScannerLive(): Promise<{
           const low = Number(d[7] || close);
           const volume = Number(d[8] || 0);
           const value = Number(d[9] || close * volume);
+          // d[10] = is_trading_halted — REAL official halt flag from TradingView/EGX
+          const isTradingHalted = Boolean(d[10]);
           // Strict: skip stocks with 0 price or 0 volume (DCRC, etc.)
           if (close <= 0 || volume <= 0) continue;
-          rows.push({ sym, close, changePct, volume, value, high, low, open, nameEn: String(d[1] || sym) });
+          rows.push({ sym, close, changePct, volume, value, high, low, open, nameEn: String(d[1] || sym), isTradingHalted });
         }
         if (rows.length > 0) return rows;
       }
@@ -131,8 +146,20 @@ export async function GET(req: NextRequest) {
       // ✅ TV Scanner returned live data — use it directly
       for (const row of tvRows) {
         const co = companyMap.get(row.sym);
-        const haltTimeSec = haltMap.get(row.sym) || null;
-        const isHalted = haltMap.has(row.sym);
+
+        // ⭐ REAL halt detection priority:
+        //   1st: is_trading_halted from TradingView (official EGX circuit breaker flag)
+        //   2nd: DB halt news table as secondary (if TV scanner didn't return halted)
+        const isTvHalted = row.isTradingHalted === true;
+        const isDbHalted = haltMap.has(row.sym);
+        const isHalted = isTvHalted || isDbHalted;
+
+        // halt_time_sec: use DB timestamp if available, otherwise use now (when TV flags it)
+        const haltTimeSec = haltMap.get(row.sym) ||
+          (isTvHalted ? Math.floor(Date.now() / 1000) : null);
+
+        const haltSource = isTvHalted ? 'tradingview_official' : isDbHalted ? 'egx_bulletin_db' : null;
+
         let volatilityPct = row.low > 0 && row.high > 0
           ? Number((((row.high - row.low) / row.low) * 100).toFixed(2))
           : Math.abs(row.changePct);
@@ -150,6 +177,7 @@ export async function GET(req: NextRequest) {
           turnover_egp: row.value,
           is_halted: isHalted,
           halt_time_sec: haltTimeSec,
+          halt_source: haltSource, // 'tradingview_official' | 'egx_bulletin_db' | null
           source: 'tv_live',
         });
       }
