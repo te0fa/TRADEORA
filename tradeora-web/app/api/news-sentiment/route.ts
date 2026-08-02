@@ -45,8 +45,8 @@ export async function GET(req: NextRequest) {
 
     let sentimentScore = 0.0;
     if (corpNews && corpNews.length > 0) {
-      const pos = corpNews.filter(n => n.sentiment === 'positive').length;
-      const neg = corpNews.filter(n => n.sentiment === 'negative').length;
+      const pos = corpNews.filter((n: any) => n.sentiment === 'positive').length;
+      const neg = corpNews.filter((n: any) => n.sentiment === 'negative').length;
       sentimentScore = (pos - neg) / corpNews.length;
     }
 
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       
     let sectorSentimentScore = 0.0;
     if (sectorCompanies && sectorCompanies.length > 0) {
-      const coIds = sectorCompanies.map(c => c.id);
+      const coIds = sectorCompanies.map((c: any) => c.id);
       const { data: sectorNews } = await supabase
         .from('company_news')
         .select('sentiment')
@@ -68,8 +68,8 @@ export async function GET(req: NextRequest) {
         .gte('published_at', fiveDaysAgoStr);
 
       if (sectorNews && sectorNews.length > 0) {
-        const pos = sectorNews.filter(n => n.sentiment === 'positive').length;
-        const neg = sectorNews.filter(n => n.sentiment === 'negative').length;
+        const pos = sectorNews.filter((n: any) => n.sentiment === 'positive').length;
+        const neg = sectorNews.filter((n: any) => n.sentiment === 'negative').length;
         sectorSentimentScore = (pos - neg) / sectorNews.length;
       }
     }
@@ -84,10 +84,10 @@ export async function GET(req: NextRequest) {
     const macroScores = { fx: 0.0, rate: 0.0, geo: 0.0 };
     if (macroNews && macroNews.length > 0) {
       for (const cat of ['macro_fx', 'macro_rate', 'macro_geopolitical'] as const) {
-        const catNews = macroNews.filter(n => n.category === cat);
+        const catNews = macroNews.filter((n: any) => n.category === cat);
         if (catNews.length > 0) {
-          const pos = catNews.filter(n => n.sentiment === 'positive').length;
-          const neg = catNews.filter(n => n.sentiment === 'negative').length;
+          const pos = catNews.filter((n: any) => n.sentiment === 'positive').length;
+          const neg = catNews.filter((n: any) => n.sentiment === 'negative').length;
           const key = cat === 'macro_fx' ? 'fx' : cat === 'macro_rate' ? 'rate' : 'geo';
           macroScores[key] = (pos - neg) / catNews.length;
         }

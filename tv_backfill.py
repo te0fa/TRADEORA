@@ -27,6 +27,12 @@ if not url or not key:
     logger.error("Missing SUPABASE_URL or SUPABASE_KEY in environment variables.")
     sys.exit(1)
 
+# EGX Weekend Guard (Friday = 4, Saturday = 5 in Python weekday())
+today_weekday = datetime.now().weekday()
+if today_weekday in (4, 5):
+    logger.info(f"☕ Today is EGX Weekend (Friday/Saturday). Market is closed. Exiting cleanly.")
+    sys.exit(0)
+
 sb: Client = create_client(url, key)
 
 # TradingView credentials (optional)

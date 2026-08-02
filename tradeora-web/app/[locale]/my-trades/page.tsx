@@ -115,7 +115,7 @@ export default function MyTradesPage({ params }: MyTradesPageProps) {
   const [trailingPct, setTrailingPct] = useState(2);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: any) => {
       if (!user) {
         router.replace(`/${locale}/auth`);
         return;

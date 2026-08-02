@@ -14,9 +14,9 @@ export async function GET() {
       console.error('Error querying signal_stats in market-summary:', error);
     }
 
-    const buySignals = stats?.filter(s => s.win_rate_tp1 !== null && s.win_rate_tp1 > 0) ?? [];
+    const buySignals = (stats || []).filter((s: any) => s.win_rate_tp1 !== null && s.win_rate_tp1 > 0);
     
-    const rawSum = buySignals.reduce((sum, s) => {
+    const rawSum = buySignals.reduce((sum: number, s: any) => {
       const rate = Number(s.win_rate_tp1 ?? 0);
       return sum + (rate > 1 ? rate / 100 : rate);
     }, 0);
@@ -27,8 +27,8 @@ export async function GET() {
 
     return NextResponse.json({
       aiScore: avgWinRate !== null ? Math.round(avgWinRate) : null,
-      buyCount: stats?.filter(s => s.signal_type === 'buy').length ?? 0,
-      sellCount: stats?.filter(s => s.signal_type === 'sell').length ?? 0,
+      buyCount: (stats || []).filter((s: any) => s.signal_type === 'buy').length,
+      sellCount: (stats || []).filter((s: any) => s.signal_type === 'sell').length,
     });
   } catch (error: any) {
     console.error('Error in GET /api/market-summary:', error);

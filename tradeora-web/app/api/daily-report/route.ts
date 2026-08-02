@@ -18,7 +18,7 @@ export async function GET(req: Request) {
       .order('recommended_at', { ascending: false });
 
     const availableDatesSet = new Set<string>();
-    (dateRows || []).forEach(r => {
+    (dateRows || []).forEach((r: any) => {
       if (r.recommended_at) {
         availableDatesSet.add(r.recommended_at.split('T')[0]);
       }
@@ -63,10 +63,10 @@ export async function GET(req: Request) {
       .select('company_id, fair_value, upside_potential, dividend_yield, last_dividend_amount, pe_ratio');
 
     const funcMap = new Map();
-    (funcs || []).forEach(f => funcMap.set(f.company_id, f));
+    (funcs || []).forEach((f: any) => funcMap.set(f.company_id, f));
 
     // Combine trades with fundamentals and normalize target price & stop loss field names for DailyReportView
-    const enrichedTrades = (trades || []).map(t => {
+    const enrichedTrades = (trades || []).map((t: any) => {
       const f = t.company_id ? funcMap.get(t.company_id) : null;
       const tp1 = t.target_price_1 ?? t.tp1 ?? null;
       const tp2 = t.target_price_2 ?? t.tp2 ?? null;
@@ -86,8 +86,8 @@ export async function GET(req: Request) {
     });
 
     // Categorize Buy and Sell/Caution recommendations
-    let buyTrades = enrichedTrades.filter(t => t.trade_type === 'BUY' || t.direction === 'buy');
-    let sellTrades = enrichedTrades.filter(t => t.trade_type === 'SELL' || t.direction === 'sell');
+    let buyTrades = enrichedTrades.filter((t: any) => t.trade_type === 'BUY' || t.direction === 'buy');
+    let sellTrades = enrichedTrades.filter((t: any) => t.trade_type === 'SELL' || t.direction === 'sell');
 
     // Fetch market overview stats
     const { data: priceData } = await supabase
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
     let losing = 0;
     let unchanged = 0;
 
-    (priceData || []).forEach(p => {
+    (priceData || []).forEach((p: any) => {
       if (p.change_percent > 0) gaining++;
       else if (p.change_percent < 0) losing++;
       else unchanged++;

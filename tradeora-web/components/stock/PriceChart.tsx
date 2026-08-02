@@ -197,7 +197,7 @@ async function fetchYahooCandles(symbol: string, interval: string): Promise<{ ca
         .limit(1000);
 
       if (dbSnapshots && dbSnapshots.length > 0) {
-        const candles = dbSnapshots.map(s => ({
+        const candles = (dbSnapshots as any[]).map((s: any) => ({
           time: new Date(s.snapshot_time).getTime() / 1000,
           open: Number(s.open_price || s.price),
           high: Number(s.high_price || s.price),
@@ -441,14 +441,14 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
       console.error('Error loading config in PriceChart:', e);
     }
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: any) => {
       if (!user) return;
       supabase
         .from('user_profiles')
         .select('default_capital, default_risk_pct')
         .eq('id', user.id)
         .maybeSingle()
-        .then(({ data }) => {
+        .then(({ data }: any) => {
           if (data?.default_capital) setUserCapital(Number(data.default_capital));
           if (data?.default_risk_pct) setUserRiskPercent(Number(data.default_risk_pct));
         });
@@ -817,19 +817,27 @@ function buildIntradayChunk(chunk: any[]): any {
           lastCandle.volume = liveStockPrice.volume;
         }
       } else if (liveStockPrice) {
-        cleaned.push({
-          time: todayStr,
-          price_date: todayStr,
-          open: liveStockPrice.open || livePriceVal,
-          open_price: liveStockPrice.open || livePriceVal,
-          high: liveStockPrice.high || livePriceVal,
-          high_price: liveStockPrice.high || livePriceVal,
-          low: liveStockPrice.low || livePriceVal,
-          low_price: liveStockPrice.low || livePriceVal,
-          close: livePriceVal,
-          close_price: livePriceVal,
-          volume: liveStockPrice.volume || 0
-        });
+        // Prevent appending synthetic live candle on weekends OR official holidays when no actual trading occurred
+        const todayDateObj = new Date();
+        const currentDay = todayDateObj.getDay();
+        const isEGXWeekend = currentDay === 5 || currentDay === 6;
+        const hasTradingVolumeToday = (liveStockPrice.volume ?? 0) > 0;
+
+        if (!isEGXWeekend && hasTradingVolumeToday) {
+          cleaned.push({
+            time: todayStr,
+            price_date: todayStr,
+            open: liveStockPrice.open || livePriceVal,
+            open_price: liveStockPrice.open || livePriceVal,
+            high: liveStockPrice.high || livePriceVal,
+            high_price: liveStockPrice.high || livePriceVal,
+            low: liveStockPrice.low || livePriceVal,
+            low_price: liveStockPrice.low || livePriceVal,
+            close: livePriceVal,
+            close_price: livePriceVal,
+            volume: liveStockPrice.volume || 0
+          });
+        }
       }
     }
 

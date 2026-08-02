@@ -1,4 +1,18 @@
 import pool from './db';
+import { createClient as createOriginalClient, SupabaseClient } from '@supabase/supabase-js';
+
+const DEFAULT_SUPABASE_URL = 'https://kdjsguozssxvtmlmqhpz.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkanNndW96c3N4dnRtbG1xaHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NzM0MDMsImV4cCI6MjA5OTQ0OTQwM30.kTSTIVQedOCupcjwidSOca4_m4s6Qp2Wh5t1Zi7_Wmg';
+
+let _rawSupabaseClient: SupabaseClient | null = null;
+export function getRawSupabaseClient(): SupabaseClient {
+  if (!_rawSupabaseClient) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_ANON_KEY;
+    _rawSupabaseClient = createOriginalClient(supabaseUrl, supabaseAnonKey);
+  }
+  return _rawSupabaseClient;
+}
 
 class PostgresQueryBuilder<T = any> implements PromiseLike<{ data: T[] | T | null; error: any }> {
   private tableName: string;
@@ -117,6 +131,36 @@ class PostgresQueryBuilder<T = any> implements PromiseLike<{ data: T[] | T | nul
     }
   }
 
+  private syncToSupabaseInBackground() {
+    try {
+      const sb = getRawSupabaseClient() as any;
+      let query = sb.from(this.tableName);
+
+      if (this.actionType === 'insert') {
+        query.insert(this.payload).then().catch(() => {});
+      } else if (this.actionType === 'upsert') {
+        query.upsert(this.payload, { onConflict: this.upsertConflict }).then().catch(() => {});
+      } else if (this.actionType === 'update') {
+        let updateQuery = query.update(this.payload);
+        for (const cond of this.whereConditions) {
+          if (cond.op === '=') updateQuery = updateQuery.eq(cond.col, cond.val);
+          else if (cond.op === 'IN') updateQuery = updateQuery.in(cond.col, cond.val);
+        }
+        updateQuery.then().catch(() => {});
+      } else if (this.actionType === 'delete') {
+        let deleteQuery = query.delete();
+        for (const cond of this.whereConditions) {
+          if (cond.op === '=') deleteQuery = deleteQuery.eq(cond.col, cond.val);
+          else if (cond.op === 'IN') deleteQuery = deleteQuery.in(cond.col, cond.val);
+          else if (cond.op === '<') deleteQuery = deleteQuery.lt(cond.col, cond.val);
+        }
+        deleteQuery.then().catch(() => {});
+      }
+    } catch (e) {
+      // Ignore background sync errors if Supabase is temporarily offline
+    }
+  }
+
   private async execute(): Promise<{ data: any; error: any }> {
     let sql = '';
     const values: any[] = [];
@@ -209,6 +253,11 @@ class PostgresQueryBuilder<T = any> implements PromiseLike<{ data: T[] | T | nul
       sql = `UPDATE "${this.tableName}" SET ${setClauses}` + buildWhere() + ` RETURNING *`;
     } else if (this.actionType === 'delete') {
       sql = `DELETE FROM "${this.tableName}"` + buildWhere() + ` RETURNING *`;
+    }
+
+    // Perform Dual-Write background sync for write operations (insert, upsert, update, delete)
+    if (this.actionType !== 'select') {
+      this.syncToSupabaseInBackground();
     }
 
     try {

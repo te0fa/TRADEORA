@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch sector companies' }, { status: 500 });
     }
 
-    const companyIds = companies.map(c => c.id);
+    const companyIds = (companies as any[]).map((c: any) => c.id);
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 

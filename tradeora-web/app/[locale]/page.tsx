@@ -16,6 +16,7 @@ import {
   Info
 } from 'lucide-react';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
+import { MarketMoversWidget } from '@/components/dashboard/MarketMoversWidget';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -63,6 +64,12 @@ export default function DashboardPage({ params }: Props) {
   // Sector Map state
   const [sectors, setSectors] = useState<any[]>([]);
 
+  // Foreign Investor Flows state
+  const [investorFlows, setInvestorFlows] = useState<any>(null);
+
+  // Market Breadth state
+  const [marketBreadth, setMarketBreadth] = useState<any>(null);
+
   // Count animations
   const [analyzedStocks, setAnalyzedStocks] = useState(0);
   const [signalsTested, setSignalsTested] = useState(0);
@@ -71,7 +78,7 @@ export default function DashboardPage({ params }: Props) {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: any) => {
       if (user) {
         const done = localStorage.getItem('onboarding_done');
         if (!done) setShowOnboarding(true);
@@ -82,6 +89,7 @@ export default function DashboardPage({ params }: Props) {
     fetchTopSignals();
     fetchSectors();
     fetchMarketSummary();
+    fetchInvestorFlows();
 
     const fetchLiveIndices = async () => {
       // 1. Direct TradingView Scanner fetch from browser for instant 0-lag live updates
@@ -119,6 +127,8 @@ export default function DashboardPage({ params }: Props) {
     };
 
     fetchLiveIndices();
+    fetchInvestorFlows();
+    fetchMarketBreadth();
     const indexIntervalId = setInterval(fetchLiveIndices, 3000);
 
     // Heavy database data polling (every 5 minutes)
@@ -161,6 +171,26 @@ export default function DashboardPage({ params }: Props) {
       if (data) setMarketSummary(data);
     } catch (e) {
       console.error('Error fetching market summary:', e);
+    }
+  }
+
+  async function fetchMarketBreadth() {
+    try {
+      const res = await fetch('/api/market-breadth');
+      const data = await res.json();
+      if (data?.success) setMarketBreadth(data.breadth);
+    } catch (e) {
+      console.error('Error fetching market breadth:', e);
+    }
+  }
+
+  async function fetchInvestorFlows() {
+    try {
+      const res = await fetch('/api/investor-flows');
+      const data = await res.json();
+      if (data?.success) setInvestorFlows(data);
+    } catch (e) {
+      console.error('Error fetching investor flows:', e);
     }
   }
 
@@ -349,6 +379,95 @@ export default function DashboardPage({ params }: Props) {
           <span className="text-down-red bg-down-red-bg px-2 py-0.5 rounded-md font-mono">{statsData.sellSignals} Sell</span>
           <span className="text-accent-blue bg-blue-500/10 px-2 py-0.5 rounded-md font-mono hidden sm:inline">Vol: {statsData.highestVolume} {statsData.highestVolumeName ? `(${statsData.highestVolumeName})` : ''}</span>
         </div>
+      </motion.div>
+
+      {/* ── Foreign Investor Flow Banner ── */}
+      {investorFlows?.latest && (
+        <motion.div variants={itemVariants} className="w-full glass-panel px-5 py-3.5 rounded-2xl mb-8 flex flex-wrap items-center justify-between gap-4 border border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🌍</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">
+                  {isAr ? 'تدفقات الأجانب والمؤسسات (EGX Official)' : 'Foreign & Institutional Flows'}
+                </span>
+                <span className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
+                  investorFlows.latest.foreigners_net >= 0 
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                }`}>
+                  {investorFlows.latest.foreigners_net >= 0 ? '🟢 أجانب يشترون' : '🔴 أجانب يبيعون'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                {investorFlows.recommendation_impact}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px]">{isAr ? 'صافي الأجانب' : 'Foreign Net'}</span>
+              <span className={`font-bold ${investorFlows.latest.foreigners_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {(investorFlows.latest.foreigners_net / 1e6).toFixed(1)}M ج.م
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px]">{isAr ? 'مؤسسات مصرية' : 'Egy Inst.'}</span>
+              <span className={`font-bold ${investorFlows.latest.egyptian_inst_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {(investorFlows.latest.egyptian_inst_net / 1e6).toFixed(1)}M ج.م
+              </span>
+            </div>
+            <button
+              onClick={() => router.push(`/${locale}/investor-flows`)}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-all text-xs"
+            >
+              {isAr ? 'تفاصيل التدفقات 📊' : 'View Flows'}
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Market Breadth & Health Banner ── */}
+      {marketBreadth && (
+        <motion.div variants={itemVariants} className="w-full glass-panel px-5 py-3.5 rounded-2xl mb-8 flex flex-wrap items-center justify-between gap-4 border border-blue-500/20 bg-blue-500/5">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📈</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">
+                  {isAr ? 'اتساع وصحة تداول السوق (Market Breadth)' : 'Market Breadth & Health'}
+                </span>
+                <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  {marketBreadth.market_health_status === 'strong_bullish' ? (isAr ? '🟢 صعود صحي ممتاز' : 'Strong Bullish') : (isAr ? '🔵 صعود معتدل' : 'Healthy Rally')}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                {isAr ? 'قياس مشاركة جميع أسهم البورصة لضمان عدم تركز الصعود في أسهم معينة.' : 'Measures market participation across all EGX stocks.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px]">{isAr ? 'أسهم صاعدة / هابطة' : 'Adv / Dec'}</span>
+              <span className="font-bold text-emerald-400">{marketBreadth.advance_count}🟢</span>
+              <span className="text-zinc-500 px-1">/</span>
+              <span className="font-bold text-rose-400">{marketBreadth.decline_count}🔴</span>
+            </div>
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px]">{isAr ? '% فوق متوسط 200' : '% > MA200'}</span>
+              <span className="font-bold text-cyan-400">{marketBreadth.pct_above_ma200}%</span>
+            </div>
+            <div className="text-right">
+              <span className="text-zinc-500 block text-[10px]">McClellan Oscillator</span>
+              <span className="font-bold text-amber-400">+{marketBreadth.mcclellan_oscillator}</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Top Market Movers Widget (Gainers, Losers, Most Active) ── */}
+      <motion.div variants={itemVariants} className="mb-8">
+        <MarketMoversWidget locale={locale} />
       </motion.div>
 
       {/* ── Hero Section ── */}

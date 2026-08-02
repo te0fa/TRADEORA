@@ -24,6 +24,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Run Real-time Intraday News & EGX Disclosures Scrapers
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python scrapers/egx_disclosures_insider_scraper.py || true
+        python scrapers/almal_news_scraper.py || true
+
     - name: Run Intraday Signal Scanner
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

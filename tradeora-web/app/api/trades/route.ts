@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Fetch latest prices for active companies
     const activeCompanyIds = Array.from(
-      new Set((trades || []).filter(t => t.company_id).map(t => t.company_id))
+      new Set((trades || []).filter((t: any) => t.company_id).map((t: any) => t.company_id))
     );
 
     const priceMap: Record<string, number> = {};

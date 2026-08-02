@@ -107,6 +107,8 @@ export function Navbar({ locale }: NavbarProps) {
 
   const navLinks = [
     { href: `/${locale}`, icon: Home, label: isAr ? 'الرئيسية' : 'Home', exact: true },
+    { href: `/${locale}/investor-flows`, icon: Globe, label: isAr ? 'تدفقات الأجانب' : 'Investor Flows', color: 'text-emerald-400' },
+    { href: `/${locale}/calendar`, icon: Clock, label: isAr ? 'الأجندة والنتائج' : 'Calendar', color: 'text-amber-400' },
     { href: `/${locale}/news`, icon: Newspaper, label: isAr ? 'الأخبار والإفصاحات' : 'News & Disclosures', color: 'text-cyan-400' },
     { href: `/${locale}/screener`, icon: Search, label: isAr ? 'الفرز' : 'Screener' },
     { href: `/${locale}/sectors`, icon: Briefcase, label: isAr ? 'القطاعات' : 'Sectors', color: 'text-blue-400' },

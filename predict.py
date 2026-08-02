@@ -616,4 +616,4 @@ if __name__ == "__main__":
                 f.write("\n")
         except Exception:
             pass
-        sys.exit(0)
+        sys.exit(1)

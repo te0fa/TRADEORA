@@ -8,6 +8,8 @@ import { PriceChart } from '@/components/stock/PriceChart';
 import { DataSourcesPanel } from '@/components/stock/DataSourcesPanel';
 import { StockFundamentals } from '@/components/stock/StockFundamentals';
 import { StockNewsPanel } from '@/components/stock/StockNewsPanel';
+import { Level2OrderBook } from '@/components/stock/Level2OrderBook';
+import { SeasonalityWidget } from '@/components/stock/SeasonalityWidget';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -276,6 +278,14 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
           priceRecord={company.priceRecord}
           liveTick={liveTick}
         />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <Level2OrderBook symbol={symbol} isAr={locale === 'ar'} />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <SeasonalityWidget symbol={symbol} isAr={locale === 'ar'} />
       </motion.div>
 
       <motion.div variants={itemVariants}>

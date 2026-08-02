@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Fetch latest prices for valuation
-    const companyIds = (companies || []).map(c => c.id);
+    const companyIds = (companies || []).map((c: any) => c.id);
     const { data: prices } = await supabase
       .from('market_prices')
       .select('company_id, close_price, price_date')

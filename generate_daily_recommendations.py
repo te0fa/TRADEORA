@@ -16,6 +16,7 @@ from services.fundamental_engine import calculate_fundamental_score
 from services.smart_money_engine import smart_money_engine
 from services.ict_smc_engine import ict_smc_engine
 from services.elliott_time_engine import elliott_time_engine
+from foreign_flow_analyzer import get_recent_flows, compute_flow_score
 
 # Configure logging
 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -51,8 +52,20 @@ _model_path  = f'models/model_1d_{MODEL_VERSION}.pkl'
 _scaler_path = f'models/scaler_1d_{MODEL_VERSION}.pkl'
 _meta_path   = f'models/model_{MODEL_VERSION}_metadata.json'
 
-# ─── Auto-upgrade to v4 if available (trained on clean data, 25 features) ───
-if os.path.exists('models/model_1d_v4.pkl'):
+# ─── Auto-upgrade to v5 if available (trained on 29 features + investor flows) ───
+if os.path.exists('models/model_1d_v6.pkl'):
+    logger.info("🚀 Model v6 (33 Features + VPOC + Seasonality + Investor Flows) detected – upgrading automatically")
+    MODEL_VERSION = 'v6'
+    _model_path  = 'models/model_1d_v6.pkl'
+    _scaler_path = 'models/scaler_1d_v6.pkl'
+    _meta_path   = 'models/model_v6_metadata.json'
+elif os.path.exists('models/model_1d_v5.pkl'):
+    logger.info("🚀 Model v5 (29 Features + Investor Flows) detected – upgrading automatically")
+    MODEL_VERSION = 'v5'
+    _model_path  = 'models/model_1d_v5.pkl'
+    _scaler_path = 'models/scaler_1d_v5.pkl'
+    _meta_path   = 'models/model_v5_metadata.json'
+elif os.path.exists('models/model_1d_v4.pkl'):
     logger.info("✨ Model v4 detected – upgrading automatically")
     MODEL_VERSION = 'v4'
     _model_path  = 'models/model_1d_v4.pkl'
@@ -93,6 +106,19 @@ else:
 # ─────────────────────────────────────────────
 
 # ── Technical Indicator & Feature Extraction ──────────────────────────────
+
+def json_clean_dict(obj):
+    if isinstance(obj, dict):
+        return {k: json_clean_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [json_clean_dict(v) for v in obj]
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    elif isinstance(obj, (np.integer, int)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, float)):
+        return float(obj) if not np.isnan(obj) else None
+    return obj
 
 def calc_rsi(closes, period=14):
     gains, losses = [], []
@@ -297,19 +323,6 @@ def fetch_canonical_candles(sb, company_id: str,
     Fetches clean, source-prioritized OHLCV candles via the official 
     Canonical Market Data Layer (services.canonical).
     """
-    # Duplicate Signal Check
-    existing = sb.table('recommended_trades') \
-                 .select('id') \
-                 .eq('company_id', company_id) \
-                 .in_('status', ['active', 'pending']) \
-                 .limit(1).execute()
-    if existing.data:
-        logger.info(
-            f"[{symbol}] Active signal already exists. "
-            f"Skipping new signal generation."
-        )
-        return []
-    
     return get_canonical_candles(sb, company_id, symbol, limit=limit, interval='1d')
 
 # ── Main Pipeline Function ──────────────────────────────────────
@@ -337,6 +350,32 @@ def generate_daily_recommendations():
     fund_map = {f['company_id']: f for f in fundamentals_res}
 
     logger.info(f"Loaded {len(companies)} ACTIVE companies for trade analysis.")
+
+    # 🌍 Foreign Investor Flow Signal & Boost Calculation
+    flow_data = get_recent_flows(days=30)
+    flow_analysis = compute_flow_score(flow_data)
+    flow_signal = flow_analysis.get('signal', 'neutral')
+    latest_net = flow_analysis.get('latest_net', 0.0)
+
+    flow_boost = 0.0
+    if latest_net >= 50_000_000:
+        flow_boost += 0.10
+        flow_signal = 'strong_buy'
+    elif latest_net >= 20_000_000:
+        flow_boost += 0.05
+        flow_signal = 'buy'
+    elif latest_net <= -50_000_000:
+        flow_boost -= 0.15
+        flow_signal = 'strong_sell'
+    elif latest_net <= -20_000_000:
+        flow_boost -= 0.05
+        flow_signal = 'sell'
+
+    # +5% Extra boost if 3 consecutive days of foreign net buying
+    if flow_analysis.get('trend') == 'bullish':
+        flow_boost += 0.05
+
+    logger.info(f"🌍 Foreign Investor Flow Analysis: signal={flow_signal}, boost={flow_boost:+.2f}, net={latest_net/1e6:.1f}M EGP")
 
     new_recs_count = 0
     updated_recs_count = 0
@@ -442,6 +481,9 @@ def generate_daily_recommendations():
         prob += elliott_info.get('ml_boost', 0.0)
         elliott_badge_ar = elliott_info.get('badge_ar')
 
+        # 9. EGX Foreign & Institutional Investor Flow Boost
+        prob += flow_boost
+
         prob = min(max(prob, 0.0), 0.99) # Clip between 0 and 0.99
 
         # ── BACKTEST-VALIDATED COMBINED GATE ─────────────────────────────────
@@ -466,6 +508,19 @@ def generate_daily_recommendations():
         if elliott_info.get('ml_boost', 0) > 0.01:
             _confirmations += 1
             _confirmation_sources.append('elliott')
+
+        # Volume Profile VPOC / VAH Confluence Check
+        try:
+            vp_res = sb.table("volume_profiles").select("vpoc, vah, val").eq("company_id", cid).order("calculated_at", desc=True).limit(1).execute()
+            if vp_res.data:
+                vpoc_val = float(vp_res.data[0]["vpoc"])
+                vah_val = float(vp_res.data[0]["vah"])
+                if last_close >= vpoc_val and last_close <= vah_val * 1.03:
+                    _confirmations += 1
+                    _confirmation_sources.append('volume_profile')
+                    prob += 0.05
+        except Exception:
+            pass
 
         # Assign timeframe based on confirmation strength
         # 4-5 confirmations → 3-5 day swing (best actual WR: 76.9%)
@@ -513,6 +568,7 @@ def generate_daily_recommendations():
             tp2_price = round(entry_price + 3.5 * atr_eff, decimals)
             rebound_zone = round(entry_price - 0.6 * atr_eff, decimals)
 
+            fair_val = co_fund.get('fair_value')
             # If Fair Value is significantly higher, align TP2 with Fair Value
             if fair_val and float(fair_val) > tp1_price:
                 tp2_price = min(round(float(fair_val), decimals), round(entry_price * 1.5, decimals))
@@ -552,7 +608,7 @@ def generate_daily_recommendations():
                 'macd_hist_prev': macd_res['hist_prev'],
                 'macd_crossover': macd_res['crossover'],
                 'macd_crossunder': macd_res['crossunder'],
-                'is_wyckoff_spring': is_wyckoff_spring,
+                'is_wyckoff_spring': bool(is_wyckoff_spring),
                 'wyckoff_badge_ar': wyckoff_badge_ar,
                 'wyckoff_boost': wyckoff_boost,
                 'pattern_badge_ar': pattern_badge_ar,
@@ -568,7 +624,11 @@ def generate_daily_recommendations():
                 # Backtest-validated fields
                 'confirmation_count': _confirmations,
                 'confirmation_sources': _confirmation_sources,
+                'flow_signal': flow_signal,
+                'flow_boost': flow_boost,
+                'foreigners_net_egp': latest_net,
             }
+            features_snap = json_clean_dict(features_snap)
 
             if cid in active_ids:
                 try:
@@ -634,7 +694,11 @@ def generate_daily_recommendations():
                 'macd_hist_prev': macd_res['hist_prev'],
                 'macd_crossover': macd_res['crossover'],
                 'macd_crossunder': macd_res['crossunder'],
+                'flow_signal': flow_signal,
+                'flow_boost': flow_boost,
+                'foreigners_net_egp': latest_net,
             }
+            features_snap_sell = json_clean_dict(features_snap_sell)
 
             if cid in active_ids:
                 try:
