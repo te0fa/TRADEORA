@@ -11,7 +11,7 @@ cockroach_sync.py
     python cockroach_sync.py --check     # مقارنة الأرقام بين الاثنين
 """
 
-import os, sys, logging, argparse
+import os, sys, json, logging, argparse
 from datetime import date, timedelta
 from dotenv import load_dotenv
 load_dotenv()
@@ -93,45 +93,70 @@ def sync_schema():
 # ══════════════════════════════════════════════════════════════
 # DATA SYNC (DML)
 # ══════════════════════════════════════════════════════════════
-def sync_table(table: str, pk: str, days_back: int = 90, date_col: str = None):
-    """Sync a table from Supabase → CockroachDB using upsert."""
+def serialize_row(row: dict) -> dict:
+    """Convert dict/list values to JSON strings for CockroachDB."""
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, (dict, list)):
+            out[k] = json.dumps(v, ensure_ascii=False)
+        else:
+            out[k] = v
+    return out
+
+
+def sync_table(table: str, pk: str, days_back: int = 90, date_col: str = None,
+               page_size: int = 5000):
+    """Sync a table from Supabase → CockroachDB using paginated upsert."""
     logger.info(f"  Syncing {table}...")
+    total_synced = 0
+    offset = 0
+
     try:
-        # Fetch from Supabase
-        q = sb.table(table).select('*')
-        if date_col:
-            since = (date.today() - timedelta(days=days_back)).isoformat()
-            q = q.gte(date_col, since)
-        q = q.order(pk, desc=True).limit(10000)
-        rows = q.execute().data or []
+        while True:
+            # Fetch page from Supabase
+            q = sb.table(table).select('*')
+            if date_col:
+                since = (date.today() - timedelta(days=days_back)).isoformat()
+                q = q.gte(date_col, since)
+            q = q.order(pk).range(offset, offset + page_size - 1)
+            rows = q.execute().data or []
 
-        if not rows:
-            logger.info(f"    No rows fetched from Supabase")
-            return 0
+            if not rows:
+                break
 
-        # Upsert into CockroachDB
-        cols    = list(rows[0].keys())
-        col_str = ', '.join(f'"{c}"' for c in cols)
-        val_str = ', '.join(f'%({c})s' for c in cols)
-        upd_str = ', '.join(f'"{c}" = EXCLUDED."{c}"' for c in cols if c != pk)
+            # Serialize JSONB columns
+            rows = [serialize_row(r) for r in rows]
 
-        upsert_sql = f"""
-            INSERT INTO {table} ({col_str})
-            VALUES ({val_str})
-            ON CONFLICT ("{pk}") DO UPDATE SET {upd_str}
-        """
+            # Upsert into CockroachDB
+            cols    = list(rows[0].keys())
+            col_str = ', '.join(f'"{c}"' for c in cols)
+            val_str = ', '.join(f'%({c})s' for c in cols)
+            upd_str = ', '.join(f'"{c}" = EXCLUDED."{c}"' for c in cols if c != pk)
 
-        with cr_conn() as conn:
-            with conn.cursor() as cur:
-                psycopg2.extras.execute_batch(cur, upsert_sql, rows, page_size=500)
-            conn.commit()
+            upsert_sql = f"""
+                INSERT INTO {table} ({col_str})
+                VALUES ({val_str})
+                ON CONFLICT ("{pk}") DO UPDATE SET {upd_str}
+            """
 
-        logger.info(f"    ✅ {len(rows):,} rows synced")
-        return len(rows)
+            with cr_conn() as conn:
+                with conn.cursor() as cur:
+                    psycopg2.extras.execute_batch(cur, upsert_sql, rows, page_size=500)
+                conn.commit()
+
+            total_synced += len(rows)
+            logger.info(f"    Page {offset//page_size + 1}: {len(rows)} rows (total: {total_synced:,})")
+
+            if len(rows) < page_size:
+                break
+            offset += page_size
+
+        logger.info(f"    ✅ {total_synced:,} rows synced")
+        return total_synced
 
     except Exception as e:
         logger.error(f"    ❌ Error syncing {table}: {e}")
-        return 0
+        return total_synced
 
 
 def sync_data(days_back: int = 90):
