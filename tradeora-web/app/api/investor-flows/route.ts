@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,21 +42,32 @@ export async function GET(req: NextRequest) {
     const todayStr = new Date().toISOString().split('T')[0];
     const sb = getSb();
 
-    // 1. Fetch latest available record ordered by trade_date desc, created_at desc
-    const { data: flows, error: flowsErr } = await sb
-      .from('daily_investor_flows')
-      .select('*')
-      .order('trade_date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    if (flowsErr) {
-      console.error('Error fetching daily_investor_flows:', flowsErr.message);
-      return NextResponse.json({ success: false, error: flowsErr.message }, { status: 500 });
+    let flowList: any[] = [];
+    try {
+      const pgRes = await pool.query('SELECT * FROM daily_investor_flows ORDER BY trade_date DESC, created_at DESC LIMIT 30');
+      if (pgRes.rows && pgRes.rows.length > 0) {
+        flowList = pgRes.rows;
+      }
+    } catch (pgErr) {
+      console.warn('CockroachDB query fallback to Supabase:', pgErr);
     }
 
-    const flowList = flows || [];
-    const latest   = flowList[0] || null;
+    if (flowList.length === 0) {
+      const { data: flows, error: flowsErr } = await sb
+        .from('daily_investor_flows')
+        .select('*')
+        .order('trade_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (flowsErr) {
+        console.error('Error fetching daily_investor_flows:', flowsErr.message);
+        return NextResponse.json({ success: false, error: flowsErr.message }, { status: 500 });
+      }
+      flowList = flows || [];
+    }
+
+    const latest = flowList[0] || null;
 
     if (!latest) {
       return NextResponse.json(
