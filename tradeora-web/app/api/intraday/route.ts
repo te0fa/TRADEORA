@@ -24,53 +24,52 @@ export async function GET(req: NextRequest) {
       timeZone: 'Africa/Cairo', hour: 'numeric', hour12: false
     }).format(new Date()))
 
-  // ── Fetch Yahoo Finance candles ───────────────────────────────────────────
-  const fetchYahoo = async (ticker: string, yInterval: string, range: string): Promise<any[] | null> => {
-    try {
-      const url = `/api/yahoo-chart?ticker=${encodeURIComponent(ticker)}&interval=${yInterval}`
-      // Call internal API via absolute URL
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000'
-      const res = await fetch(`${baseUrl}/api/yahoo-chart?ticker=${encodeURIComponent(ticker)}&interval=${yInterval}`, {
-        headers: { 'User-Agent': 'TRADEORA/1.0' },
-        next: { revalidate: 30 },
-      })
-      if (!res.ok) return null
-      const data = await res.json()
-      const result = data?.chart?.result?.[0]
-      if (!result?.timestamp || !result?.indicators?.quote?.[0]) return null
-
-      const timestamps = result.timestamp as number[]
-      const quote = result.indicators.quote[0]
-      const candles: any[] = []
-
-      for (let i = 0; i < timestamps.length; i++) {
-        const close  = quote.close?.[i]
-        const open   = quote.open?.[i]
-        const high   = quote.high?.[i]
-        const low    = quote.low?.[i]
-        const vol    = quote.volume?.[i] ?? 0
-        const ts     = timestamps[i]
-
-        if (!ts || !close || isNaN(close) || close <= 0) continue
-
-        candles.push({
-          time: ts,   // Unix seconds
-          open:   open  ?? close,
-          high:   high  ?? close,
-          low:    low   ?? close,
-          close,
-          volume: vol,
-        })
-      }
-
-      return candles.length > 0 ? candles : null
-    } catch (e) {
-      console.error('[intraday] Yahoo fetch error:', e)
-      return null
-    }
+async function fetchYahoo(ticker: string, yInterval: string, range: string): Promise<any[] | null> {
+  const YAHOO_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cache-Control': 'no-cache',
   }
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${yInterval}&range=${range}&events=div,splits`
+    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 30 } })
+    if (!res.ok) return null
+    const data = await res.json()
+    const result = data?.chart?.result?.[0]
+    if (!result?.timestamp || !result?.indicators?.quote?.[0]) return null
+
+    const timestamps = result.timestamp as number[]
+    const quote = result.indicators.quote[0]
+    const candles: any[] = []
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const close  = quote.close?.[i]
+      const open   = quote.open?.[i]
+      const high   = quote.high?.[i]
+      const low    = quote.low?.[i]
+      const vol    = quote.volume?.[i] ?? 0
+      const ts     = timestamps[i]
+
+      if (!ts || !close || isNaN(close) || close <= 0) continue
+
+      candles.push({
+        time: ts,
+        open:   open  ?? close,
+        high:   high  ?? close,
+        low:    low   ?? close,
+        close,
+        volume: vol,
+      })
+    }
+
+    return candles.length > 0 ? candles : null
+  } catch (e) {
+    console.error('[intraday] Yahoo fetch error:', e)
+    return null
+  }
+}
+
 
   // ── 1. Resolve company_id ─────────────────────────────────────────────────
   const { data: company } = await sb

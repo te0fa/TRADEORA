@@ -30,29 +30,29 @@ function getCairoTime(): { hour: number; day: number } {
 }
 
 async function fetchYahoo15m(ticker: string): Promise<any[] | null> {
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
-
+  const YAHOO_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cache-Control': 'no-cache',
+  }
   try {
-    const res = await fetch(
-      `${baseUrl}/api/yahoo-chart?ticker=${encodeURIComponent(ticker)}&interval=15m`,
-      { headers: { 'User-Agent': 'TRADEORA-Cron/1.0' }, next: { revalidate: 0 } }
-    );
-    if (!res.ok) return null;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=15m&range=5d&events=div,splits`
+    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 0 } })
+    if (!res.ok) return null
 
-    const data = await res.json();
-    const result = data?.chart?.result?.[0];
-    if (!result?.timestamp || !result?.indicators?.quote?.[0]) return null;
+    const data = await res.json()
+    const result = data?.chart?.result?.[0]
+    if (!result?.timestamp || !result?.indicators?.quote?.[0]) return null
 
-    const timestamps: number[] = result.timestamp;
-    const quote = result.indicators.quote[0];
-    const candles: any[] = [];
+    const timestamps: number[] = result.timestamp
+    const quote = result.indicators.quote[0]
+    const candles: any[] = []
 
     for (let i = 0; i < timestamps.length; i++) {
-      const ts    = timestamps[i];
-      const close = quote.close?.[i];
-      if (!ts || !close || isNaN(close) || close <= 0) continue;
+      const ts    = timestamps[i]
+      const close = quote.close?.[i]
+      if (!ts || !close || isNaN(close) || close <= 0) continue
 
       candles.push({
         time:   ts,
@@ -61,15 +61,16 @@ async function fetchYahoo15m(ticker: string): Promise<any[] | null> {
         low:    quote.low?.[i]    ?? close,
         close,
         volume: quote.volume?.[i] ?? 0,
-      });
+      })
     }
 
-    return candles.length > 0 ? candles : null;
+    return candles.length > 0 ? candles : null
   } catch (e) {
-    console.error(`[sync-intraday] Yahoo fetch error for ${ticker}:`, e);
-    return null;
+    console.error(`[sync-intraday] Yahoo fetch error for ${ticker}:`, e)
+    return null
   }
 }
+
 
 export async function GET(req: NextRequest) {
   // ── Security ───────────────────────────────────────────────────────────────
