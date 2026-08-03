@@ -39,7 +39,7 @@ jobs:
             joblib \
             xgboost \
             scikit-learn \
-            pandas_ta \
+            "pandas-ta>=0.3.14b" \
             requests
 
       - name: 🧠 Generate recommendations

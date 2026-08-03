@@ -36,7 +36,7 @@ jobs:
           joblib \
           scikit-learn \
           xgboost \
-          pandas-ta
+          "pandas-ta>=0.3.14b"
 
     - name: Run Real-time Intraday News & EGX Disclosures Scrapers
       env:
