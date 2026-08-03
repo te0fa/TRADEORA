@@ -49,6 +49,9 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   useEffect(() => {
     let active = true;
     let ws: WebSocket | null = null;
+    let pollInterval: NodeJS.Timeout | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let lastWsTickTime = 0;
 
     const formatMessage = (func: string, args: any[]) => {
       const content = JSON.stringify({ m: func, p: args });
@@ -57,69 +60,96 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
 
     const tvSymbol = `EGX:${symbol.toUpperCase()}`;
 
-    try {
-      ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket');
-      const quoteSession = 'qs_' + Math.random().toString(36).substring(2, 12);
+    const connectWS = () => {
+      if (!active) return;
+      try {
+        ws = new WebSocket('wss://data.tradingview.com/socket.io/websocket');
+        const quoteSession = 'qs_' + Math.random().toString(36).substring(2, 12);
 
-      ws.onopen = () => {
-        if (!active || !ws) return;
-        ws.send(formatMessage('set_auth_token', ['unauthorized_user_token']));
-        ws.send(formatMessage('quote_create_session', [quoteSession]));
-        ws.send(formatMessage('quote_set_fields', [
-          quoteSession,
-          'ch', 'chp', 'lp', 'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume'
-        ]));
-        ws.send(formatMessage('quote_add_symbols', [quoteSession, tvSymbol]));
-      };
+        ws.onopen = () => {
+          if (!active || !ws) return;
+          ws.send(formatMessage('set_auth_token', ['unauthorized_user_token']));
+          ws.send(formatMessage('quote_create_session', [quoteSession]));
+          ws.send(formatMessage('quote_set_fields', [
+            quoteSession,
+            'ch', 'chp', 'lp', 'open_price', 'high_price', 'low_price', 'prev_close_price', 'volume', 'ask', 'bid'
+          ]));
+          ws.send(formatMessage('quote_add_symbols', [quoteSession, tvSymbol]));
+        };
 
-      ws.onmessage = (event) => {
-        if (!active) return;
-        const str = String(event.data);
+        ws.onmessage = (event) => {
+          if (!active) return;
+          const str = String(event.data);
 
-        // Ping-pong handler
-        if (str.includes('~h~')) {
-          const parts = str.split('~h~');
-          for (let i = 1; i < parts.length; i++) {
-            const pingId = parts[i].split('~m~')[0];
-            if (pingId && ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(`~m~${pingId.length + 4}~m~~h~${pingId}`);
-            }
-          }
-        }
-
-        // Parse qsd tick packets
-        const packets = str.split(/~m~\d+~m~/).filter(Boolean);
-        for (const packet of packets) {
-          try {
-            const parsed = JSON.parse(packet);
-            if (parsed.m === 'qsd' && parsed.p && parsed.p[1]) {
-              const v = parsed.p[1].v;
-              if (v) {
-                setLiveTick((prev) => {
-                  const close = v.lp != null ? v.lp : (prev?.close ?? 0);
-                  const changePct = v.chp != null ? v.chp : (prev?.changePct ?? 0);
-                  const changeAbs = v.ch != null ? v.ch : (prev?.changeAbs ?? 0);
-                  const open = v.open_price != null ? v.open_price : (prev?.open ?? close);
-                  const high = v.high_price != null ? v.high_price : (prev?.high ?? close);
-                  const low = v.low_price != null ? v.low_price : (prev?.low ?? close);
-                  const volume = v.volume != null ? v.volume : (prev?.volume ?? 0);
-                  const updatedAt = new Date().toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', {
-                    hour: '2-digit', minute: '2-digit', second: '2-digit'
-                  });
-
-                  return { close, changePct, changeAbs, open, high, low, volume, updatedAt };
-                });
+          // Ping-pong handler
+          if (str.includes('~h~')) {
+            const parts = str.split('~h~');
+            for (let i = 1; i < parts.length; i++) {
+              const pingId = parts[i].split('~m~')[0];
+              if (pingId && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(`~m~${pingId.length + 4}~m~~h~${pingId}`);
               }
             }
-          } catch { /* skip non-JSON */ }
-        }
-      };
-    } catch (e) {
-      console.error('TradingView WS connection error:', e);
-    }
+          }
 
-    // ── REST Poll Fallback ──
+          // Parse qsd tick packets
+          const packets = str.split(/~m~\d+~m~/).filter(Boolean);
+          for (const packet of packets) {
+            try {
+              const parsed = JSON.parse(packet);
+              if (parsed.m === 'qsd' && parsed.p && parsed.p[1]) {
+                const v = parsed.p[1].v;
+                if (v) {
+                  lastWsTickTime = Date.now();
+                  setLiveTick((prev) => {
+                    const close = v.lp != null ? v.lp : (prev?.close ?? 0);
+                    const changePct = v.chp != null ? v.chp : (prev?.changePct ?? 0);
+                    const changeAbs = v.ch != null ? v.ch : (prev?.changeAbs ?? 0);
+                    const open = v.open_price != null ? v.open_price : (prev?.open ?? close);
+                    const high = v.high_price != null ? v.high_price : (prev?.high ?? close);
+                    const low = v.low_price != null ? v.low_price : (prev?.low ?? close);
+                    const volume = v.volume != null ? v.volume : (prev?.volume ?? 0);
+                    const updatedAt = new Date().toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+                      hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    });
+
+                    if (typeof window !== 'undefined') {
+                      (window as any).__liveTickPrice = close;
+                    }
+
+                    return { close, changePct, changeAbs, open, high, low, volume, updatedAt };
+                  });
+                }
+              }
+            } catch { /* skip non-JSON */ }
+          }
+        };
+
+        ws.onerror = () => {
+          if (ws) {
+            try { ws.close(); } catch {}
+          }
+        };
+
+        ws.onclose = () => {
+          if (active) {
+            reconnectTimeout = setTimeout(() => {
+              connectWS();
+            }, 500);
+          }
+        };
+      } catch (e) {
+        console.error('TradingView WS connection error:', e);
+      }
+    };
+
+    connectWS();
+
+    // ── REST Poll Fallback (Ultra-Fast 250ms sub-second polling when WS is silent) ──
     const pollREST = async () => {
+      // If WS delivered a tick in the last 2000ms, skip REST call to prevent unnecessary requests
+      if (Date.now() - lastWsTickTime < 2000) return;
+
       try {
         const res = await fetch(`/api/stock-live?symbol=${encodeURIComponent(symbol)}`, { cache: 'no-store' });
         if (res.ok && active) {
@@ -135,21 +165,27 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
               volume: data.volume ?? prev?.volume ?? 0,
               updatedAt: data.updatedAt
             }));
+            if (typeof window !== 'undefined') {
+              (window as any).__liveTickPrice = data.close;
+            }
           }
         }
       } catch { /* silent */ }
     };
 
     pollREST();
-    const pollId = setInterval(pollREST, 1000);
+    pollInterval = setInterval(pollREST, 250);
 
     return () => {
       active = false;
-      clearInterval(pollId);
-      if (ws) ws.close();
+      if (pollInterval) clearInterval(pollInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
     };
   }, [symbol, locale]);
-
 
   const [sortKey, setSortKey] = useState<string>('price_date');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
