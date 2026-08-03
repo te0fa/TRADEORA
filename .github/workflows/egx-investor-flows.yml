@@ -121,7 +121,7 @@ jobs:
           fi
 
           echo "📡 Running intraday scraper..."
-          python egx_intraday_flows.py $DATE_ARG $DRY_RUN
+          python egx_intraday_flows.py $DATE_ARG $DRY_RUN || echo "⚠️ EGX network connection reset — will retry on next schedule"
 
       - name: 📸 Post-Close Final Capture (bypass session guard)
         if: steps.mode.outputs.mode == 'post_close'

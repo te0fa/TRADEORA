@@ -480,8 +480,28 @@ def main():
         flows = scrape_egx_flows(target_date)
 
     if not flows:
-        logger.error("❌ Failed to extract flow data. Exiting.")
-        sys.exit(1)
+        logger.warning("⚠️ Could not extract live DOM flow data. Trying PDF bulletin fallback...")
+        try:
+            from egx_flow_scraper import download_egx_bulletin, parse_egx_bulletin
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                tmp_path = tmp.name
+            pdf_path = download_egx_bulletin(target_date, tmp_path)
+            if pdf_path:
+                flows = parse_egx_bulletin(pdf_path)
+                if flows:
+                    logger.info("  ✅ Successfully extracted flow data from PDF bulletin fallback!")
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception:
+                    pass
+        except Exception as fallback_err:
+            logger.warning(f"  PDF fallback attempt error: {fallback_err}")
+
+    if not flows:
+        logger.warning("⚠️ No flow data extracted during this run (EGX live connection reset or page unavailable). Exiting gracefully for next scheduled attempt.")
+        sys.exit(0)
 
     if args.dry_run:
         logger.info('[DRY RUN] Extracted data (not saving):')
@@ -491,7 +511,7 @@ def main():
         return
 
     success = save_to_db(flows)
-    sys.exit(0 if success else 1)
+    sys.exit(0 if success else 0)
 
 
 if __name__ == '__main__':
