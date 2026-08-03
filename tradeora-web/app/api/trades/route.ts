@@ -582,16 +582,61 @@ export async function GET(req: NextRequest) {
     const avgPnl     = closedCount > 0 ? totalPnl / closedCount : 0;
     const avgWin     = winningTrades.length > 0 ? winningTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / winningTrades.length : 0;
     const avgLoss    = losingTrades.length > 0 ? losingTrades.reduce((s: number, t: any) => s + Number(t.pnl_percent), 0) / losingTrades.length : 0;
-    const activeCount = buyTrades.length;
+
+    // ── Primary Stock Trades vs Sub-Trades (Per Company) ──────────────────────
+    // Primary Trade: Main daily/highest-score trade for each unique company
+    // Sub-Trade: Secondary intraday trades on smaller timeframes (15m, 1h, 4h) for the same company
+    const primaryBuyTradesMap: Record<string, any> = {};
+    const subBuyTradesList: any[]                  = [];
+
+    buyTrades.forEach((t: any) => {
+      const key = (t.symbol || t.company_id || 'UNKNOWN').toUpperCase();
+      if (!primaryBuyTradesMap[key]) {
+        t.is_sub_trade = false;
+        t.sub_trades = [];
+        primaryBuyTradesMap[key] = t;
+      } else {
+        const existing = primaryBuyTradesMap[key];
+        const isCurrentDaily = t.timeframe === '1d' || (t.timeframe || '').includes('أيام');
+        const isExistingDaily = existing.timeframe === '1d' || (existing.timeframe || '').includes('أيام');
+
+        if (isCurrentDaily && !isExistingDaily) {
+          // Promote current to primary and move existing to sub-trades
+          existing.is_sub_trade = true;
+          existing.sub_trade_badge_ar = `⚡ صفقة مضاربة فرعية (فريم ${existing.timeframe || 'لحظي'})`;
+          subBuyTradesList.push(existing);
+
+          t.is_sub_trade = false;
+          t.sub_trades = [existing, ...(existing.sub_trades || [])];
+          primaryBuyTradesMap[key] = t;
+        } else {
+          // Treat as sub-trade under primary
+          t.is_sub_trade = true;
+          t.sub_trade_badge_ar = `⚡ صفقة مضاربة فرعية (فريم ${t.timeframe || 'لحظي'})`;
+          existing.sub_trades = existing.sub_trades || [];
+          existing.sub_trades.push(t);
+          subBuyTradesList.push(t);
+        }
+      }
+    });
+
+    const primaryBuyTrades = Object.values(primaryBuyTradesMap);
+    primaryBuyTrades.forEach((primary: any) => {
+      const subCount = primary.sub_trades ? primary.sub_trades.length : 0;
+      primary.sub_trade_count = subCount;
+      if (subCount > 0) {
+        primary.sub_trade_badge_ar = `⚡ +${subCount} صفقة مضاربة فرعية على الفريمات اللحظية`;
+      }
+    });
 
     // ── Tier Thresholds ──────────────────────────────────────────────────────
-    // premier_elite: Top 30 ultra-selective Premier Elite signals (highest composite score & ML confidence)
-    // standard_market: General market signals
-    // combined: All signals
+    // premier_elite: Top 30 ultra-selective Premier Elite signals
+    // standard_market: Remaining primary market signals
+    // combined: All primary stock signals
     const MAX_PREMIER_COUNT  = 30;
-    const premierBuyTrades   = buyTrades.slice(0, Math.min(MAX_PREMIER_COUNT, buyTrades.length));
+    const premierBuyTrades   = primaryBuyTrades.slice(0, Math.min(MAX_PREMIER_COUNT, primaryBuyTrades.length));
     const premierIds         = new Set(premierBuyTrades.map((t: any) => t.id));
-    const standardBuyTrades  = buyTrades.filter((t: any) => !premierIds.has(t.id));
+    const standardBuyTrades  = primaryBuyTrades.filter((t: any) => !premierIds.has(t.id));
 
     const closedPremierTrades  = closedBuyTrades.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= 0.88);
     const closedStandardTrades = closedBuyTrades.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= 0.88));
@@ -619,11 +664,14 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       // ── Primary: Top premier picks (sorted by composite_score) ────────────
-      trades:        premierBuyTrades.length > 0 ? premierBuyTrades : buyTrades, // Default primary is Premier Elite
-      all_buy_trades: buyTrades,
-      top_picks:     topPicks,       // Top 20 premier picks
-      other_signals: otherSignals,   // Remaining signals
-      sell_signals:  sellTrades,
+      trades:          premierBuyTrades.length > 0 ? premierBuyTrades : primaryBuyTrades,
+      all_buy_trades:  primaryBuyTrades,      // Primary unique stock trades
+      all_signals:     buyTrades,             // All signals including sub-trades
+      sub_trades:      subBuyTradesList,      // Sub-trades list
+      sub_trades_count: subBuyTradesList.length,
+      top_picks:       topPicks,              // Top 20 premier picks
+      other_signals:   otherSignals,          // Remaining signals
+      sell_signals:    sellTrades,
 
       // ── Quality Metrics: TP1 vs TP2 vs SL breakdown ──────────────────────
       quality_metrics: combinedQualityMetrics,

@@ -66,6 +66,10 @@ export interface ActiveTrade {
   price_channel?: any;
   is_activated?: boolean;
   activation_status_ar?: string;
+  is_sub_trade?: boolean;
+  sub_trades?: any[];
+  sub_trade_count?: number;
+  sub_trade_badge_ar?: string;
 }
 
 interface ActiveTradesModalProps {

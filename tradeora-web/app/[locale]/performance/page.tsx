@@ -380,7 +380,7 @@ export default function PerformancePage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 font-mono text-xs">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
                     <select
                       value={evaluationTier}
                       onChange={(e) => setEvaluationTier(e.target.value as any)}
@@ -388,8 +388,15 @@ export default function PerformancePage() {
                     >
                       <option value="premier_elite">👑 صفقات النخبة الذهبية (درجة ثقة 88% - 99%) [الرئيسي] ({tierEvaluations?.premier_elite?.total_signals || 0} صفقة)</option>
                       <option value="standard_market">🌐 إشارات السوق (ثقة 65% - 87%) ({tierEvaluations?.standard_market?.total_signals || 0} صفقة)</option>
-                      <option value="combined">📊 التقييم الشامل (كافة إشارات السوق - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
+                      <option value="combined">📊 التقييم الشامل (كافة الأسهم الرئيسية - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
                     </select>
+
+                    {tierEvaluations?.sub_trades_count ? (
+                      <div className="px-3.5 py-2 bg-purple-500/15 border border-purple-500/40 rounded-xl text-purple-300 font-bold text-xs flex items-center gap-1.5 shadow-lg">
+                        <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                        <span>{tierEvaluations.sub_trades_label_ar || `+${tierEvaluations.sub_trades_count} صفقة مضاربة فرعية`}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
