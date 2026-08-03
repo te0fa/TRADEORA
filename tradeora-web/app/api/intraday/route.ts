@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  const symbol = req.nextUrl.searchParams.get('symbol')
+  const symbol   = req.nextUrl.searchParams.get('symbol')
   const interval = parseInt(req.nextUrl.searchParams.get('interval') ?? '15')
   const daysBack = parseInt(req.nextUrl.searchParams.get('days') ?? '90')
 
@@ -15,10 +15,67 @@ export async function GET(req: NextRequest) {
 
   const sb = createClient(supabaseUrl, supabaseKey)
 
-  // 1. Get active company_id from symbol
+  // ── Cairo time helpers ────────────────────────────────────────────────────
+  const getCairoDateStr = (): string =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date())
+
+  const getCairoHour = (): number =>
+    parseInt(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Cairo', hour: 'numeric', hour12: false
+    }).format(new Date()))
+
+  // ── Fetch Yahoo Finance candles ───────────────────────────────────────────
+  const fetchYahoo = async (ticker: string, yInterval: string, range: string): Promise<any[] | null> => {
+    try {
+      const url = `/api/yahoo-chart?ticker=${encodeURIComponent(ticker)}&interval=${yInterval}`
+      // Call internal API via absolute URL
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000'
+      const res = await fetch(`${baseUrl}/api/yahoo-chart?ticker=${encodeURIComponent(ticker)}&interval=${yInterval}`, {
+        headers: { 'User-Agent': 'TRADEORA/1.0' },
+        next: { revalidate: 30 },
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      const result = data?.chart?.result?.[0]
+      if (!result?.timestamp || !result?.indicators?.quote?.[0]) return null
+
+      const timestamps = result.timestamp as number[]
+      const quote = result.indicators.quote[0]
+      const candles: any[] = []
+
+      for (let i = 0; i < timestamps.length; i++) {
+        const close  = quote.close?.[i]
+        const open   = quote.open?.[i]
+        const high   = quote.high?.[i]
+        const low    = quote.low?.[i]
+        const vol    = quote.volume?.[i] ?? 0
+        const ts     = timestamps[i]
+
+        if (!ts || !close || isNaN(close) || close <= 0) continue
+
+        candles.push({
+          time: ts,   // Unix seconds
+          open:   open  ?? close,
+          high:   high  ?? close,
+          low:    low   ?? close,
+          close,
+          volume: vol,
+        })
+      }
+
+      return candles.length > 0 ? candles : null
+    } catch (e) {
+      console.error('[intraday] Yahoo fetch error:', e)
+      return null
+    }
+  }
+
+  // ── 1. Resolve company_id ─────────────────────────────────────────────────
   const { data: company } = await sb
     .from('companies')
-    .select('id')
+    .select('id, symbol')
     .ilike('symbol', symbol.trim())
     .eq('status', 'active')
     .maybeSingle()
@@ -27,7 +84,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })
   }
 
-  // 2. Handle Daily candles (1440 mins or 1d)
+  // ── 2. Daily candles ──────────────────────────────────────────────────────
   if (interval >= 1440) {
     const { data: dailyPrices } = await sb
       .from('market_prices')
@@ -38,60 +95,47 @@ export async function GET(req: NextRequest) {
       .limit(1000)
 
     if (dailyPrices && dailyPrices.length >= 10) {
-      // Group by dateStr, giving 100% priority to tradingview source
       const dateMap: Record<string, any> = {}
       for (const d of dailyPrices) {
         const dateStr = d.price_date.split('T')[0]
         const isTv = d.source === 'tradingview_1d' || d.source === 'tradingview'
-        if (!dateMap[dateStr] || isTv) {
-          dateMap[dateStr] = d
-        }
+        if (!dateMap[dateStr] || isTv) dateMap[dateStr] = d
       }
 
-      const sortedDates = Object.keys(dateMap).sort()
       const formattedDaily: any[] = []
-
-      for (const dateStr of sortedDates) {
+      for (const dateStr of Object.keys(dateMap).sort()) {
         const d = dateMap[dateStr]
         const close = parseFloat(d.close_price)
-        const open = parseFloat(d.open_price ?? d.close_price)
-        const high = parseFloat(d.high_price ?? d.close_price)
-        const low = parseFloat(d.low_price ?? d.close_price)
-
+        const open  = parseFloat(d.open_price ?? d.close_price)
+        const high  = parseFloat(d.high_price ?? d.close_price)
+        const low   = parseFloat(d.low_price  ?? d.close_price)
         if (isNaN(close) || close <= 0) continue
 
         formattedDaily.push({
-          time: dateStr, // YYYY-MM-DD string format required by Lightweight Charts for 1D!
+          time: dateStr,
           open: open > 0 ? open : close,
           high: Math.max(high, open, close),
-          low: Math.min(low > 0 ? low : close, open, close),
-          close: close,
-          volume: parseInt(d.volume ?? 0, 10)
+          low:  Math.min(low > 0 ? low : close, open, close),
+          close,
+          volume: parseInt(d.volume ?? 0, 10),
         })
       }
 
       if (formattedDaily.length >= 10) {
-        return NextResponse.json({
-          candles: formattedDaily,
-          source: 'tradingview',
-          count: formattedDaily.length,
-          fallback: false
-        })
+        return NextResponse.json({ candles: formattedDaily, source: 'tradingview', count: formattedDaily.length, fallback: false })
       }
     }
-
     return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })
   }
 
-  // 3. Determine intervalKey for intraday & priority sources
+  // ── 3. Intraday interval key ──────────────────────────────────────────────
   let intervalKey = '15m'
-  if (interval === 1) intervalKey = '1m'
-  else if (interval === 5) intervalKey = '5m'
-  else if (interval === 30) intervalKey = '30m'
-  else if (interval === 60) intervalKey = '1h'
+  if (interval === 1)   intervalKey = '1m'
+  else if (interval === 5)   intervalKey = '5m'
+  else if (interval === 30)  intervalKey = '30m'
+  else if (interval === 60)  intervalKey = '1h'
   else if (interval === 240) intervalKey = '4h'
 
-  // Priority: official Canonical intraday sources
   const CANONICAL_SOURCES_INTRADAY = [
     'tradingview_15m', 'yahoo_15m',
     'tradingview_30m', 'yahoo_30m',
@@ -101,7 +145,7 @@ export async function GET(req: NextRequest) {
     'tradingview_1d',  'yahoo_1d',
   ]
 
-  // 4. Fetch exact source intraday snapshots
+  // ── 4. Fetch from intraday_snapshots ──────────────────────────────────────
   const { data: tvSnapshots } = await sb
     .from('intraday_snapshots')
     .select('snapshot_time, open_price, high_price, low_price, price, volume, source')
@@ -110,129 +154,116 @@ export async function GET(req: NextRequest) {
     .order('snapshot_time', { ascending: true })
     .limit(2000)
 
-  // Filter exact interval snapshots (tradingview or yahoo)
   const exactKeySnapshots = (tvSnapshots || []).filter(s =>
     s.source === `tradingview_${intervalKey}` || s.source === `yahoo_${intervalKey}`
   )
 
-  if (exactKeySnapshots && exactKeySnapshots.length >= 10) {
-    const seenTimes = new Set<number>()
-    const formattedCandles: any[] = []
-
-    for (const s of exactKeySnapshots) {
+  const parseSnapshots = (snaps: any[]): any[] => {
+    const seen = new Set<number>()
+    const result: any[] = []
+    for (const s of snaps) {
       const timeSec = Math.floor(new Date(s.snapshot_time).getTime() / 1000)
-      if (seenTimes.has(timeSec)) continue
-      seenTimes.add(timeSec)
-
+      if (seen.has(timeSec)) continue
+      seen.add(timeSec)
       const close = parseFloat(s.price)
-      const open = parseFloat(s.open_price ?? s.price)
-      const high = parseFloat(s.high_price ?? s.price)
-      const low = parseFloat(s.low_price ?? s.price)
-
+      const open  = parseFloat(s.open_price ?? s.price)
+      const high  = parseFloat(s.high_price ?? s.price)
+      const low   = parseFloat(s.low_price  ?? s.price)
       if (isNaN(close) || close <= 0) continue
-
-      formattedCandles.push({
-        time: timeSec, // Unix timestamp in seconds for intraday!
-        open: open > 0 ? open : close,
-        high: Math.max(high, open, close),
-        low: Math.min(low > 0 ? low : close, open, close),
-        close: close,
-        volume: parseInt(s.volume ?? 0, 10),
-      })
-    }
-
-    if (formattedCandles.length >= 10) {
-      return NextResponse.json({
-        candles: formattedCandles,
-        source: 'tradingview',
-        count: formattedCandles.length,
-        fallback: false
-      })
-    }
-  }
-
-  // 5. Fallback: Aggregate from 15m candles
-  const base15mSnapshots = (tvSnapshots || []).filter(s => s.source === 'tradingview_15m')
-
-  if (base15mSnapshots && base15mSnapshots.length >= 10) {
-    const seenTimes = new Set<number>()
-    const raw15m: any[] = []
-
-    for (const s of base15mSnapshots) {
-      const timeSec = Math.floor(new Date(s.snapshot_time).getTime() / 1000)
-      if (seenTimes.has(timeSec)) continue
-      seenTimes.add(timeSec)
-
-      const close = parseFloat(s.price)
-      const open = parseFloat(s.open_price ?? s.price)
-      const high = parseFloat(s.high_price ?? s.price)
-      const low = parseFloat(s.low_price ?? s.price)
-
-      if (isNaN(close) || close <= 0) continue
-
-      raw15m.push({
+      result.push({
         time: timeSec,
-        open: open > 0 ? open : close,
-        high: Math.max(high, open, close),
-        low: Math.min(low > 0 ? low : close, open, close),
-        close: close,
+        open:   open  > 0 ? open  : close,
+        high:   Math.max(high, open, close),
+        low:    Math.min(low > 0 ? low : close, open, close),
+        close,
         volume: parseInt(s.volume ?? 0, 10),
       })
     }
+    return result
+  }
 
-    if (interval === 1 || interval === 15) {
-      if (raw15m.length >= 10) {
-        return NextResponse.json({
-          candles: raw15m,
-          source: 'tradingview',
-          count: raw15m.length,
-          fallback: false
-        })
-      }
-    } else {
-      const groupSize = interval === 30 ? 2 : interval === 60 ? 4 : 16
-      const aggregated: any[] = []
-      for (let i = 0; i < raw15m.length; i += groupSize) {
-        const chunk = raw15m.slice(i, i + groupSize)
-        if (chunk.length === 0) continue
-        const first = chunk[0]
-        const last = chunk[chunk.length - 1]
-        let maxHigh = chunk[0].high
-        let minLow = chunk[0].low
-        let sumVol = 0
-        chunk.forEach(c => {
-          if (c.high > maxHigh) maxHigh = c.high
-          if (c.low < minLow) minLow = c.low
-          sumVol += c.volume
-        })
-        // BUG FIX: Use first candle time, not last
-        aggregated.push({
-          time: first.time,
-          open: first.open,
-          high: maxHigh,
-          low: minLow,
-          close: last.close,
-          volume: sumVol
-        })
-      }
+  let dbCandles: any[] = []
 
-      if (aggregated.length >= 10) {
-        return NextResponse.json({
-          candles: aggregated,
-          source: 'tradingview',
-          count: aggregated.length,
-          fallback: false
-        })
+  if (exactKeySnapshots.length >= 10) {
+    dbCandles = parseSnapshots(exactKeySnapshots)
+  }
+
+  // Fallback: aggregate from 15m
+  if (dbCandles.length < 10) {
+    const base15m = (tvSnapshots || []).filter(s => s.source === 'tradingview_15m')
+    const raw15m  = parseSnapshots(base15m)
+
+    if (raw15m.length >= 10) {
+      if (interval <= 15) {
+        dbCandles = raw15m
+      } else {
+        const groupSize = interval === 30 ? 2 : interval === 60 ? 4 : 16
+        const aggregated: any[] = []
+        for (let i = 0; i < raw15m.length; i += groupSize) {
+          const chunk = raw15m.slice(i, i + groupSize)
+          if (!chunk.length) continue
+          const first = chunk[0]
+          const last  = chunk[chunk.length - 1]
+          aggregated.push({
+            time:   first.time,
+            open:   first.open,
+            high:   Math.max(...chunk.map(c => c.high)),
+            low:    Math.min(...chunk.map(c => c.low)),
+            close:  last.close,
+            volume: chunk.reduce((s, c) => s + c.volume, 0),
+          })
+        }
+        if (aggregated.length >= 10) dbCandles = aggregated
       }
     }
   }
 
-  // If result is less than 10 candles, do not fallback here or mix sources.
-  // Leave fallback to frontend (Yahoo).
-  return NextResponse.json({
-    candles: [],
-    source: 'none',
-    count: 0,
-    fallback: true
-  })
+  // ── 5. Inject today's live data (Yahoo) if last candle is stale ──────────
+  const cairoDateStr = getCairoDateStr()
+  const cairoHour    = getCairoHour()
+  const isMarketOpen = cairoHour >= 10 && cairoHour < 16
+
+  const lastCandleTime = dbCandles.length > 0 ? dbCandles[dbCandles.length - 1].time : 0
+  const lastCandleDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' })
+    .format(new Date(lastCandleTime * 1000))
+  const isStale = lastCandleDate < cairoDateStr
+
+  if (isStale || isMarketOpen) {
+    // Build Yahoo ticker for EGX symbol
+    const yahooTicker = symbol.includes('.CA') ? symbol : `${symbol}.CA`
+    const yInterval   = interval <= 5  ? '5m'
+                      : interval <= 15 ? '15m'
+                      : interval <= 30 ? '30m'
+                      : interval <= 60 ? '60m' : '60m'
+
+    const yCandles = await fetchYahoo(yahooTicker, yInterval, '5d')
+
+    if (yCandles && yCandles.length > 0) {
+      // Merge: filter out timestamps already in dbCandles, keep today's
+      const existingTimes = new Set(dbCandles.map(c => c.time))
+      const todayStart    = new Date(cairoDateStr + 'T00:00:00+03:00').getTime() / 1000
+
+      const newCandles = yCandles.filter(c =>
+        !existingTimes.has(c.time) && c.time >= todayStart
+      )
+
+      if (newCandles.length > 0) {
+        dbCandles = [...dbCandles, ...newCandles].sort((a, b) => a.time - b.time)
+      }
+    }
+  }
+
+  // ── 6. Return result ──────────────────────────────────────────────────────
+  if (dbCandles.length >= 5) {
+    return NextResponse.json({
+      candles: dbCandles,
+      source: 'tradingview',
+      count: dbCandles.length,
+      fallback: false,
+      lastCandleDate,
+      todayInjected: isStale || isMarketOpen,
+    })
+  }
+
+  return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })
 }
