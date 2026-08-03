@@ -727,7 +727,7 @@ export async function GET(req: NextRequest) {
 
       // ── Ranking metadata ────────────────────────────────────────────────
       ranking: {
-        total_active:   activeCount,
+        total_active:   primaryBuyTrades.length,
         top_picks_count: topPicks.length,
         other_count:    otherSignals.length,
         formula:        'ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)',
