@@ -39,7 +39,7 @@ jobs:
             joblib \
             xgboost \
             scikit-learn \
-            pandas-ta @ git+https://github.com/twopirllc/pandas-ta.git \
+            pandas-ta-classic \
             requests
 
       - name: 🧠 Generate recommendations
