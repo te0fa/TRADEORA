@@ -27,6 +27,7 @@ export interface ClosedDrilldownTrade {
   direction?: string;
   entry_price: number;
   exit_price?: number | null;
+  current_price?: number | null;
   tp1?: number;
   tp2?: number;
   sl?: number;
@@ -255,7 +256,7 @@ export function QualityDrilldownModal({
                   {/* Interactive Trade Visualizer with 5-column grid & real-time progress bar */}
                   <TradeVisualizer
                     entryPrice={Number(t.entry_price || 0)}
-                    currentPrice={Number(t.exit_price || t.tp1 || t.entry_price || 0)}
+                    currentPrice={Number(t.current_price || t.exit_price || t.tp1 || t.entry_price || 0)}
                     exitPrice={t.exit_price ? Number(t.exit_price) : null}
                     slPrice={Number(t.sl || (t.entry_price ? t.entry_price * 0.95 : 0))}
                     tp1Price={Number(t.tp1 || (t.entry_price ? t.entry_price * 1.05 : 0))}

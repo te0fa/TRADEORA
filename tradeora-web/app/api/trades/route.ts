@@ -44,30 +44,58 @@ export async function GET(req: NextRequest) {
       trades = [];
     }
 
-    // 2. Fetch latest prices for active companies
+    // 3. Fetch closed BUY trades & tp1_hit trades to compute platform statistics
+    const { data: allClosed, error: closedErr } = await supabase
+      .from('recommended_trades')
+      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
+      .eq('status', 'closed')
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
+      .gte('recommended_at', LAUNCH_DATE);
+
+    if (closedErr) console.error('Error fetching allClosed:', closedErr);
+
+    const { data: tp1HitTrades, error: tp1Err } = await supabase
+      .from('recommended_trades')
+      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
+      .eq('status', 'tp1_hit')
+      .gte('recommended_at', LAUNCH_DATE);
+
+    if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
+
+    // 2. Fetch latest prices for ALL active, closed, and tp1_hit companies
     const activeCompanyIds = Array.from(
-      new Set((trades || []).filter((t: any) => t.company_id).map((t: any) => t.company_id))
+      new Set([
+        ...(trades || []).filter((t: any) => t.company_id).map((t: any) => t.company_id),
+        ...(allClosed || []).filter((t: any) => t.company_id).map((t: any) => t.company_id),
+        ...(tp1HitTrades || []).filter((t: any) => t.company_id).map((t: any) => t.company_id),
+      ])
     );
 
     const priceMap: Record<string, number> = {};
+    const symbolPriceMap: Record<string, number> = {};
+
     if (activeCompanyIds.length > 0) {
       const { data: latestPrices } = await supabase
         .from('market_prices')
-        .select('company_id, close_price, price_date, source')
+        .select('company_id, symbol, close_price, price_date, source')
         .in('company_id', activeCompanyIds)
         .order('price_date', { ascending: false });
 
       if (latestPrices) {
-        // First pass: TradingView source
         latestPrices.forEach((p: any) => {
           if (!priceMap[p.company_id] && p.source === 'tradingview') {
             priceMap[p.company_id] = parseFloat(p.close_price);
           }
+          if (p.symbol && !symbolPriceMap[p.symbol] && p.source === 'tradingview') {
+            symbolPriceMap[p.symbol] = parseFloat(p.close_price);
+          }
         });
-        // Second pass: Any fallback source
         latestPrices.forEach((p: any) => {
           if (!priceMap[p.company_id]) {
             priceMap[p.company_id] = parseFloat(p.close_price);
+          }
+          if (p.symbol && !symbolPriceMap[p.symbol]) {
+            symbolPriceMap[p.symbol] = parseFloat(p.close_price);
           }
         });
       }
@@ -404,29 +432,35 @@ export async function GET(req: NextRequest) {
     const topPicks     = buyTrades.filter((t: any) => t.is_top_pick);
     const otherSignals = buyTrades.filter((t: any) => !t.is_top_pick);
 
-    // 3. Fetch closed BUY trades to compute platform statistics
-    const { data: allClosed, error: closedErr } = await supabase
-      .from('recommended_trades')
-      .select('id, symbol, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
-      .eq('status', 'closed')
-      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
-      .gte('recommended_at', LAUNCH_DATE);
+    // 3. Process closed BUY trades & tp1_hit trades for statistics
 
-    if (closedErr) console.error('Error fetching allClosed:', closedErr);
+    const mapTradeDetails = (t: any) => {
+      let livePrice = (t.company_id && priceMap[t.company_id])
+        || (t.symbol && symbolPriceMap[t.symbol])
+        || t.current_price
+        || t.exit_price
+        || t.entry_price;
 
-    // Also fetch tp1_hit trades (still open, but TP1 achieved = partial win)
-    const { data: tp1HitTrades, error: tp1Err } = await supabase
-      .from('recommended_trades')
-      .select('id, symbol, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
-      .eq('status', 'tp1_hit')
-      .gte('recommended_at', LAUNCH_DATE);
+      if (livePrice && t.entry_price) {
+        const rawRatio = livePrice / (t.entry_price || 1);
+        if (rawRatio > 2.5 || rawRatio < 0.4) {
+          livePrice = Number(t.entry_price || 1);
+        }
+      }
 
-    if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
+      const entry = Number(t.entry_price || 0);
+      const current = Number(livePrice || entry);
+      const realPnlPct = t.status === 'closed' && t.pnl_percent !== null && t.pnl_percent !== undefined
+        ? Number(t.pnl_percent)
+        : (entry > 0 ? parseFloat((((current - entry) / entry) * 100).toFixed(1)) : 0);
 
-    const mapTradeDetails = (t: any) => ({
-      ...t,
-      company_name: t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol,
-    });
+      return {
+        ...t,
+        company_name: t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol,
+        current_price: current,
+        pnl_percent: realPnlPct,
+      };
+    };
 
     // Filter closed trades for BUY direction with valid PnL
     const closedBuyTrades = (allClosed || [])
