@@ -75,7 +75,7 @@ export default function PerformancePage() {
 
   // Drill-down Modal States
   const [drilldownModalOpen, setDrilldownModalOpen] = useState(false);
-  const [drilldownFilter, setDrilldownFilter] = useState<'all' | 'tp1' | 'tp2' | 'sl' | 'trailing' | 'breakeven'>('all');
+  const [drilldownFilter, setDrilldownFilter] = useState<'all' | 'tp1' | 'tp2' | 'sl' | 'trailing' | 'breakeven' | 'winning' | 'losing'>('all');
   const [drilldownTitle, setDrilldownTitle] = useState('');
 
   const activeQualityMetrics = useMemo(() => {
