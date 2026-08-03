@@ -376,9 +376,9 @@ export default function PerformancePage() {
                       onChange={(e) => setEvaluationTier(e.target.value as any)}
                       className="px-4 py-2 bg-black border border-amber-500/40 rounded-xl text-amber-400 font-bold text-xs focus:outline-none cursor-pointer hover:border-amber-400 transition-colors shadow-lg"
                     >
-                      <option value="premier_elite">👑 تقييم صفقات النخبة الذهبية (درجة ثقة 85% - 99%) [الرئيسي] ({tierEvaluations?.premier_elite?.total_signals || 0} صفقة)</option>
-                      <option value="standard_market">🌐 تقييم إشارات السوق العامة (درجة ثقة 65% - 84%) ({tierEvaluations?.standard_market?.total_signals || 0} صفقة)</option>
-                      <option value="combined">📊 التقييم الشامل المدمج (كافة إشارات السوق - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
+                      <option value="premier_elite">👑 تقييم صفقات النخبة الذهبية (درجة ثقة 95% - 99%) [الرئيسي] ({tierEvaluations?.premier_elite?.total_signals || 0} صفقة)</option>
+                      <option value="standard_market">🌐 إشارات السوق (ثقة عالية 65% - 94%) ({tierEvaluations?.standard_market?.total_signals || 0} صفقة)</option>
+                      <option value="combined">📊 التقييم الشامل (كافة إشارات السوق - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
                     </select>
                   </div>
                 </div>
@@ -440,7 +440,10 @@ export default function PerformancePage() {
                           <span>{activeStats.total_signals || activeStats.total_trades || 0}</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
-                              ⚡ {activeStats.activated_trades || 0} مفعلة
+                              ⚡ {activeStats.activated_trades || 0} سوق
+                            </span>
+                            <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              ⏳ {activeStats.pending_trades || 0} معلق
                             </span>
                             <span className="text-xs font-bold text-accent-blue bg-accent-blue/10 px-2 py-0.5 rounded border border-accent-blue/20">
                               {activeStats.active_trades || 0} Active ➔
