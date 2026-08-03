@@ -20,7 +20,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Clock, TrendingUp, Award, Activity, BarChart2, Briefcase, UserCheck, XCircle, ChevronLeft, ChevronRight, Info, Zap } from 'lucide-react';
 import { ActiveTradesModal } from '@/components/performance/ActiveTradesModal';
 import { QualityDrilldownModal } from '@/components/performance/QualityDrilldownModal';
 import { supabase } from '@/lib/supabase';
