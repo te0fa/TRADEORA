@@ -440,6 +440,7 @@ def generate_daily_recommendations():
 
         # Fundamental Adjustments (Fair Value & Dividend Yield)
         co_fund = fund_map.get(cid, {})
+        fair_val = co_fund.get('fair_value')
         fund_info = calculate_fundamental_score(co_fund, last_close)
         prob += fund_info.get('fundamental_boost', 0.0)
         fundamental_badge_ar = fund_info.get('badge_ar')
