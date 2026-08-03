@@ -43,26 +43,16 @@ def setup_logging():
         ]
     )
 
-def calculate_consensus(tv_data: dict | None, yahoo_data: dict | None) -> tuple[float | None, float | None, float | None, int | None, str | None, str | None]:
-    """
-    Consensus Logic (TradingView primary, Yahoo fallback):
-    
-    # Mubasher excluded: provides close-only price, no OHLCV. Using TV + Yahoo consensus instead.
-    # Investing.com excluded: frequent Cloudflare blocks make it unreliable for production use.
-    
-    if tv_price is not None:
-        consensus_price = tv_price  (source = 'tradingview')
-    elif yahoo_price is not None:
-        consensus_price = yahoo_price  (source = 'yahoo_live')
-    else:
-        consensus_price = None  (skip symbol)
-    """
+def calculate_consensus(tv_data: dict | None, yahoo_data: dict | None):
     tv_price = tv_data.get("price") if tv_data and tv_data.get("price") and tv_data.get("price") > 0 else None
     yahoo_price = yahoo_data.get("price") if yahoo_data and yahoo_data.get("price") and yahoo_data.get("price") > 0 else None
 
     if tv_price is not None:
         return (
-            tv_data.get("price"),
+            tv_data.get("open") or tv_price,
+            tv_data.get("high") or tv_price,
+            tv_data.get("low") or tv_price,
+            tv_price,
             tv_data.get("change") or 0.0,
             tv_data.get("change_percent") or 0.0,
             tv_data.get("volume") or 0,
@@ -71,7 +61,10 @@ def calculate_consensus(tv_data: dict | None, yahoo_data: dict | None) -> tuple[
         )
     elif yahoo_price is not None:
         return (
-            yahoo_data.get("price"),
+            yahoo_data.get("open") or yahoo_price,
+            yahoo_data.get("high") or yahoo_price,
+            yahoo_data.get("low") or yahoo_price,
+            yahoo_price,
             yahoo_data.get("change") or 0.0,
             yahoo_data.get("change_percent") or 0.0,
             yahoo_data.get("volume") or 0,
@@ -79,7 +72,7 @@ def calculate_consensus(tv_data: dict | None, yahoo_data: dict | None) -> tuple[
             "yahoo_fallback"
         )
     else:
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None
 
 async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False, run_type: str = "dynamic"):
     start_time = datetime.now()
@@ -168,7 +161,7 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
             tv_data = tv_map.get(sym)
             yahoo_data = yahoo_map.get(sym)
             
-            p_final, chg_final, chg_pct_final, vol_final, resolved_source, q_flag = calculate_consensus(
+            open_final, high_final, low_final, p_final, chg_final, chg_pct_final, vol_final, resolved_source, q_flag = calculate_consensus(
                 tv_data, yahoo_data
             )
             
@@ -186,6 +179,9 @@ async def run_pipeline(dry_run: bool = False, bypass_session_guard: bool = False
                 
             consensus_records.append({
                 "company_id": company_id,
+                "open_price": open_final,
+                "high_price": high_final,
+                "low_price": low_final,
                 "close_price": p_final,
                 "change_value": chg_final,
                 "change_percent": chg_pct_final,

@@ -32,7 +32,7 @@ class TradingViewProvider:
             "options": { "lang": "en" },
             "markets": ["egypt"],
             "symbols": { "tickers": tickers },
-            "columns": ["close", "change", "change_abs", "volume"]
+            "columns": ["close", "change", "change_abs", "volume", "open", "high", "low"]
         }
         
         results = []
@@ -50,15 +50,21 @@ class TradingViewProvider:
                     change_percent = float(d[1]) if d[1] is not None else None
                     change = float(d[2]) if d[2] is not None else None
                     volume = int(d[3]) if d[3] is not None else 0
+                    open_price = float(d[4]) if len(d) > 4 and d[4] is not None else price
+                    high_price = float(d[5]) if len(d) > 5 and d[5] is not None else price
+                    low_price = float(d[6]) if len(d) > 6 and d[6] is not None else price
                     
                     results.append({
                         "symbol": sym,
                         "price": price,
+                        "open": open_price,
+                        "high": high_price,
+                        "low": low_price,
                         "change": change,
                         "change_percent": change_percent,
                         "volume": volume,
                         "timestamp": timestamp,
-                        "source": "TradingView"
+                        "source": "tradingview"
                     })
             else:
                 print(f"[TradingViewProvider] Failed to fetch. Status: {r.status_code}")
