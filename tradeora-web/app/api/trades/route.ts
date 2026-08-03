@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from('recommended_trades')
       .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
-      .neq('exit_reason', 'pre_launch_reset')
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
       .gte('recommended_at', LAUNCH_DATE)
       .order('recommended_at', { ascending: false });
 
