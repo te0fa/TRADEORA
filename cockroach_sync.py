@@ -26,14 +26,20 @@ logger = logging.getLogger('tradeora.sync')
 # ── Supabase ───────────────────────────────────────────────────
 from supabase import create_client
 sb_url = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
-sb_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
-sb     = create_client(sb_url, sb_key)
+sb_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY')
+
+if not sb_url or not sb_key:
+    logger.warning("⚠️ SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured. Skipping CockroachDB sync.")
+    sys.exit(0)
+
+sb = create_client(sb_url, sb_key)
 
 # ── CockroachDB ────────────────────────────────────────────────
 import psycopg2, psycopg2.extras
-cr_url = os.getenv('DATABASE_URL')
+cr_url = os.getenv('DATABASE_URL') or os.getenv('COCKROACHDB_URL') or os.getenv('COCKROACH_DB_URL')
 if not cr_url:
-    raise EnvironmentError("DATABASE_URL not set in .env")
+    logger.warning("⚠️ DATABASE_URL / COCKROACHDB_URL not set in environment secrets. Skipping CockroachDB sync.")
+    sys.exit(0)
 
 def cr_conn():
     return psycopg2.connect(cr_url, connect_timeout=10)

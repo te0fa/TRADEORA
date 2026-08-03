@@ -28,8 +28,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL"
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    logger.error("Missing SUPABASE_URL or SUPABASE_KEY in environment variables.")
-    sys.exit(1)
+    logger.warning("⚠️ Missing SUPABASE_URL or SUPABASE_KEY in environment variables. Skipping track_trades gracefully.")
+    sys.exit(0)
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
