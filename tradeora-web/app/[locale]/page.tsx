@@ -36,6 +36,7 @@ export default function DashboardPage({ params }: Props) {
   // Market Indices states
   const [egx30, setEgx30] = useState<{value: number|null, change: number|null}>({value: null, change: null});
   const [egx70, setEgx70] = useState<{value: number|null, change: number|null}>({value: null, change: null});
+  const [egx100, setEgx100] = useState<{value: number|null, change: number|null}>({value: null, change: null});
   const [egx33, setEgx33] = useState<{value: number|null, change: number|null}>({value: null, change: null});
 
   const [statsData, setStatsData] = useState({
@@ -92,13 +93,13 @@ export default function DashboardPage({ params }: Props) {
     fetchInvestorFlows();
 
     const fetchLiveIndices = async () => {
-      // Single TradingView Scanner call for ALL 3 indices — same source, same speed
+      // 1. Try TradingView Scanner for EGX30, EGX70EWI, EGX100EWI
       try {
         const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI', 'EGX:EGX33'] },
+            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI', 'EGX:EGX100EWI'] },
             columns: ['close', 'change']
           }),
           cache: 'no-store',
@@ -108,35 +109,34 @@ export default function DashboardPage({ params }: Props) {
           const rows = tvData?.data || [];
           const egx30Row = rows.find((r: any) => r.s === 'EGX:EGX30')?.d;
           const egx70Row = rows.find((r: any) => r.s === 'EGX:EGX70EWI')?.d;
-          const egx33Row = rows.find((r: any) => r.s === 'EGX:EGX33')?.d;
+          const egx100Row = rows.find((r: any) => r.s === 'EGX:EGX100EWI')?.d;
 
           if (egx30Row?.[0] != null)
             setEgx30({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
           if (egx70Row?.[0] != null)
             setEgx70({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
-          if (egx33Row?.[0] != null)
-            setEgx33({ value: parseFloat(Number(egx33Row[0]).toFixed(2)), change: parseFloat(Number(egx33Row[1] ?? 0).toFixed(2)) });
-
-          // TV returned at least one index — skip fallback
-          if (egx30Row || egx70Row || egx33Row) return;
+          if (egx100Row?.[0] != null)
+            setEgx100({ value: parseFloat(Number(egx100Row[0]).toFixed(2)), change: parseFloat(Number(egx100Row[1] ?? 0).toFixed(2)) });
         }
-      } catch { /* fall through to server API fallback */ }
+      } catch { /* silent fallback to server APIs */ }
 
-      // Fallback: server-side APIs in parallel (TV CORS blocked on Vercel)
-      const [r30, r70, r33] = await Promise.allSettled([
+      // 2. Parallel server API fetches for all 4 indices (including EGX33 Shariah)
+      const [r30, r70, r100, r33] = await Promise.allSettled([
         fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()),
+        fetch('/api/egx100', { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()),
       ]);
       if (r30.status === 'fulfilled' && r30.value?.value) setEgx30(r30.value);
       if (r70.status === 'fulfilled' && r70.value?.value) setEgx70(r70.value);
+      if (r100.status === 'fulfilled' && r100.value?.value) setEgx100(r100.value);
       if (r33.status === 'fulfilled' && r33.value?.value) setEgx33(r33.value);
     };
 
     fetchLiveIndices();
     fetchInvestorFlows();
     fetchMarketBreadth();
-    // Poll every 5 seconds — same interval for all 3 indices
+    // Poll every 5 seconds — strict 5s live index update cycle
     const indexIntervalId = setInterval(fetchLiveIndices, 5000);
 
 
@@ -393,6 +393,7 @@ export default function DashboardPage({ params }: Props) {
           {[
             { label: 'EGX30', data: egx30 },
             { label: 'EGX70', data: egx70 },
+            { label: 'EGX100', data: egx100 },
             { label: 'EGX33', data: egx33 },
           ].map((idx, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -427,54 +428,73 @@ export default function DashboardPage({ params }: Props) {
 
       {/* ── Foreign Investor Flow Banner ── */}
       {investorFlows?.latest && (
-        <motion.div variants={itemVariants} className="w-full glass-panel px-5 py-3.5 rounded-2xl mb-8 flex flex-wrap items-center justify-between gap-4 border border-emerald-500/20 bg-emerald-500/5">
-          <div className="flex items-center gap-3">
-            <span className="text-xl">🌍</span>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">
-                  {isAr ? 'تدفقات الأجانب والمؤسسات (EGX Official)' : 'Foreign & Institutional Flows'}
-                </span>
-                <span className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
-                  investorFlows.latest.foreigners_net >= 0 
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                }`}>
-                  {investorFlows.latest.foreigners_net >= 0 ? '🟢 أجانب يشترون' : '🔴 أجانب يبيعون'}
-                </span>
+        (() => {
+          const formatFlowAmount = (val: number) => {
+            if (val === undefined || val === null || isNaN(val)) return '0';
+            const abs = Math.abs(val);
+            if (abs >= 1_000_000_000) {
+              const b = (val / 1_000_000_000).toFixed(2);
+              return isAr ? `${b} مليار ج.م` : `${b}B EGP`;
+            }
+            if (abs >= 1_000_000) {
+              const m = (val / 1_000_000).toFixed(1);
+              return isAr ? `${m}M ج.م` : `${m}M EGP`;
+            }
+            const k = (val / 1000).toFixed(1);
+            return isAr ? `${k}K ج.م` : `${k}K EGP`;
+          };
+
+          return (
+            <motion.div variants={itemVariants} className="w-full glass-panel px-5 py-3.5 rounded-2xl mb-8 flex flex-wrap items-center justify-between gap-4 border border-emerald-500/20 bg-emerald-500/5">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🌍</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white">
+                      {isAr ? 'تدفقات الأجانب والمؤسسات (EGX Official)' : 'Foreign & Institutional Flows'}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
+                      investorFlows.latest.foreigners_net >= 0 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    }`}>
+                      {investorFlows.latest.foreigners_net >= 0 ? '🟢 أجانب يشترون' : '🔴 أجانب يبيعون'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {investorFlows.recommendation_impact}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                {investorFlows.recommendation_impact}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-xs font-mono">
-            <div className="text-right">
-              <span className="text-zinc-500 block text-[10px]">{isAr ? 'صافي الأجانب' : 'Foreign Net'}</span>
-              <span className={`font-bold ${investorFlows.latest.foreigners_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {(investorFlows.latest.foreigners_net / 1e6).toFixed(1)}M ج.م
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-zinc-500 block text-[10px]">{isAr ? 'مؤسسات مصرية' : 'Egy Inst.'}</span>
-              <span className={`font-bold ${investorFlows.latest.egyptian_inst_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {(investorFlows.latest.egyptian_inst_net / 1e6).toFixed(1)}M ج.م
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-zinc-500 block text-[10px]">{isAr ? 'أفراد مصرية' : 'Egy Retail'}</span>
-              <span className={`font-bold ${investorFlows.latest.egyptian_ind_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {(investorFlows.latest.egyptian_ind_net / 1e6).toFixed(1)}M ج.م
-              </span>
-            </div>
-            <button
-              onClick={() => router.push(`/${locale}/investor-flows`)}
-              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-all text-xs"
-            >
-              {isAr ? 'تفاصيل التدفقات 📊' : 'View Flows'}
-            </button>
-          </div>
-        </motion.div>
+              <div className="flex items-center gap-4 text-xs font-mono">
+                <div className="text-right">
+                  <span className="text-zinc-500 block text-[10px]">{isAr ? 'صافي الأجانب' : 'Foreign Net'}</span>
+                  <span className={`font-bold ${investorFlows.latest.foreigners_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {formatFlowAmount(investorFlows.latest.foreigners_net)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-zinc-500 block text-[10px]">{isAr ? 'مؤسسات مصرية' : 'Egy Inst.'}</span>
+                  <span className={`font-bold ${investorFlows.latest.egyptian_inst_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {formatFlowAmount(investorFlows.latest.egyptian_inst_net)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-zinc-500 block text-[10px]">{isAr ? 'أفراد مصرية' : 'Egy Retail'}</span>
+                  <span className={`font-bold ${investorFlows.latest.egyptian_ind_net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {formatFlowAmount(investorFlows.latest.egyptian_ind_net)}
+                  </span>
+                </div>
+                <button
+                  onClick={() => router.push(`/${locale}/investor-flows`)}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-all text-xs"
+                >
+                  {isAr ? 'تفاصيل التدفقات 📊' : 'View Flows'}
+                </button>
+              </div>
+            </motion.div>
+          );
+        })()
       )}
 
       {/* ── Market Breadth & Health Banner ── */}
