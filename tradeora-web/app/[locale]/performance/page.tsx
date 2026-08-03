@@ -402,34 +402,52 @@ export default function PerformancePage() {
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                   <motion.div variants={itemVariants}>
-                    <Card className="p-5 h-full flex flex-col justify-between">
+                    <Card 
+                      onClick={() => {
+                        setDrilldownFilter('winning');
+                        setDrilldownTitle('🏆 صفقات نسبة النجاح والربح (Win Rate Trades)');
+                        setDrilldownModalOpen(true);
+                      }}
+                      className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-emerald-500/40 transition-all group shadow-lg"
+                    >
                       <div className="flex items-center justify-between text-zinc-400 mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider">Win Rate</span>
-                        <Award className="w-5 h-5 text-up-green" />
+                        <span className="text-xs font-bold uppercase tracking-wider group-hover:text-emerald-400 transition-colors flex items-center gap-1">
+                          Win Rate ➔
+                        </span>
+                        <Award className="w-5 h-5 text-up-green group-hover:scale-110 transition-transform" />
                       </div>
                       <div>
                         <div className="text-3xl font-black text-up-green font-mono">
                           {activeStats.win_rate ? activeStats.win_rate.toFixed(1) : '0.0'}%
                         </div>
-                        <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                          Based on {activeStats.closed_trades || 0} closed trades
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium group-hover:text-zinc-300">
+                          Based on {activeStats.closed_trades || 0} closed trades (اضغط للتفاصيل)
                         </p>
                       </div>
                     </Card>
                   </motion.div>
 
                   <motion.div variants={itemVariants}>
-                    <Card className="p-5 h-full flex flex-col justify-between">
+                    <Card 
+                      onClick={() => {
+                        setDrilldownFilter('all');
+                        setDrilldownTitle('📈 صفقات إجمالي العائد التراكمي (Compounded Return Trades)');
+                        setDrilldownModalOpen(true);
+                      }}
+                      className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-accent-blue/40 transition-all group shadow-lg"
+                    >
                       <div className="flex items-center justify-between text-zinc-400 mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider">Cum. Return</span>
-                        <TrendingUp className="w-5 h-5 text-accent-blue" />
+                        <span className="text-xs font-bold uppercase tracking-wider group-hover:text-accent-blue transition-colors flex items-center gap-1">
+                          Cum. Return ➔
+                        </span>
+                        <TrendingUp className="w-5 h-5 text-accent-blue group-hover:scale-110 transition-transform" />
                       </div>
                       <div>
                         <div className={`text-3xl font-black font-mono ${(activeStats.total_pnl || 0) >= 0 ? 'text-accent-blue' : 'text-down-red'}`}>
                           {(activeStats.total_pnl || 0) > 0 ? '+' : ''}{(activeStats.total_pnl || 0).toFixed(1)}%
                         </div>
-                        <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                          Total compounded PnL percentage
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium group-hover:text-zinc-300">
+                          Total compounded PnL percentage (اضغط للتفاصيل)
                         </p>
                       </div>
                     </Card>
@@ -438,11 +456,11 @@ export default function PerformancePage() {
                   <motion.div variants={itemVariants}>
                     <Card 
                       onClick={() => setIsModalOpen(true)}
-                      className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-accent-blue/40 transition-all group"
+                      className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-accent-blue/40 transition-all group shadow-lg"
                     >
                       <div className="flex items-center justify-between text-zinc-400 mb-2">
                         <span className="text-xs font-bold uppercase tracking-wider group-hover:text-accent-blue transition-colors flex items-center gap-1">
-                          Total Signals (Open/Closed)
+                          Total Signals (Open/Closed) ➔
                           <span 
                             className="inline-flex items-center text-accent-blue cursor-pointer"
                             title="إجمالي صفقات وتوصيات الذكاء الاصطناعي المحددة (نقاط دخول، أهداف ربح، وقف خسارة)."
@@ -477,17 +495,26 @@ export default function PerformancePage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants}>
-                    <Card className="p-5 h-full flex flex-col justify-between">
+                    <Card 
+                      onClick={() => {
+                        setDrilldownFilter('all');
+                        setDrilldownTitle('📊 صفقات متوسط العائد لكل صفقة (Average Return Trades)');
+                        setDrilldownModalOpen(true);
+                      }}
+                      className="p-5 h-full flex flex-col justify-between cursor-pointer hover:border-amber-400/40 transition-all group shadow-lg"
+                    >
                       <div className="flex items-center justify-between text-zinc-400 mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider">Avg Return</span>
-                        <BarChart2 className="w-5 h-5 text-accent-gold" />
+                        <span className="text-xs font-bold uppercase tracking-wider group-hover:text-amber-400 transition-colors flex items-center gap-1">
+                          Avg Return ➔
+                        </span>
+                        <BarChart2 className="w-5 h-5 text-accent-gold group-hover:scale-110 transition-transform" />
                       </div>
                       <div>
                         <div className={`text-3xl font-black font-mono ${platformStats.avg_pnl >= 0 ? 'text-accent-gold' : 'text-down-red'}`}>
                           {platformStats.avg_pnl > 0 ? '+' : ''}{platformStats.avg_pnl.toFixed(1)}%
                         </div>
-                        <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                          Average return per trade
+                        <p className="text-[11px] text-zinc-500 mt-1 font-medium group-hover:text-zinc-300">
+                          Average return per trade (اضغط للتفاصيل)
                         </p>
                       </div>
                     </Card>

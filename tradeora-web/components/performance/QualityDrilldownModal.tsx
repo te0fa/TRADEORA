@@ -44,7 +44,7 @@ export interface ClosedDrilldownTrade {
 interface QualityDrilldownModalProps {
   isOpen: boolean;
   onClose: () => void;
-  filterType: 'all' | 'tp1' | 'tp2' | 'sl' | 'trailing' | 'breakeven';
+  filterType: 'all' | 'tp1' | 'tp2' | 'sl' | 'trailing' | 'breakeven' | 'winning' | 'losing';
   filterTitle: string;
   tierLabel: string;
   trades: ClosedDrilldownTrade[];
@@ -76,6 +76,10 @@ export function QualityDrilldownModal({
         matchesCategory = reason === 'sl';
       } else if (filterType === 'trailing') {
         matchesCategory = reason === 'trailing_stop' || reason === 'breakeven';
+      } else if (filterType === 'winning') {
+        matchesCategory = Number(t.pnl_percent || 0) > 0 || t.status === 'tp1_hit' || reason === 'tp1' || reason === 'tp2';
+      } else if (filterType === 'losing') {
+        matchesCategory = Number(t.pnl_percent || 0) < 0 || reason === 'sl';
       }
 
       // Search query filter
