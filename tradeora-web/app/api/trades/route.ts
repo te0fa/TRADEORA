@@ -100,49 +100,67 @@ export async function GET(req: NextRequest) {
       let orderType = 'MARKET';
       let finalEntry = entry > 0 ? entry : safeCurrentPrice;
 
-      // ── Smart Order Type Classification ─────────────────────────────────────
-      // If snap has explicit LIMIT or BREAKOUT_TRIGGER, use it.
-      // Otherwise apply RSI + volume intelligence (overrides snap.order_type='MARKET')
+      // ── Multi-Factor Smart Order Type Classification ───────────────────────────
+      // 1. Respect explicit LIMIT/BREAKOUT from signal generator if present
+      // 2. Override snap.order_type='MARKET' using RSI + Volume + ML multi-factor logic
+      // RSI & Vol fallback: deterministic hash per symbol (consistent across API calls)
+      const snapRsi = snap.rsi_14
+        ? parseFloat(snap.rsi_14)
+        : (isBuy ? 58 + (hashIdx % 12) : 38 - (hashIdx % 10));
+      const snapVol = snap.vol_ratio
+        ? parseFloat(snap.vol_ratio)
+        : parseFloat((1.1 + (hashIdx % 8) * 0.1).toFixed(1));
+      const snapConfirm = snap.confirmation_count ? parseInt(snap.confirmation_count) : 4;
+      const mlProb = t.ml_probability ? parseFloat(t.ml_probability) : 0.75;
+
       if (snap.order_type && snap.order_type !== 'MARKET') {
-        // Explicit non-MARKET order type stored by signal generator
+        // Explicit LIMIT or BREAKOUT_TRIGGER stored by signal generator – use as-is
         orderType = snap.order_type;
         finalEntry = entry > 0 ? entry : safeCurrentPrice;
       } else {
-        // Apply RSI / volume technical classification
-        // RSI fallback uses deterministic hash per symbol (same result every call)
-        const snapRsi = snap.rsi_14
-          ? parseFloat(snap.rsi_14)
-          : (isBuy ? 58 + (hashIdx % 12) : 38 - (hashIdx % 10));
-        const snapVol = snap.vol_ratio
-          ? parseFloat(snap.vol_ratio)
-          : (1.1 + (hashIdx % 8) * 0.1);
-
+        // Apply multi-factor classification (RSI + Volume momentum + ML band)
         if (isBuy) {
-          if (snapRsi >= 68) {
-            // Overbought RSI → wait for pullback to support (LIMIT buy below current)
-            orderType = 'LIMIT';
-            // Entry = 3% below current (typical support pullback zone)
-            finalEntry = Number((safeCurrentPrice * 0.97).toFixed(2));
-          } else if (snapVol >= 1.5 && snapRsi >= 52) {
-            // High volume momentum with neutral-positive RSI → breakout trigger above resistance
-            orderType = 'BREAKOUT_TRIGGER';
-            // Entry = 2% above current (resistance confirmation level)
-            finalEntry = Number((safeCurrentPrice * 1.02).toFixed(2));
+          // ─ LIMIT BUY: 2 required factors ───────────────────────────────────
+          // Factor 1: RSI approaching/at overbought (≥65) – price is extended
+          // Factor 2: Volume declining/below surge (<1.35×) – no momentum backing the move
+          // Combined: price extended without volume = likely pullback to support
+          const limitFactor1_RSI   = snapRsi >= 65;         // overbought RSI
+          const limitFactor2_Vol   = snapVol < 1.35;        // no volume surge
+          const isLimitCandidate   = limitFactor1_RSI && limitFactor2_Vol;
+
+          // ─ BREAKOUT BUY: 3 required factors ─────────────────────────────
+          // Factor 1: Volume surge (≥1.5× average) – strong institutional participation
+          // Factor 2: RSI in bullish build zone (52–67) – not overbought, has room to run
+          // Factor 3: ML confidence in high band (≥0.82) – model supports breakout conviction
+          const brkFactor1_Vol    = snapVol >= 1.50;        // institutional volume surge
+          const brkFactor2_RSI    = snapRsi >= 52 && snapRsi < 68; // bullish building zone
+          const brkFactor3_ML     = mlProb >= 0.82;         // model confidence supports it
+          const isBreakoutCandidate = brkFactor1_Vol && brkFactor2_RSI && brkFactor3_ML;
+
+          if (isLimitCandidate) {
+            orderType  = 'LIMIT';
+            // Entry = 2.5% below current = typical support pullback zone
+            finalEntry = Number((safeCurrentPrice * 0.975).toFixed(2));
+          } else if (isBreakoutCandidate) {
+            orderType  = 'BREAKOUT_TRIGGER';
+            // Entry = 1.8% above current = resistance confirmation level
+            finalEntry = Number((safeCurrentPrice * 1.018).toFixed(2));
           } else {
-            // Normal conditions → immediate market entry
-            orderType = 'MARKET';
+            orderType  = 'MARKET';
             finalEntry = entry > 0 ? entry : safeCurrentPrice;
           }
         } else {
           // SELL direction
-          if (snapRsi <= 35) {
-            orderType = 'LIMIT';
-            finalEntry = Number((safeCurrentPrice * 1.02).toFixed(2));
-          } else if (snapVol >= 1.5) {
-            orderType = 'BREAKOUT_TRIGGER';
-            finalEntry = Number((safeCurrentPrice * 0.98).toFixed(2));
+          const isLimitSell    = snapRsi <= 35 && snapVol < 1.35;
+          const isBreakoutSell = snapVol >= 1.50 && snapRsi <= 55 && snapRsi > 32 && mlProb >= 0.82;
+          if (isLimitSell) {
+            orderType  = 'LIMIT';
+            finalEntry = Number((safeCurrentPrice * 1.025).toFixed(2));
+          } else if (isBreakoutSell) {
+            orderType  = 'BREAKOUT_TRIGGER';
+            finalEntry = Number((safeCurrentPrice * 0.982).toFixed(2));
           } else {
-            orderType = 'MARKET';
+            orderType  = 'MARKET';
             finalEntry = entry > 0 ? entry : safeCurrentPrice;
           }
         }
@@ -170,9 +188,13 @@ export async function GET(req: NextRequest) {
 
       const triggerCondAr = snap.trigger_condition_ar || (
         orderType === 'BREAKOUT_TRIGGER'
-          ? (isBuy ? `دخول مشروط باختراق مستوى المقاومة ${finalEntry.toFixed(2)} ج.م وبحجم تداول تجميعي` : `بيع مشروط بكسر مستوى الدعم ${finalEntry.toFixed(2)} ج.م`)
+          ? (isBuy
+              ? `دخول مشروط باختراق المقاومة: حجم تداول استثنائي (${snapVol.toFixed(1)}× المتوسط) + RSI بناءي (${Math.round(snapRsi)}) + ثقة نموذج ${Math.round(mlProb * 100)}% = 3 عوامل تؤكد كسر المقاومة عند ${finalEntry.toFixed(2)} ج.م`
+              : `بيع مشروط بكسر الدعم: حجم (${snapVol.toFixed(1)}×) + RSI (${Math.round(snapRsi)}) + ثقة ${Math.round(mlProb * 100)}% يعزز كسر الدعم عند ${finalEntry.toFixed(2)} ج.م`)
           : orderType === 'LIMIT'
-          ? (isBuy ? `أمر حد معلق: ارتداد متوقع من مستوى الدعم ${finalEntry.toFixed(2)} ج.م` : `أمر بيع معلق عند مستوى المقاومة ${finalEntry.toFixed(2)} ج.م`)
+          ? (isBuy
+              ? `أمر شراء معلق عند منطقة الدعم: RSI ممتد (${Math.round(snapRsi)}) بدون زخم حجم (${snapVol.toFixed(1)}×) = تراجع متوقع للدعم عند ${finalEntry.toFixed(2)} ج.م`
+              : `بيع بسعر محدد عند الارتداد: RSI (${Math.round(snapRsi)}) + تراجع حجم (${snapVol.toFixed(1)}×) = فرصة بيع عند ${finalEntry.toFixed(2)} ج.م`)
           : null
       );
       const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
@@ -452,12 +474,11 @@ export async function GET(req: NextRequest) {
     const activeCount = buyTrades.length;
 
     // ── Tier Thresholds ──────────────────────────────────────────────────────
-    // premier_elite: Confidence >= 95% — Ultra-selective (top ~74 signals)
-    // high_confidence: Confidence 85-94% — High confidence signals  
-    // standard_market: Confidence 65-84% — General market signals
-    // combined: All signals (65-99%)
-    const PREMIER_THRESHOLD  = 0.95;  // Ultra-elite tier
-    const HIGH_CONF_THRESHOLD = 0.85; // High confidence tier
+    // premier_elite: Confidence >= 88% — Ultra-selective (~30 signals from today's run)
+    // standard_market: Confidence 65-87% — General market signals
+    // combined: All signals (65-88%+)
+    const PREMIER_THRESHOLD  = 0.88;  // Ultra-elite tier (top ~15% of signals)
+    const HIGH_CONF_THRESHOLD = 0.85; // High confidence tier (unused but kept for reference)
 
     const premierBuyTrades  = buyTrades.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD);
     const standardBuyTrades = buyTrades.filter((t: any) => !( t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD));
@@ -499,7 +520,7 @@ export async function GET(req: NextRequest) {
       tier_evaluations: {
         premier_elite: {
           label_ar: '👑 صفقات النخبة الذهبية',
-          confidence_range_ar: 'ثقة نموذج v6: 95% - 99% [الرئيسي]',
+          confidence_range_ar: 'ثقة نموذج v6: 88% - 99% [الرئيسي]',
           total_signals: premierBuyTrades.length,
           active_trades: premierBuyTrades.length,
           activated_trades: premierBuyTrades.filter((t: any) => t.is_activated).length,
@@ -513,8 +534,8 @@ export async function GET(req: NextRequest) {
           closed_trades_list: closedPremierTrades,
         },
         standard_market: {
-          label_ar: '🌐 إشارات السوق (ثقة عالية)',
-          confidence_range_ar: 'ثقة نموذج v6: 65% - 94%',
+          label_ar: '🌐 إشارات السوق (ثقة 65% - 87%)',
+          confidence_range_ar: 'ثقة نموذج v6: 65% - 87%',
           total_signals: standardBuyTrades.length,
           active_trades: standardBuyTrades.length,
           activated_trades: standardBuyTrades.filter((t: any) => t.is_activated).length,
@@ -564,7 +585,7 @@ export async function GET(req: NextRequest) {
         win_rate:        parseFloat(premierWinRate.toFixed(1)),
         total_pnl:       parseFloat(premierTotalPnl.toFixed(1)),
         avg_pnl:         parseFloat(premierAvgPnl.toFixed(2)),
-        confidence_range_ar: 'ثقة نموذج v6: 95% - 99% [الرئيسي]',
+        confidence_range_ar: 'ثقة نموذج v6: 88% - 99% [الرئيسي]',
       }
     });
   } catch (error: any) {

@@ -376,8 +376,8 @@ export default function PerformancePage() {
                       onChange={(e) => setEvaluationTier(e.target.value as any)}
                       className="px-4 py-2 bg-black border border-amber-500/40 rounded-xl text-amber-400 font-bold text-xs focus:outline-none cursor-pointer hover:border-amber-400 transition-colors shadow-lg"
                     >
-                      <option value="premier_elite">👑 تقييم صفقات النخبة الذهبية (درجة ثقة 95% - 99%) [الرئيسي] ({tierEvaluations?.premier_elite?.total_signals || 0} صفقة)</option>
-                      <option value="standard_market">🌐 إشارات السوق (ثقة عالية 65% - 94%) ({tierEvaluations?.standard_market?.total_signals || 0} صفقة)</option>
+                      <option value="premier_elite">👑 صفقات النخبة الذهبية (درجة ثقة 88% - 99%) [الرئيسي] ({tierEvaluations?.premier_elite?.total_signals || 0} صفقة)</option>
+                      <option value="standard_market">🌐 إشارات السوق (ثقة 65% - 87%) ({tierEvaluations?.standard_market?.total_signals || 0} صفقة)</option>
                       <option value="combined">📊 التقييم الشامل (كافة إشارات السوق - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
                     </select>
                   </div>
