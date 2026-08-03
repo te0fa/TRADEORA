@@ -12,10 +12,17 @@ const CANONICAL_SOURCES_DAILY = [
 
 const CANONICAL_SOURCES_INTRADAY = [
   'tradingview_15m',
+  'yahoo_15m',
   'tradingview_30m',
+  'yahoo_30m',
   'tradingview_1h',
+  'yahoo_1h',
   'tradingview_4h',
+  'yahoo_4h',
+  'tradingview_5m',
+  'yahoo_5m',
   'tradingview_1d',
+  'yahoo_1d',
 ];
 
 export async function GET(req: NextRequest) {
@@ -39,9 +46,10 @@ export async function GET(req: NextRequest) {
   const isIntraday = interval !== '1d';
   const table      = isIntraday ? 'intraday_snapshots' : 'market_prices';
   const dateCol    = isIntraday ? 'snapshot_time'      : 'price_date';
-  const exactSource = `tradingview_${interval}`;
+  const exactTvSource = `tradingview_${interval}`;
+  const exactYfSource = `yahoo_${interval}`;
   const sources    = isIntraday
-                     ? [exactSource, ...CANONICAL_SOURCES_INTRADAY.filter(s => s !== exactSource)]
+                     ? [exactTvSource, exactYfSource, ...CANONICAL_SOURCES_INTRADAY.filter(s => s !== exactTvSource && s !== exactYfSource)]
                      : CANONICAL_SOURCES_DAILY;
 
   // For intraday: only fetch last 90 days to avoid stale snapshots from months ago

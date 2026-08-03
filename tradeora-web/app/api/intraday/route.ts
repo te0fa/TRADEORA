@@ -93,11 +93,12 @@ export async function GET(req: NextRequest) {
 
   // Priority: official Canonical intraday sources
   const CANONICAL_SOURCES_INTRADAY = [
-    'tradingview_15m',
-    'tradingview_30m',
-    'tradingview_1h',
-    'tradingview_4h',
-    'tradingview_1d',
+    'tradingview_15m', 'yahoo_15m',
+    'tradingview_30m', 'yahoo_30m',
+    'tradingview_1h',  'yahoo_1h',
+    'tradingview_4h',  'yahoo_4h',
+    'tradingview_5m',  'yahoo_5m',
+    'tradingview_1d',  'yahoo_1d',
   ]
 
   // 4. Fetch exact source intraday snapshots
@@ -109,8 +110,10 @@ export async function GET(req: NextRequest) {
     .order('snapshot_time', { ascending: true })
     .limit(2000)
 
-  // Filter exact interval snapshots
-  const exactKeySnapshots = (tvSnapshots || []).filter(s => s.source === `tradingview_${intervalKey}`)
+  // Filter exact interval snapshots (tradingview or yahoo)
+  const exactKeySnapshots = (tvSnapshots || []).filter(s =>
+    s.source === `tradingview_${intervalKey}` || s.source === `yahoo_${intervalKey}`
+  )
 
   if (exactKeySnapshots && exactKeySnapshots.length >= 10) {
     const seenTimes = new Set<number>()

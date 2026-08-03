@@ -800,39 +800,49 @@ function buildIntradayChunk(chunk: any[]): any {
     // Merge live tick into last candle or append today's live candle
     const livePriceVal = liveStockPrice?.close ?? Number(priceRecord?.close_price || 0);
     if (cleaned.length > 0 && livePriceVal > 0) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      // Get Cairo local date string (YYYY-MM-DD)
+      const cairoDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+      const cairoTimeString = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
+      const cairoHour = new Date(cairoTimeString).getHours();
+      const isPreMarket = cairoHour < 10; // Before 10:00 AM Cairo time
+
       const lastCandle = cleaned[cleaned.length - 1];
       const lastDate = typeof lastCandle.time === 'string' ? lastCandle.time.split('T')[0] : '';
 
-      if (lastDate === todayStr) {
-        lastCandle.close = livePriceVal;
-        lastCandle.close_price = livePriceVal;
-        if (liveStockPrice?.open) {
-          lastCandle.open = liveStockPrice.open;
-          lastCandle.open_price = liveStockPrice.open;
+      if (lastDate === cairoDateStr) {
+        // If market is pre-session (before 10:00 AM) and no trading volume has occurred today, remove the empty candle
+        if (isPreMarket && (liveStockPrice?.volume ?? lastCandle.volume ?? 0) === 0) {
+          cleaned.pop();
+        } else {
+          lastCandle.close = livePriceVal;
+          lastCandle.close_price = livePriceVal;
+          if (liveStockPrice?.open) {
+            lastCandle.open = liveStockPrice.open;
+            lastCandle.open_price = liveStockPrice.open;
+          }
+          if (liveStockPrice?.high) {
+            lastCandle.high = Math.max(lastCandle.high, liveStockPrice.high);
+            lastCandle.high_price = Math.max(lastCandle.high_price, liveStockPrice.high);
+          }
+          if (liveStockPrice?.low) {
+            lastCandle.low = Math.min(lastCandle.low > 0 ? lastCandle.low : liveStockPrice.low, liveStockPrice.low);
+            lastCandle.low_price = Math.min(lastCandle.low_price > 0 ? lastCandle.low_price : liveStockPrice.low, liveStockPrice.low);
+          }
+          if (liveStockPrice?.volume) {
+            lastCandle.volume = liveStockPrice.volume;
+          }
         }
-        if (liveStockPrice?.high) {
-          lastCandle.high = Math.max(lastCandle.high, liveStockPrice.high);
-          lastCandle.high_price = Math.max(lastCandle.high_price, liveStockPrice.high);
-        }
-        if (liveStockPrice?.low) {
-          lastCandle.low = Math.min(lastCandle.low > 0 ? lastCandle.low : liveStockPrice.low, liveStockPrice.low);
-          lastCandle.low_price = Math.min(lastCandle.low_price > 0 ? lastCandle.low_price : liveStockPrice.low, liveStockPrice.low);
-        }
-        if (liveStockPrice?.volume) {
-          lastCandle.volume = liveStockPrice.volume;
-        }
-      } else if (liveStockPrice) {
-        // Prevent appending synthetic live candle on weekends OR official holidays when no actual trading occurred
-        const todayDateObj = new Date();
+      } else if (liveStockPrice && !isPreMarket) {
+        // Prevent appending synthetic live candle on weekends OR official holidays or before market open
+        const todayDateObj = new Date(cairoTimeString);
         const currentDay = todayDateObj.getDay();
         const isEGXWeekend = currentDay === 5 || currentDay === 6;
         const hasTradingVolumeToday = (liveStockPrice.volume ?? 0) > 0;
 
         if (!isEGXWeekend && hasTradingVolumeToday) {
           cleaned.push({
-            time: todayStr,
-            price_date: todayStr,
+            time: cairoDateStr,
+            price_date: cairoDateStr,
             open: liveStockPrice.open || livePriceVal,
             open_price: liveStockPrice.open || livePriceVal,
             high: liveStockPrice.high || livePriceVal,

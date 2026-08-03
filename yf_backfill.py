@@ -94,7 +94,7 @@ def fetch_and_store(symbol: str, company_id: str, interval: str, period: str = N
     table      = cfg['table']
     date_col   = cfg['date_col']
 
-    # Check if up-to-date (skip if incremental and fresh)
+    # Check if up-to-date (skip if incremental and fresh, but force fetch in live/fill-gaps mode)
     if not fill_gaps:
         last = get_last_date_in_db(company_id, source, cfg)
         if last:
@@ -103,15 +103,6 @@ def fetch_and_store(symbol: str, company_id: str, interval: str, period: str = N
             if days_missing <= 1 and interval == '1d':
                 logger.debug(f'[{symbol}] {source}: up-to-date, skip')
                 return 'skipped', 0
-            # For intraday, skip if last candle is < 30 min ago
-            if interval in ('5m', '15m', '30m', '1h') and days_missing < 1:
-                try:
-                    last_ts = datetime.fromisoformat(str(last).replace('Z', '+00:00'))
-                    if (datetime.now(timezone.utc) - last_ts).seconds < 1800:
-                        logger.debug(f'[{symbol}] {source}: fresh, skip')
-                        return 'skipped', 0
-                except:
-                    pass
 
     try:
         ticker = yf.Ticker(ticker_sym)
@@ -223,9 +214,9 @@ def main():
         cid = comp['id']
         logger.info(f'[{i+1}/{len(companies)}] {sym}')
 
-        sym_written = 0
+        force_fetch = args.fill_gaps or args.live
         for ivl in intervals:
-            status, count = fetch_and_store(sym, cid, ivl, fill_gaps=args.fill_gaps)
+            status, count = fetch_and_store(sym, cid, ivl, fill_gaps=force_fetch)
             total_written += count
             sym_written   += count
             if status == 'processed': processed += 1
