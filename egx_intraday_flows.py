@@ -44,26 +44,28 @@ HOME_URL     = 'https://www.egx.com.eg/ar/Home.aspx'
 
 
 
-ARABIC_DIGITS_TRANS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+ARABIC_DIGITS_TRANS = str.maketrans('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '01234567890123456789')
 
 def parse_egp(text: str) -> float | None:
-    """Convert EGP number string → float. Handles Eastern Arabic digits, commas, negatives."""
+    """Convert EGP number string → float. Handles Eastern Arabic digits, commas, negatives, invisible RTL/ALM marks."""
     if not text:
         return None
     cleaned = str(text).strip()
-    # Convert Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) to standard ASCII digits
+    # 1. Translate Arabic/Persian digits to standard ASCII digits
     cleaned = cleaned.translate(ARABIC_DIGITS_TRANS)
-    # Remove Arabic formatting chars, non-breaking spaces, RTL marks, and commas
-    cleaned = re.sub(r'[\s\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\xa0،,٬]', '', cleaned)
-    cleaned = cleaned.replace(',', '').replace('،', '').replace('٬', '')
-    # Handle bracketed negatives like (300,000)
+    # 2. Remove Arabic formatting chars, non-breaking spaces, RTL marks, ALM (\u061c), and commas
+    cleaned = re.sub(r'[\u061c\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\xa0]', '', cleaned)
+    cleaned = re.sub(r'[\s،,٬]', '', cleaned)
+    cleaned = cleaned.replace('٫', '.')
+    # 3. Handle bracketed negatives like (300,000)
     if cleaned.startswith('(') and cleaned.endswith(')'):
         cleaned = '-' + cleaned[1:-1]
-    # Handle Arabic minus signs
-    cleaned = cleaned.replace('−', '-').replace('–', '-').replace('ـ', '')
+    # 4. Handle Arabic minus signs & dashes
+    cleaned = re.sub(r'[−–—ـ]', '-', cleaned)
+    # Keep only digits, dot, and leading minus
+    cleaned = re.sub(r'[^\d.-]', '', cleaned)
     try:
-        v = float(cleaned)
-        return v
+        return float(cleaned)
     except ValueError:
         return None
 
@@ -146,10 +148,23 @@ def _try_scrape(target_date: date) -> dict | None:
             except Exception as ex:
                 logger.warning(f"Home page load warning: {ex}")
 
-            # Step 2: Navigate to InvestorsTypeCharts.aspx
+            # Step 2: Navigate to InvestorsTypeCharts.aspx with retries
             logger.info("Step 2: Loading InvestorsTypeCharts.aspx...")
-            page.goto(INTRADAY_URL, timeout=30000)
-            time.sleep(5)
+            loaded = False
+            for nav_attempt in range(1, 4):
+                try:
+                    page.goto(INTRADAY_URL, timeout=45000, wait_until='domcontentloaded')
+                    time.sleep(4)
+                    loaded = True
+                    break
+                except Exception as ex:
+                    logger.warning(f"  Navigation attempt {nav_attempt} warning: {ex}")
+                    time.sleep(3)
+
+            if not loaded:
+                logger.error("  ❌ Failed to load page after 3 navigation attempts")
+                return None
+
             logger.info("  ✅ Page loaded")
 
             # Step 3: Extract ALL table data via structured JS
@@ -242,21 +257,12 @@ def _try_scrape(target_date: date) -> dict | None:
 
 def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
     """
-    Parse the 3 EGX flow tables from the extracted DOM data.
-
-    Expected table structure (RTL — columns appear in Arabic order):
-    Col 0: Nationality label (مصريين / عرب / أجانب)
-    Col 1: صافي قيمة (Net)
-    Col 2: قيمة شراء (Buy)
-    Col 3: قيمة بيع (Sell)
-
-    OR sometimes reversed:
-    Col 0: Nationality
-    Col 1: Sell
-    Col 2: Buy
-    Col 3: Net
-
-    We detect the column order by looking at headers.
+    Parse the 3 EGX flow tables (Total / Retail / Institutional) from the extracted DOM data.
+    EGX table structure (RTL):
+      Rows 0..2: Total (إجمالي) -> Egyptians, Arabs, Foreigners
+      Rows 3..5: Retail (أفراد) -> Egyptians, Arabs, Foreigners
+      Rows 6..8: Institutional (مؤسسات) -> Egyptians, Arabs, Foreigners
+    Columns: Sell | Buy | Net (or Net | Buy | Sell depending on header)
     """
     tables = extracted.get('tables', [])
     all_text = extracted.get('all_text', '')
@@ -267,17 +273,10 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
         'scraped_at':  datetime.utcnow().isoformat() + 'Z',
     }
 
-    # ── Try to find the 3 data tables (Total / Retail / Institutional) ──────────
-    # Each table should have ~4 rows (header + 3 nationality rows)
-    data_tables = [t for t in tables if 2 <= len(t['rows']) <= 8]
-
-    logger.info(f"Candidate data tables: {len(data_tables)}")
-
-    # Map of keywords for nationality detection
     NAT_KEYS = {
         'egyptian': ['مصري', 'مصريين', 'المصري'],
         'arab':     ['عرب', 'العرب', 'عربي'],
-        'foreign':  ['أجانب', 'الأجانب', 'أجنبي'],
+        'foreign':  ['أجانب', 'الأجانب', 'أجنبي', 'اجانب'],
     }
 
     def detect_nat(cell: str) -> str | None:
@@ -288,7 +287,6 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
         return None
 
     def extract_row_numbers(cells: list[str]) -> list[float]:
-        """Extract all valid EGP numbers from a row's cells."""
         nums = []
         for c in cells:
             v = parse_egp(c)
@@ -297,142 +295,90 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
         return nums
 
     def detect_column_order(headers: list[str]) -> str:
-        """
-        Returns 'sell_buy_net' or 'net_buy_sell' based on header text.
-        Default: 'sell_buy_net' (as shown on EGX site in Arabic RTL)
-        """
         header_text = ' '.join(headers).lower()
         if 'صافي' in header_text and headers:
-            # Detect which column position صافي is in
             for i, h in enumerate(headers):
                 if 'صافي' in h:
                     if i == len(headers) - 1:
-                        return 'sell_buy_net'  # net is last
+                        return 'sell_buy_net'
                     elif i == 1:
-                        return 'net_buy_sell'  # net is first after label
-        return 'sell_buy_net'  # default based on EGX site structure
+                        return 'net_buy_sell'
+        return 'sell_buy_net'
 
-    # We expect tables in order: Total → Retail → Institutional
-    # Or we can detect by content (which has "مؤسسات" vs "أفراد" header text)
-    def classify_table(tbl: dict) -> str | None:
-        """Classify table as 'total', 'retail', or 'institutional'."""
-        header_text = ' '.join(str(h) for h in tbl.get('headers', []))
-        row_text    = ' '.join(str(c) for r in tbl.get('rows', []) for c in r)
-        combined    = header_text + ' ' + row_text
+    def is_clean_label(label: str) -> bool:
+        if not label:
+            return False
+        l = str(label).strip()
+        if len(l) > 25 or '\n' in l or '%' in l or '0M' in l or 'بحث' in l:
+            return False
+        return True
 
-        # Look for preceding text context
-        if 'مؤسسات' in combined and 'أفراد' not in combined:
-            return 'institutional'
-        if 'أفراد' in combined and 'مؤسسات' not in combined:
-            return 'retail'
-        if 'إجمالي' in combined or ('مصري' in combined and 'عرب' in combined and 'أجانب' in combined):
-            return 'total'
-        return None
-
-    def parse_single_table(tbl: dict, table_type: str) -> dict:
-        """
-        Parse one table (3 nationality rows) and return field dict.
-        Prefix: 'total' → egyptian_total / arab_total / foreigners_total
-                'retail' → egyptian_ind / arab_ind / foreign_ind
-                'institutional' → egyptian_inst / arab_inst / foreign_inst
-        """
-        prefixes = {
-            'total':         ('egyptian_total', 'arab',         'foreigners'),
-            'retail':        ('egyptian_ind',   'arab_ind',     'foreign_ind'),
-            'institutional': ('egyptian_inst',  'arab_inst',    'foreign_inst'),
-        }
-        eg_pre, ar_pre, fo_pre = prefixes.get(table_type, ('eg', 'ar', 'fo'))
-
-        col_order = detect_column_order(tbl.get('headers', []))
-        parsed = {}
-
-        for row in tbl.get('rows', []):
-            if not row:
-                continue
-            label = str(row[0])
-            nat = detect_nat(label)
-            if nat is None:
-                continue
-
-            nums = extract_row_numbers(row[1:])  # skip label cell
-            if len(nums) < 2:
-                logger.warning(f"  Skipping row (not enough numbers): {row}")
-                continue
-
-            # Column order detection
-            if col_order == 'sell_buy_net':
-                # EGX Arabic table: Sell | Buy | Net (RTL display)
-                sell = nums[0] if len(nums) > 0 else 0
-                buy  = nums[1] if len(nums) > 1 else 0
-                net  = nums[2] if len(nums) > 2 else (buy - sell)
-            else:
-                # net_buy_sell order
-                net  = nums[0] if len(nums) > 0 else 0
-                buy  = nums[1] if len(nums) > 1 else 0
-                sell = nums[2] if len(nums) > 2 else (buy - net)
-
-            if nat == 'egyptian':
-                pre = eg_pre
-            elif nat == 'arab':
-                pre = ar_pre
-            else:
-                pre = fo_pre
-
-            parsed[f'{pre}_sell_egp'] = sell
-            parsed[f'{pre}_buy_egp']  = buy
-            parsed[f'{pre}_net_egp']  = net
-
-            logger.info(f"  ✅ {table_type}/{nat}: sell={sell:,.0f} buy={buy:,.0f} net={net:,.0f}")
-
-        return parsed
-
-    # ── Try structured table parsing ──────────────────────────────────────────
-    flow_tables = []
+    # Gather all clean nationality rows across all extracted tables
+    nat_rows = []
     for tbl in tables:
-        rows = tbl.get('rows', [])
-        if 2 <= len(rows) <= 5:
-            row_text = ' '.join(str(c) for r in rows for c in r)
-            if 'مصري' in row_text and 'عرب' in row_text and 'أجانب' in row_text:
-                flow_tables.append(tbl)
+        col_order = detect_column_order(tbl.get('headers', []))
+        for r in tbl.get('rows', []):
+            if not r:
+                continue
+            label = str(r[0])
+            if not is_clean_label(label):
+                continue
+            nat = detect_nat(label)
+            if not nat:
+                continue
+            nums = extract_row_numbers(r[1:])
+            if len(nums) >= 2:
+                if col_order == 'sell_buy_net':
+                    sell = nums[0] if len(nums) > 0 else 0
+                    buy  = nums[1] if len(nums) > 1 else 0
+                    net  = nums[2] if len(nums) > 2 else (buy - sell)
+                else:
+                    net  = nums[0] if len(nums) > 0 else 0
+                    buy  = nums[1] if len(nums) > 1 else 0
+                    sell = nums[2] if len(nums) > 2 else (buy - net)
+                nat_rows.append((nat, sell, buy, net))
 
-    logger.info(f"Detected {len(flow_tables)} flow tables by nationality content")
+    logger.info(f"Extracted {len(nat_rows)} valid nationality rows from DOM")
 
-    if len(flow_tables) >= 3:
-        types_order = ['total', 'retail', 'institutional']
-        for i in range(3):
-            ttype = types_order[i]
-            tbl = flow_tables[i]
-            parsed = parse_single_table(tbl, ttype)
-            result.update(parsed)
-            logger.info(f"  ✅ Parsed flow table [{i+1}/3] as '{ttype}'")
-    else:
-        # Fallback to candidate data tables
-        logger.warning("Could not find 3 flow tables by nationality content — using candidate data tables")
-        types_order = ['total', 'retail', 'institutional']
-        for i, tbl in enumerate(data_tables[:3]):
-            ttype = types_order[i]
-            parsed = parse_single_table(tbl, ttype)
-            result.update(parsed)
+    types_prefixes = [
+        ('total',         {'egyptian': 'egyptian_total', 'arab': 'arab',      'foreign': 'foreigners'}),
+        ('retail',        {'egyptian': 'egyptian_ind',   'arab': 'arab_ind',  'foreign': 'foreign_ind'}),
+        ('institutional', {'egyptian': 'egyptian_inst',  'arab': 'arab_inst', 'foreign': 'foreign_inst'}),
+    ]
 
-    # ── Compute totals if missing ─────────────────────────────────────────────
-    # egyptian_total = egyptian_ind + egyptian_inst (if individual tables have data)
+    # Map the extracted rows sequentially in groups of 3 (Total, Retail, Institutional)
+    for idx, (nat, sell, buy, net) in enumerate(nat_rows):
+        group_idx = min(idx // 3, 2)
+        ttype, pre_map = types_prefixes[group_idx]
+        pre = pre_map[nat]
+        result[f'{pre}_sell_egp'] = sell
+        result[f'{pre}_buy_egp']  = buy
+        result[f'{pre}_net_egp']  = net
+        logger.info(f"  ✅ [{ttype}] {pre}: sell={sell:,.0f} buy={buy:,.0f} net={net:,.0f}")
+
+    # Compute totals if total table was missing or needs calculation
     if not result.get('egyptian_total_buy_egp') and result.get('egyptian_ind_buy_egp') and result.get('egyptian_inst_buy_egp'):
         result['egyptian_total_buy_egp']  = result['egyptian_ind_buy_egp']  + result['egyptian_inst_buy_egp']
         result['egyptian_total_sell_egp'] = result.get('egyptian_ind_sell_egp', 0) + result.get('egyptian_inst_sell_egp', 0)
         result['egyptian_total_net_egp']  = result.get('egyptian_ind_net_egp', 0)  + result.get('egyptian_inst_net_egp', 0)
         logger.info("  📐 Computed egyptian_total from ind+inst")
 
-    if not result.get('arab_total_buy_egp') and result.get('arab_ind_buy_egp') and result.get('arab_inst_buy_egp'):
-        result['arab_total_buy_egp']  = result['arab_ind_buy_egp']  + result['arab_inst_buy_egp']
-        result['arab_total_sell_egp'] = result.get('arab_ind_sell_egp', 0) + result.get('arab_inst_sell_egp', 0)
-        result['arab_total_net_egp']  = result.get('arab_ind_net_egp', 0)  + result.get('arab_inst_net_egp', 0)
+    if not result.get('arab_buy_egp') and result.get('arab_ind_buy_egp') and result.get('arab_inst_buy_egp'):
+        result['arab_buy_egp']  = result['arab_ind_buy_egp']  + result['arab_inst_buy_egp']
+        result['arab_sell_egp'] = result.get('arab_ind_sell_egp', 0) + result.get('arab_inst_sell_egp', 0)
+        result['arab_net_egp']  = result.get('arab_ind_net_egp', 0)  + result.get('arab_inst_net_egp', 0)
         logger.info("  📐 Computed arab_total from ind+inst")
 
-    if not result.get('foreigners_total_buy_egp') and result.get('foreign_ind_buy_egp') and result.get('foreign_inst_buy_egp'):
-        result['foreigners_total_buy_egp']  = result['foreign_ind_buy_egp']  + result['foreign_inst_buy_egp']
-        result['foreigners_total_sell_egp'] = result.get('foreign_ind_sell_egp', 0) + result.get('foreign_inst_sell_egp', 0)
-        result['foreigners_total_net_egp']  = result.get('foreign_ind_net_egp', 0)  + result.get('foreign_inst_net_egp', 0)
+    if not result.get('foreigners_buy_egp') and result.get('foreign_ind_buy_egp') and result.get('foreign_inst_buy_egp'):
+        result['foreigners_buy_egp']  = result['foreign_ind_buy_egp']  + result['foreign_inst_buy_egp']
+        result['foreigners_sell_egp'] = result.get('foreign_ind_sell_egp', 0) + result.get('foreign_inst_sell_egp', 0)
+        result['foreigners_net_egp']  = result.get('foreign_ind_net_egp', 0)  + result.get('foreign_inst_net_egp', 0)
         logger.info("  📐 Computed foreigners_total from ind+inst")
+
+    # Set total market volume
+    tot_buy = (result.get('egyptian_total_buy_egp', 0) or 0) + (result.get('arab_buy_egp', 0) or 0) + (result.get('foreigners_buy_egp', 0) or 0)
+    if tot_buy > 0:
+        result['total_volume_egp'] = tot_buy
 
     # Validate we have at least some real data
     has_data = any(
@@ -450,8 +396,8 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
     logger.info("=" * 60)
     logger.info("📊 EXTRACTED FLOWS SUMMARY:")
     logger.info(f"  Total Egyptians:  buy={result.get('egyptian_total_buy_egp',0):>20,.0f}  sell={result.get('egyptian_total_sell_egp',0):>20,.0f}  net={result.get('egyptian_total_net_egp',0):>+20,.0f}")
-    logger.info(f"  Total Arabs:      buy={result.get('arab_total_buy_egp',0):>20,.0f}  sell={result.get('arab_total_sell_egp',0):>20,.0f}  net={result.get('arab_total_net_egp',0):>+20,.0f}")
-    logger.info(f"  Total Foreigners: buy={result.get('foreigners_total_buy_egp',0):>20,.0f}  sell={result.get('foreigners_total_sell_egp',0):>20,.0f}  net={result.get('foreigners_total_net_egp',0):>+20,.0f}")
+    logger.info(f"  Total Arabs:      buy={result.get('arab_buy_egp',0):>20,.0f}  sell={result.get('arab_sell_egp',0):>20,.0f}  net={result.get('arab_net_egp',0):>+20,.0f}")
+    logger.info(f"  Total Foreigners: buy={result.get('foreigners_buy_egp',0):>20,.0f}  sell={result.get('foreigners_sell_egp',0):>20,.0f}  net={result.get('foreigners_net_egp',0):>+20,.0f}")
     logger.info(f"  Retail EG:        buy={result.get('egyptian_ind_buy_egp',0):>20,.0f}  sell={result.get('egyptian_ind_sell_egp',0):>20,.0f}  net={result.get('egyptian_ind_net_egp',0):>+20,.0f}")
     logger.info(f"  Retail Arabs:     buy={result.get('arab_ind_buy_egp',0):>20,.0f}  sell={result.get('arab_ind_sell_egp',0):>20,.0f}  net={result.get('arab_ind_net_egp',0):>+20,.0f}")
     logger.info(f"  Retail Foreigners:buy={result.get('foreign_ind_buy_egp',0):>20,.0f}  sell={result.get('foreign_ind_sell_egp',0):>20,.0f}  net={result.get('foreign_ind_net_egp',0):>+20,.0f}")
