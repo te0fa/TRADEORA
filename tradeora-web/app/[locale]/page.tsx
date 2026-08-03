@@ -360,15 +360,16 @@ export default function DashboardPage({ params }: Props) {
       dir={isAr ? 'rtl' : 'ltr'}
     >
       {/* ── Marquee / Ticker Bar ── */}
-      <motion.div variants={itemVariants} className="w-full glass-panel px-4 py-3 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold rounded-2xl mb-10 overflow-hidden">
-        <div className="flex items-center gap-6 animate-pulse-soft">
+      <motion.div variants={itemVariants} className="w-full glass-panel px-4 py-3.5 flex flex-col gap-3 rounded-2xl mb-10 overflow-hidden border border-white/10 shadow-lg backdrop-blur-md">
+        {/* Row 1: Market Indices */}
+        <div className="w-full flex items-center justify-between flex-wrap gap-4 animate-pulse-soft">
           {[
             { label: 'EGX30', data: egx30 },
             { label: 'EGX70', data: egx70 },
             { label: 'EGX100', data: egx100 },
             { label: 'EGX33', data: egx33 },
           ].map((idx, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex items-center gap-2 text-xs font-semibold">
               <span className="text-zinc-400 font-bold">{idx.label}</span>
               <span className="text-white font-mono font-extrabold">{idx.data?.value != null ? Number(idx.data.value).toLocaleString('en-US') : '---'}</span>
               {idx.data?.change != null ? (
@@ -382,19 +383,34 @@ export default function DashboardPage({ params }: Props) {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-4 text-[11px]">
-          <span className="text-zinc-400 hidden sm:inline-flex items-center gap-1">
-            <span>{isAr ? 'إشارات اليوم:' : 'Today signals:'}</span>
-            <span 
-              className="relative group cursor-pointer inline-flex items-center text-accent-blue hover:text-white"
-              title={isAr ? "الفرز الفني اللحظي للمؤشرات لجميع أسهم البورصة (281 سهم). يختلف عن صفقات وتوصيات التداول المحددة في صفحة الأداء." : "Instant technical screener signals for all 281 EGX stocks."}
-            >
-              <Info className="w-3.5 h-3.5" />
+
+        {/* Row 2: Fixed Row for Today's Signals & Top Volume Stock */}
+        <div className="w-full flex flex-wrap items-center justify-between gap-3 text-[11px] font-semibold pt-2.5 border-t border-white/10">
+          <div className="flex items-center gap-3">
+            <span className="text-zinc-300 font-bold flex items-center gap-1.5">
+              <span>{isAr ? 'إشارات اليوم:' : 'Today Signals:'}</span>
+              <span 
+                className="relative group cursor-pointer inline-flex items-center text-accent-blue hover:text-white"
+                title={isAr ? "الفرز الفني اللحظي للمؤشرات لجميع أسهم البورصة (281 سهم). يختلف عن صفقات وتوصيات التداول المحددة في صفحة الأداء." : "Instant technical screener signals for all 281 EGX stocks."}
+              >
+                <Info className="w-3.5 h-3.5" />
+              </span>
             </span>
-          </span>
-          <span className="text-up-green bg-up-green-bg px-2 py-0.5 rounded-md font-mono">{statsData.buySignals} Buy</span>
-          <span className="text-down-red bg-down-red-bg px-2 py-0.5 rounded-md font-mono">{statsData.sellSignals} Sell</span>
-          <span className="text-accent-blue bg-blue-500/10 px-2 py-0.5 rounded-md font-mono hidden sm:inline">Vol: {statsData.highestVolume} {statsData.highestVolumeName ? `(${statsData.highestVolumeName})` : ''}</span>
+            <span className="text-up-green bg-up-green-bg px-2.5 py-0.5 rounded-md font-mono font-bold border border-emerald-500/20">{statsData.buySignals} Buy</span>
+            <span className="text-down-red bg-down-red-bg px-2.5 py-0.5 rounded-md font-mono font-bold border border-rose-500/20">{statsData.sellSignals} Sell</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-400 font-medium">{isAr ? 'الأعلى حجم تداول اليوم:' : 'Top Volume Stock:'}</span>
+            <div 
+              className="relative group cursor-pointer inline-flex items-center gap-1.5 text-accent-blue bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-md font-mono font-semibold hover:bg-blue-500/20 transition-colors"
+              title={isAr ? "السهم الأعلى حجماً اليوم: يظهر كود البورصة أولاً (رمز السهم مثل ARAB) متبوعاً باسم الشركة بالكامل باللغة العربية لسهولة التعرف عليه." : "Highest volume stock today: Shows ticker symbol followed by full company name."}
+            >
+              <span className="font-bold">{statsData.highestVolume}</span>
+              {statsData.highestVolumeName && <span className="text-zinc-300 font-sans font-normal">({statsData.highestVolumeName})</span>}
+              <Info className="w-3.5 h-3.5 text-accent-blue/80 group-hover:text-white transition-colors ml-0.5" />
+            </div>
+          </div>
         </div>
       </motion.div>
 
