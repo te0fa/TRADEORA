@@ -214,6 +214,7 @@ def main():
         cid = comp['id']
         logger.info(f'[{i+1}/{len(companies)}] {sym}')
 
+        sym_written = 0
         force_fetch = args.fill_gaps or args.live
         for ivl in intervals:
             status, count = fetch_and_store(sym, cid, ivl, fill_gaps=force_fetch)
