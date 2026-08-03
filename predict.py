@@ -4,7 +4,10 @@ import joblib
 import traceback
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+try:
+    import pandas_ta as ta
+except ImportError:
+    import pandas_ta_classic as ta
 from datetime import date, datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv

@@ -4,7 +4,10 @@ import logging
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+try:
+    import pandas_ta as ta
+except ImportError:
+    import pandas_ta_classic as ta
 import joblib
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -532,8 +535,8 @@ def generate_daily_recommendations():
             _signal_timeframe = '1d'
         else:
             # Backtest shows 0-1 confirmations = no edge over buy & hold
-            if prob < 0.80:  # Only skip if prob is not extremely high
-                logger.info(f"[{symbol}] Skipping: prob={prob:.3f} but only {_confirmations} confirmations (need ≥2 per backtest)")
+            if prob >= 0.65 and prob < 0.80:  # Only skip buy candidates with weak confirmations
+                logger.info(f"[{symbol}] Skipping buy recommendation: prob={prob:.3f} but only {_confirmations} confirmations (need ≥2 per backtest)")
                 continue
             _signal_timeframe = '1d'
 
@@ -633,6 +636,7 @@ def generate_daily_recommendations():
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
+                        "direction": "buy",
                         "ml_probability": round(prob, 4),
                         "tp1": tp1_price,
                         "tp2": tp2_price,
@@ -703,6 +707,7 @@ def generate_daily_recommendations():
             if cid in active_ids:
                 try:
                     sb.table("recommended_trades").update({
+                        "direction": "sell",
                         "ml_probability": round(prob, 4),
                         "tp1": tp1_price,
                         "tp2": tp2_price,

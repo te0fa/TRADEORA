@@ -585,17 +585,16 @@ export async function GET(req: NextRequest) {
     const activeCount = buyTrades.length;
 
     // ── Tier Thresholds ──────────────────────────────────────────────────────
-    // premier_elite: Confidence >= 88% — Ultra-selective (~30 signals from today's run)
-    // standard_market: Confidence 65-87% — General market signals
-    // combined: All signals (65-88%+)
-    const PREMIER_THRESHOLD  = 0.88;  // Ultra-elite tier (top ~15% of signals)
-    const HIGH_CONF_THRESHOLD = 0.85; // High confidence tier (unused but kept for reference)
+    // premier_elite: Top 30 ultra-selective Premier Elite signals (highest composite score & ML confidence)
+    // standard_market: General market signals
+    // combined: All signals
+    const MAX_PREMIER_COUNT  = 30;
+    const premierBuyTrades   = buyTrades.slice(0, Math.min(MAX_PREMIER_COUNT, buyTrades.length));
+    const premierIds         = new Set(premierBuyTrades.map((t: any) => t.id));
+    const standardBuyTrades  = buyTrades.filter((t: any) => !premierIds.has(t.id));
 
-    const premierBuyTrades  = buyTrades.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD);
-    const standardBuyTrades = buyTrades.filter((t: any) => !( t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD));
-
-    const closedPremierTrades  = closedBuyTrades.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD);
-    const closedStandardTrades = closedBuyTrades.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD));
+    const closedPremierTrades  = closedBuyTrades.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= 0.88);
+    const closedStandardTrades = closedBuyTrades.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= 0.88));
 
     const tp1HitBuy = (tp1HitTrades || [])
       .filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy')

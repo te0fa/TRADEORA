@@ -81,14 +81,11 @@ def scrape_egx_flows(target_date: date) -> dict | None:
         logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
         return None
 
-    # Check session hours using Cairo timezone (NOT local/UTC time)
+    # Log current Cairo time for context
     import pytz
     cairo_tz = pytz.timezone('Africa/Cairo')
     now_cairo = datetime.now(cairo_tz).time()
-    # Allow scraping until 4:00 PM Cairo to capture post-close final numbers
-    if not (dtime(10, 0) <= now_cairo <= dtime(16, 0)):
-        logger.warning(f"Market hours check: Cairo time {now_cairo} is outside 10:00-16:00. Skipping.")
-        return None
+    logger.info(f"Scraper execution time (Cairo): {now_cairo}")
 
     logger.info(f"🔄 Opening EGX InvestorsTypeCharts.aspx for {target_date}")
 
@@ -315,8 +312,17 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
 
     # Gather all clean nationality rows across all extracted tables
     nat_rows = []
+    types_prefixes = [
+        ('total',         {'egyptian': 'egyptian_total', 'arab': 'arab',      'foreign': 'foreigners'}),
+        ('retail',        {'egyptian': 'egyptian_ind',   'arab': 'arab_ind',  'foreign': 'foreign_ind'}),
+        ('institutional', {'egyptian': 'egyptian_inst',  'arab': 'arab_inst', 'foreign': 'foreign_inst'}),
+    ]
+
+    valid_tables = []
     for tbl in tables:
         col_order = detect_column_order(tbl.get('headers', []))
+        tbl_nat_rows = []
+        seen_nats = set()
         for r in tbl.get('rows', []):
             if not r:
                 continue
@@ -324,7 +330,7 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
             if not is_clean_label(label):
                 continue
             nat = detect_nat(label)
-            if not nat:
+            if not nat or nat in seen_nats:
                 continue
             nums = extract_row_numbers(r[1:])
             if len(nums) >= 2:
@@ -336,25 +342,25 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
                     net  = nums[0] if len(nums) > 0 else 0
                     buy  = nums[1] if len(nums) > 1 else 0
                     sell = nums[2] if len(nums) > 2 else (buy - net)
-                nat_rows.append((nat, sell, buy, net))
+                tbl_nat_rows.append((nat, sell, buy, net))
+                seen_nats.add(nat)
+        
+        # If this table contains all 3 nationalities, it's a valid flow table
+        if len(tbl_nat_rows) == 3:
+            valid_tables.append(tbl_nat_rows)
+            if len(valid_tables) == 3:
+                break
 
-    logger.info(f"Extracted {len(nat_rows)} valid nationality rows from DOM")
+    logger.info(f"Extracted {len(valid_tables)} valid 3-nationality tables from DOM")
 
-    types_prefixes = [
-        ('total',         {'egyptian': 'egyptian_total', 'arab': 'arab',      'foreign': 'foreigners'}),
-        ('retail',        {'egyptian': 'egyptian_ind',   'arab': 'arab_ind',  'foreign': 'foreign_ind'}),
-        ('institutional', {'egyptian': 'egyptian_inst',  'arab': 'arab_inst', 'foreign': 'foreign_inst'}),
-    ]
-
-    # Map the extracted rows sequentially in groups of 3 (Total, Retail, Institutional)
-    for idx, (nat, sell, buy, net) in enumerate(nat_rows):
-        group_idx = min(idx // 3, 2)
-        ttype, pre_map = types_prefixes[group_idx]
-        pre = pre_map[nat]
-        result[f'{pre}_sell_egp'] = sell
-        result[f'{pre}_buy_egp']  = buy
-        result[f'{pre}_net_egp']  = net
-        logger.info(f"  ✅ [{ttype}] {pre}: sell={sell:,.0f} buy={buy:,.0f} net={net:,.0f}")
+    for tbl_idx, rows in enumerate(valid_tables):
+        ttype, pre_map = types_prefixes[tbl_idx]
+        for nat, sell, buy, net in rows:
+            pre = pre_map[nat]
+            result[f'{pre}_sell_egp'] = sell
+            result[f'{pre}_buy_egp']  = buy
+            result[f'{pre}_net_egp']  = net
+            logger.info(f"  ✅ [{ttype}] {pre}: sell={sell:,.0f} buy={buy:,.0f} net={net:,.0f}")
 
     # Compute totals if total table was missing or needs calculation
     if not result.get('egyptian_total_buy_egp') and result.get('egyptian_ind_buy_egp') and result.get('egyptian_inst_buy_egp'):
@@ -412,15 +418,21 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
 ALLOWED_COLS = {
     'trade_date', 'source', 'pdf_url', 'created_at', 'updated_at', 'total_volume_egp',
     'foreigners_buy_egp', 'foreigners_sell_egp', 'foreigners_net_egp',
+    'foreigners_total_buy_egp', 'foreigners_total_sell_egp', 'foreigners_total_net_egp',
     'foreign_inst_buy_egp', 'foreign_inst_sell_egp', 'foreign_inst_net_egp',
+    'foreign_ind_buy_egp', 'foreign_ind_sell_egp', 'foreign_ind_net_egp',
     'egyptian_inst_buy_egp', 'egyptian_inst_sell_egp', 'egyptian_inst_net_egp',
     'egyptian_ind_buy_egp', 'egyptian_ind_sell_egp', 'egyptian_ind_net_egp',
+    'egyptians_total_buy_egp', 'egyptians_total_sell_egp', 'egyptians_total_net_egp',
     'arab_buy_egp', 'arab_sell_egp', 'arab_net_egp',
+    'arab_total_buy_egp', 'arab_total_sell_egp', 'arab_total_net_egp',
+    'arab_inst_buy_egp', 'arab_inst_sell_egp', 'arab_inst_net_egp',
+    'arab_ind_buy_egp', 'arab_ind_sell_egp', 'arab_ind_net_egp',
 }
 
 
 def save_to_db(flows: dict) -> bool:
-    """Upsert valid flow fields into Supabase daily_investor_flows."""
+    """Upsert valid flow fields into Supabase and CockroachDB daily_investor_flows."""
     if not sb:
         logger.error("Supabase client is not initialized.")
         return False
@@ -433,7 +445,34 @@ def save_to_db(flows: dict) -> bool:
         sb.table('daily_investor_flows') \
           .upsert(clean, on_conflict='trade_date') \
           .execute()
-        logger.info(f"✅ Saved {len(clean)} fields to DB for {flows['trade_date']}")
+        logger.info(f"✅ Saved {len(clean)} fields to Supabase for {flows['trade_date']}")
+
+        # Also sync directly to CockroachDB if DATABASE_URL is present
+        cr_url = os.getenv("DATABASE_URL") or "postgresql://tradeora:gdW77s_jShDK8nChydbbCg@raw-donkey-30500.j77.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb?sslmode=require"
+        try:
+            import psycopg2
+            conn = psycopg2.connect(cr_url)
+            cur = conn.cursor()
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'daily_investor_flows'")
+            cr_cols = set(r[0] for r in cur.fetchall())
+
+            keys = [k for k in clean.keys() if k in cr_cols]
+            values = [clean[k] for k in keys]
+            set_clauses = [f"{k} = EXCLUDED.{k}" for k in keys if k not in ('trade_date', 'id', 'created_at')]
+
+            sql = f"""
+            INSERT INTO daily_investor_flows ({", ".join(keys)})
+            VALUES ({", ".join(["%s"] * len(values))})
+            ON CONFLICT (trade_date) DO UPDATE SET {", ".join(set_clauses)};
+            """
+            cur.execute(sql, values)
+            conn.commit()
+            cur.close()
+            conn.close()
+            logger.info(f"✅ Synced CockroachDB for {flows['trade_date']}")
+        except Exception as cr_err:
+            logger.warning(f"CockroachDB direct sync warning: {cr_err}")
+
         return True
     except Exception as e:
         logger.error(f"DB save error: {e}", exc_info=True)

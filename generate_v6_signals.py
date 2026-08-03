@@ -28,6 +28,10 @@ for p in prices:
 print(f"  ✓ Latest price records mapped for {len(price_map)} companies.")
 
 # 3. Model v6 Signal Generation Algorithm
+# Clear previous active trades to prevent duplicate signals per symbol and keep clean total signal count (~100 signals)
+print("  🧹 Cleaning previous active signals to prevent duplicates...")
+sb.table("recommended_trades").delete().eq("status", "active").execute()
+
 signals_to_insert = []
 
 # Key high-priority stocks to ensure top quality setups

@@ -1,7 +1,10 @@
 import os, math
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
+try:
+    import pandas_ta as ta
+except ImportError:
+    import pandas_ta_classic as ta
 from supabase import create_client
 from dotenv import load_dotenv
 
