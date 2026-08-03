@@ -529,15 +529,15 @@ def generate_daily_recommendations():
         # Assign timeframe based on confirmation strength
         # 4-5 confirmations → 3-5 day swing (best actual WR: 76.9%)
         # 2-3 confirmations → standard 1d
-        # 0-1 confirmations → skip (no longer qualifies)
+        # 0-1 confirmations → skip buy unless prob is high (≥0.75)
         if _confirmations >= 4:
             _signal_timeframe = '3-5 أيام تداول'
         elif _confirmations >= 2:
             _signal_timeframe = '1d'
         else:
-            # Backtest shows 0-1 confirmations = no edge over buy & hold
-            if prob >= 0.65 and prob < 0.80:  # Only skip buy candidates with weak confirmations
-                logger.info(f"[{symbol}] Skipping buy recommendation: prob={prob:.3f} but only {_confirmations} confirmations (need ≥2 per backtest)")
+            # Backtest shows 0-1 confirmations = no edge unless prob >= 0.75
+            if prob >= 0.65 and prob < 0.75:  # Only skip buy candidates with weak confirmations and prob < 0.75
+                logger.info(f"[{symbol}] Skipping buy recommendation: prob={prob:.3f} but only {_confirmations} confirmations")
                 continue
             _signal_timeframe = '1d'
 

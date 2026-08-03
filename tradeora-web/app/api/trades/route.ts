@@ -599,8 +599,8 @@ export async function GET(req: NextRequest) {
     const tp1HitBuy = (tp1HitTrades || [])
       .filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy')
       .map(mapTradeDetails);
-    const tp1HitPremier  = tp1HitBuy.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD);
-    const tp1HitStandard = tp1HitBuy.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD));
+    const tp1HitPremier  = tp1HitBuy.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= 0.88);
+    const tp1HitStandard = tp1HitBuy.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= 0.88));
 
     const premierQualityMetrics  = buildQualityMetrics(closedPremierTrades, tp1HitPremier);
     const standardQualityMetrics = buildQualityMetrics(closedStandardTrades, tp1HitStandard);

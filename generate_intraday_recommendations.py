@@ -174,15 +174,14 @@ def scan_and_generate_intraday(force: bool = False, specified_tf: Optional[str] 
                     logger.warning(f"[{symbol}] Invalid entry price ({entry_price}). Skipping signal.")
                     continue
 
-                # Deduplicate: Check if active signal exists for this company & timeframe
+                # Deduplicate: Check if active signal exists for this company (across all timeframes)
                 existing = sb.table('recommended_trades') \
                              .select('id') \
                              .eq('company_id', cid) \
-                             .eq('timeframe', tf) \
                              .in_('status', ['active', 'pending']) \
                              .limit(1).execute()
                 if existing.data:
-                    logger.debug(f"[{symbol} - {tf}] Active signal already exists. Skipping.")
+                    logger.debug(f"[{symbol}] Active signal already exists for company. Skipping.")
                     continue
 
                 # Calculate ATR & Volatility metrics
