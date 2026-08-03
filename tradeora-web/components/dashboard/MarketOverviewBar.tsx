@@ -3,8 +3,7 @@
 import React from 'react';
 import { useTranslations } from 'next-intl';
 import { CompanyWithPrice } from '@/lib/queries';
-import { toEasternArabic, formatChangePercent } from '@/lib/formatters';
-import { TrendingUp, TrendingDown, RefreshCw, Layers } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 interface MarketOverviewBarProps {
   stocks: CompanyWithPrice[];
@@ -12,22 +11,9 @@ interface MarketOverviewBarProps {
 }
 
 export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
-  const t = useTranslations('overview');
-  const tGlobal = useTranslations();
-
-  const total = stocks.length;
-  
-  // Calculate gainers, losers, unchanged
   let gaining = 0;
   let losing = 0;
   let unchanged = 0;
-  let totalChangePercent = 0;
-  let countWithChanges = 0;
-
-  // Track sources presence
-  let hasTv = false;
-  let hasMubasher = false;
-  let hasInvesting = false;
 
   stocks.forEach(stock => {
     const price = stock.priceRecord;
@@ -39,32 +25,10 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
       } else {
         unchanged++;
       }
-
-      if (price.change_percent !== null) {
-        totalChangePercent += price.change_percent;
-        countWithChanges++;
-      }
-
-      if (price.source === 'tradingview') hasTv = true;
-      if (price.source === 'mubasher') hasMubasher = true;
-      if (price.source === 'investing') hasInvesting = true;
-      
-      const flag = price.data_quality_flag;
-      if (flag) {
-        if (!flag.includes('tradingview')) hasTv = true;
-        if (!flag.includes('mubasher')) hasMubasher = true;
-        if (!flag.includes('investing')) hasInvesting = true;
-      } else if (price.source === 'intraday_consensus') {
-        hasTv = true;
-        hasMubasher = true;
-        hasInvesting = true;
-      }
     }
   });
 
-  const avgChange = countWithChanges > 0 ? totalChangePercent / countWithChanges : 0;
-
-  // Fetch Live Index data for EGX30, EGX70EWI, EGX100EWI, EGX33
+  // Fetch Live Index data for EGX30, EGX70EWI, EGX100EWI, EGX33 from SINGLE unified source
   const [egx30Idx, setEgx30Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
   const [egx70Idx, setEgx70Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
   const [egx100Idx, setEgx100Idx] = React.useState<{ value: number | null; change: number | null } | null>(null);
@@ -72,49 +36,20 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
 
   React.useEffect(() => {
     const fetchAll = async () => {
-      // 1. Try TradingView Scanner for EGX30, EGX70, EGX100
       try {
-        const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI', 'EGX:EGX100EWI'] },
-            columns: ['close', 'change']
-          }),
-          cache: 'no-store',
-        });
-        if (tvRes.ok) {
-          const tvData = await tvRes.json();
-          const rows = tvData?.data || [];
-
-          const egx30Row = rows.find((r: any) => r.s === 'EGX:EGX30')?.d;
-          const egx70Row = rows.find((r: any) => r.s === 'EGX:EGX70EWI')?.d;
-          const egx100Row = rows.find((r: any) => r.s === 'EGX:EGX100EWI')?.d;
-
-          if (egx30Row?.[0] != null)
-            setEgx30Idx({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
-          if (egx70Row?.[0] != null)
-            setEgx70Idx({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
-          if (egx100Row?.[0] != null)
-            setEgx100Idx({ value: parseFloat(Number(egx100Row[0]).toFixed(2)), change: parseFloat(Number(egx100Row[1] ?? 0).toFixed(2)) });
+        const res = await fetch('/api/market-indices', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.egx30)  setEgx30Idx(data.egx30);
+          if (data.egx70)  setEgx70Idx(data.egx70);
+          if (data.egx100) setEgx100Idx(data.egx100);
+          if (data.egx33)  setEgx33Idx(data.egx33);
         }
-      } catch { /* silent fallback to server APIs */ }
-
-      // 2. Parallel server API fetches for guaranteed indices (including EGX33 Shariah)
-      const [r30, r70, r100, r33] = await Promise.allSettled([
-        fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/egx100', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()),
-      ]);
-      if (r30.status === 'fulfilled' && r30.value?.value) setEgx30Idx(r30.value);
-      if (r70.status === 'fulfilled' && r70.value?.value) setEgx70Idx(r70.value);
-      if (r100.status === 'fulfilled' && r100.value?.value) setEgx100Idx(r100.value);
-      if (r33.status === 'fulfilled' && r33.value?.value) setEgx33Idx(r33.value);
+      } catch { /* silent */ }
     };
 
     fetchAll();
-    // Poll every 5 seconds — strict requirement for real-time live index updates
+    // Poll every 5 seconds — 100% synchronized for all 4 indices
     const id = setInterval(fetchAll, 5000);
     return () => clearInterval(id);
   }, []);
@@ -130,7 +65,7 @@ export function MarketOverviewBar({ stocks, locale }: MarketOverviewBarProps) {
         <div className="flex items-center justify-between mb-2 border-b border-white/5 pb-2">
           <span className="text-xs font-black text-cyan-400 flex items-center gap-1.5">
             <TrendingUp className="w-4 h-4 text-cyan-400" />
-            <span>مؤشرات البورصة المصرية الرئيسية (تحديث مباشر كل 5 ثوانٍ)</span>
+            <span>مؤشرات البورصة المصرية الرئيسية (تحديث مباشر موحد كل 5 ثوانٍ)</span>
           </span>
           <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono font-bold">
             جلسة رسمية 100%

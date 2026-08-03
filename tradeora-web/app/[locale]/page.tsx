@@ -93,50 +93,22 @@ export default function DashboardPage({ params }: Props) {
     fetchInvestorFlows();
 
     const fetchLiveIndices = async () => {
-      // 1. Try TradingView Scanner for EGX30, EGX70EWI, EGX100EWI
       try {
-        const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            symbols: { tickers: ['EGX:EGX30', 'EGX:EGX70EWI', 'EGX:EGX100EWI'] },
-            columns: ['close', 'change']
-          }),
-          cache: 'no-store',
-        });
-        if (tvRes.ok) {
-          const tvData = await tvRes.json();
-          const rows = tvData?.data || [];
-          const egx30Row = rows.find((r: any) => r.s === 'EGX:EGX30')?.d;
-          const egx70Row = rows.find((r: any) => r.s === 'EGX:EGX70EWI')?.d;
-          const egx100Row = rows.find((r: any) => r.s === 'EGX:EGX100EWI')?.d;
-
-          if (egx30Row?.[0] != null)
-            setEgx30({ value: parseFloat(Number(egx30Row[0]).toFixed(2)), change: parseFloat(Number(egx30Row[1] ?? 0).toFixed(2)) });
-          if (egx70Row?.[0] != null)
-            setEgx70({ value: parseFloat(Number(egx70Row[0]).toFixed(2)), change: parseFloat(Number(egx70Row[1] ?? 0).toFixed(2)) });
-          if (egx100Row?.[0] != null)
-            setEgx100({ value: parseFloat(Number(egx100Row[0]).toFixed(2)), change: parseFloat(Number(egx100Row[1] ?? 0).toFixed(2)) });
+        const res = await fetch('/api/market-indices', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.egx30)  setEgx30(data.egx30);
+          if (data.egx70)  setEgx70(data.egx70);
+          if (data.egx100) setEgx100(data.egx100);
+          if (data.egx33)  setEgx33(data.egx33);
         }
-      } catch { /* silent fallback to server APIs */ }
-
-      // 2. Parallel server API fetches for all 4 indices (including EGX33 Shariah)
-      const [r30, r70, r100, r33] = await Promise.allSettled([
-        fetch('/api/egx30', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/egx70', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/egx100', { cache: 'no-store' }).then(r => r.json()),
-        fetch('/api/egx33', { cache: 'no-store' }).then(r => r.json()),
-      ]);
-      if (r30.status === 'fulfilled' && r30.value?.value) setEgx30(r30.value);
-      if (r70.status === 'fulfilled' && r70.value?.value) setEgx70(r70.value);
-      if (r100.status === 'fulfilled' && r100.value?.value) setEgx100(r100.value);
-      if (r33.status === 'fulfilled' && r33.value?.value) setEgx33(r33.value);
+      } catch { /* silent fallback */ }
     };
 
     fetchLiveIndices();
     fetchInvestorFlows();
     fetchMarketBreadth();
-    // Poll every 5 seconds — strict 5s live index update cycle
+    // Poll every 5 seconds — strict 5s synchronized live index update cycle
     const indexIntervalId = setInterval(fetchLiveIndices, 5000);
 
 
