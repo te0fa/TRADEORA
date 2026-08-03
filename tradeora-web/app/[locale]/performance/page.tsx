@@ -181,32 +181,42 @@ export default function PerformancePage() {
   }, [platformSellSignals]);
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch('/api/trades?limit=350').then(res => res.json()),
-      fetch('/api/user-trades').then(res => res.json())
-    ])
-      .then(([platData, persData]) => {
-        // Use all_buy_trades for the modal so ALL active trades appear (top 20 by composite_score)
-        // 'trades' = only premierBuyTrades (ml_prob >= 0.85) → causes 10/20 limit bug
-        setPlatformTrades(platData.all_buy_trades || platData.trades || []);
-        setPlatformSellSignals(platData.sell_signals || []);
-        setPlatformStats(platData.stats || null);
-        setTierEvaluations(platData.tier_evaluations || null);
-        setQualityMetrics(platData.quality_metrics || null);
+    let isMounted = true;
 
-        
-        if (persData.success) {
-          setPersonalTrades(persData.trades || []);
-          setPersonalStats(persData.stats || null);
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching performance stats:', err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    const fetchPerformanceData = (showSpinner = false) => {
+      if (showSpinner) setLoading(true);
+      Promise.all([
+        fetch('/api/trades?limit=350', { cache: 'no-store' }).then(res => res.json()),
+        fetch('/api/user-trades', { cache: 'no-store' }).then(res => res.json())
+      ])
+        .then(([platData, persData]) => {
+          if (!isMounted) return;
+          setPlatformTrades(platData.all_buy_trades || platData.trades || []);
+          setPlatformSellSignals(platData.sell_signals || []);
+          setPlatformStats(platData.stats || null);
+          setTierEvaluations(platData.tier_evaluations || null);
+          setQualityMetrics(platData.quality_metrics || null);
+
+          if (persData.success) {
+            setPersonalTrades(persData.trades || []);
+            setPersonalStats(persData.stats || null);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching performance stats:', err);
+        })
+        .finally(() => {
+          if (isMounted && showSpinner) setLoading(false);
+        });
+    };
+
+    fetchPerformanceData(true);
+    const intervalId = setInterval(() => fetchPerformanceData(false), 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   const formatNum = (num: number | null | undefined, precision: number = 2) => {

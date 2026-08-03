@@ -122,12 +122,54 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // ── Real-Time Live TradingView Scanner Batch Fetch ────────────────────────
+    const liveTvPriceMap: Record<string, number> = {};
+    if (activeSymbols.length > 0) {
+      try {
+        const tvTickers = activeSymbols.map((s) => `EGX:${s}`);
+        const tvRes = await fetch('https://scanner.tradingview.com/egypt/scan', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Origin': 'https://www.tradingview.com',
+            'Referer': 'https://www.tradingview.com/'
+          },
+          body: JSON.stringify({
+            symbols: { tickers: tvTickers },
+            columns: ['close', 'change', 'change_abs']
+          }),
+          cache: 'no-store'
+        });
+
+        if (tvRes.ok) {
+          const tvData = await tvRes.json();
+          if (tvData?.data && Array.isArray(tvData.data)) {
+            tvData.data.forEach((row: any) => {
+              const ticker = row?.s;
+              const closeVal = row?.d?.[0];
+              if (ticker && closeVal != null) {
+                const sym = ticker.replace('EGX:', '').toUpperCase();
+                const price = parseFloat(Number(closeVal).toFixed(3));
+                if (price > 0) {
+                  liveTvPriceMap[sym] = price;
+                }
+              }
+            });
+          }
+        }
+      } catch (tvErr) {
+        console.error('TradingView Live Batch Scan Error:', tvErr);
+      }
+    }
+
     // Enforce gating and append explainability / FRA disclaimer / current_price / sector
     const processedTrades = (trades || []).map((t: any) => {
       const confidence = t.ml_probability ? parseFloat(t.ml_probability) : null;
       const requiresWarning = confidence !== null && confidence < 0.75;
       const sym = t.symbol ? t.symbol.toUpperCase() : '';
-      let safeCurrentPrice = (t.company_id && priceMap[t.company_id])
+      let safeCurrentPrice = (sym && liveTvPriceMap[sym])
+        || (t.company_id && priceMap[t.company_id])
         || (sym && symbolPriceMap[sym])
         || t.entry_price;
       const rawRatio = safeCurrentPrice / (t.entry_price || 1);
@@ -459,8 +501,10 @@ export async function GET(req: NextRequest) {
     // 3. Process closed BUY trades & tp1_hit trades for statistics
 
     const mapTradeDetails = (t: any) => {
-      let livePrice = (t.company_id && priceMap[t.company_id])
-        || (t.symbol && symbolPriceMap[t.symbol])
+      const sym = t.symbol ? t.symbol.toUpperCase() : '';
+      let livePrice = (sym && liveTvPriceMap[sym])
+        || (t.company_id && priceMap[t.company_id])
+        || (sym && symbolPriceMap[sym])
         || t.current_price
         || t.exit_price
         || t.entry_price;
