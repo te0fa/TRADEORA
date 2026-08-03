@@ -110,7 +110,7 @@ export function QualityDrilldownModal({
     const pnl = t.pnl_percent || 0;
     const symbol = t.symbol;
     const entry = t.entry_price ? Number(t.entry_price).toFixed(2) : '-';
-    const exit = t.exit_price ? Number(t.exit_price).toFixed(2) : '-';
+    const exit = t.exit_price ? Number(t.exit_price).toFixed(2) : (t.tp1 ? Number(t.tp1).toFixed(2) : '-');
 
     if (reason === 'sl') {
       return (

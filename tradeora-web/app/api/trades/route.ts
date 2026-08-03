@@ -407,7 +407,7 @@ export async function GET(req: NextRequest) {
     // 3. Fetch closed BUY trades to compute platform statistics
     const { data: allClosed } = await supabase
       .from('recommended_trades')
-      .select('pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at')
+      .select('id, symbol, company_name, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, explanation_ar')
       .eq('status', 'closed')
       .neq('exit_reason', 'pre_launch_reset')
       .gte('recommended_at', LAUNCH_DATE);
@@ -415,7 +415,7 @@ export async function GET(req: NextRequest) {
     // Also fetch tp1_hit trades (still open, but TP1 achieved = partial win)
     const { data: tp1HitTrades } = await supabase
       .from('recommended_trades')
-      .select('pnl_percent, direction, ml_probability')
+      .select('id, symbol, company_name, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, explanation_ar')
       .eq('status', 'tp1_hit')
       .gte('recommended_at', LAUNCH_DATE);
 
@@ -531,7 +531,7 @@ export async function GET(req: NextRequest) {
           avg_pnl: parseFloat(premierAvgPnl.toFixed(2)),
           quality_metrics: premierQualityMetrics,
           trades: premierBuyTrades,
-          closed_trades_list: closedPremierTrades,
+          closed_trades_list: [...closedPremierTrades, ...tp1HitPremier],
         },
         standard_market: {
           label_ar: '🌐 إشارات السوق (ثقة 65% - 87%)',
@@ -546,7 +546,7 @@ export async function GET(req: NextRequest) {
           avg_pnl: parseFloat(standardAvgPnl.toFixed(2)),
           quality_metrics: standardQualityMetrics,
           trades: standardBuyTrades,
-          closed_trades_list: closedStandardTrades,
+          closed_trades_list: [...closedStandardTrades, ...tp1HitStandard],
         },
         combined: {
           label_ar: '📊 التقييم الشامل المدمج (كافة الإشارات)',
@@ -561,7 +561,7 @@ export async function GET(req: NextRequest) {
           avg_pnl: parseFloat(avgPnl.toFixed(2)),
           quality_metrics: combinedQualityMetrics,
           trades: buyTrades,
-          closed_trades_list: closedBuyTrades,
+          closed_trades_list: [...closedBuyTrades, ...tp1HitBuy],
         }
       },
 
