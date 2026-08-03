@@ -405,24 +405,33 @@ export async function GET(req: NextRequest) {
     const otherSignals = buyTrades.filter((t: any) => !t.is_top_pick);
 
     // 3. Fetch closed BUY trades to compute platform statistics
-    const { data: allClosed } = await supabase
+    const { data: allClosed, error: closedErr } = await supabase
       .from('recommended_trades')
-      .select('id, symbol, company_name, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, explanation_ar')
+      .select('id, symbol, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
       .eq('status', 'closed')
-      .neq('exit_reason', 'pre_launch_reset')
+      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
       .gte('recommended_at', LAUNCH_DATE);
 
+    if (closedErr) console.error('Error fetching allClosed:', closedErr);
+
     // Also fetch tp1_hit trades (still open, but TP1 achieved = partial win)
-    const { data: tp1HitTrades } = await supabase
+    const { data: tp1HitTrades, error: tp1Err } = await supabase
       .from('recommended_trades')
-      .select('id, symbol, company_name, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, explanation_ar')
+      .select('id, symbol, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
       .eq('status', 'tp1_hit')
       .gte('recommended_at', LAUNCH_DATE);
 
+    if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
+
+    const mapTradeDetails = (t: any) => ({
+      ...t,
+      company_name: t.companies ? (t.companies.name_ar || t.companies.name_en) : t.symbol,
+    });
+
     // Filter closed trades for BUY direction with valid PnL
-    const closedBuyTrades = (allClosed || []).filter((t: any) =>
-      (t.direction || 'buy').toLowerCase() === 'buy' && t.pnl_percent !== null
-    );
+    const closedBuyTrades = (allClosed || [])
+      .filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy' && t.pnl_percent !== null)
+      .map(mapTradeDetails);
 
     // ── Helper: Build tier-specific Quality Metrics ─────────────────────────
     function buildQualityMetrics(closedList: any[], tp1HitList: any[]) {
@@ -486,7 +495,9 @@ export async function GET(req: NextRequest) {
     const closedPremierTrades  = closedBuyTrades.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD);
     const closedStandardTrades = closedBuyTrades.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD));
 
-    const tp1HitBuy = (tp1HitTrades || []).filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy');
+    const tp1HitBuy = (tp1HitTrades || [])
+      .filter((t: any) => (t.direction || 'buy').toLowerCase() === 'buy')
+      .map(mapTradeDetails);
     const tp1HitPremier  = tp1HitBuy.filter((t: any) => t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD);
     const tp1HitStandard = tp1HitBuy.filter((t: any) => !(t.ml_probability && Number(t.ml_probability) >= PREMIER_THRESHOLD));
 
