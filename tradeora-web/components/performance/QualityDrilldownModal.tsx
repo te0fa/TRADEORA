@@ -17,6 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
+import { TradeVisualizer } from './TradeVisualizer';
 
 export interface ClosedDrilldownTrade {
   id: string;
@@ -251,25 +252,18 @@ export function QualityDrilldownModal({
                     </div>
                   </div>
 
-                  {/* Price Metrics Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-black/40 p-3 rounded-xl border border-zinc-800/80 text-xs font-mono">
-                    <div>
-                      <span className="text-[10px] text-zinc-500 block">{isAr ? 'سعر الدخول' : 'Entry Price'}</span>
-                      <span className="font-bold text-white">{t.entry_price ? Number(t.entry_price).toFixed(2) : '-'} ج.م</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-500 block">{isAr ? 'سعر الخروج' : 'Exit Price'}</span>
-                      <span className="font-bold text-amber-400">{t.exit_price ? Number(t.exit_price).toFixed(2) : '-'} ج.م</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-500 block">{isAr ? 'الهدف 1 / 2' : 'Targets 1 / 2'}</span>
-                      <span className="font-bold text-emerald-400">{t.tp1 || '-'} / {t.tp2 || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-zinc-500 block">{isAr ? 'وقف الخسارة' : 'Stop Loss'}</span>
-                      <span className="font-bold text-red-400">{t.sl || '-'} ج.م</span>
-                    </div>
-                  </div>
+                  {/* Interactive Trade Visualizer with 5-column grid & real-time progress bar */}
+                  <TradeVisualizer
+                    entryPrice={Number(t.entry_price || 0)}
+                    currentPrice={Number(t.exit_price || t.tp1 || t.entry_price || 0)}
+                    exitPrice={t.exit_price ? Number(t.exit_price) : null}
+                    slPrice={Number(t.sl || (t.entry_price ? t.entry_price * 0.95 : 0))}
+                    tp1Price={Number(t.tp1 || (t.entry_price ? t.entry_price * 1.05 : 0))}
+                    tp2Price={Number(t.tp2 || (t.entry_price ? t.entry_price * 1.10 : 0))}
+                    status={t.status}
+                    exitReason={t.exit_reason}
+                    pnlPercent={t.pnl_percent}
+                  />
 
                   {/* AI Learning Note */}
                   {getAiLearningNote(t)}

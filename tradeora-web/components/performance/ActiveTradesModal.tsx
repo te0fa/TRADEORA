@@ -20,6 +20,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
+import { TradeVisualizer } from './TradeVisualizer';
 
 export interface ActiveTrade {
   id: string;
@@ -713,207 +714,17 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                     </div>
                   )}
 
-                  {/* Live Prices Grid — Ordered from Right (SL) to Left (TP1) for Arabic RTL */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs font-mono">
-                    {isBreakoutPending ? (
-                      <>
-                        {/* Col 1 (Far Right in RTL): Stop Loss SL */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (إلغاء هبوط SL)' : 'Stop Exit Invalidation')}</span>
-                          <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
-                        </div>
-
-                        {/* Col 2 (Middle Right in RTL): Current Live Price (Lower than Breakout Trigger) */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
-                          <span className="font-bold text-cyan-400 text-sm flex items-center gap-1">
-                            {current.toFixed(2)} ج.م
-                            <span className={`text-[10px] ${isZeroChange ? 'text-zinc-400' : isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              ({isPositive ? '+' : ''}{pnlPct.toFixed(1)}%)
-                            </span>
-                          </span>
-                        </div>
-
-                        {/* Col 3 (Middle Left in RTL): Breakout Trigger Target Entry Price */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة تفعيل الاختراق' : 'Breakout Trigger Price') : (isAr ? 'نقطة تفعيل الكسر' : 'Breakdown Trigger Price')}</span>
-                          <span className="font-bold text-purple-300 text-sm">{entry.toFixed(2)} ج.م</span>
-                        </div>
-
-                        {/* Col 4 (Far Left in RTL): Target 1 TP1 */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
-                          <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Standard Market / Limit Order Grid */}
-                        {/* Column 1 (FAR RIGHT in RTL): Stop Loss SL / Invalidation Level */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'وقف الخسارة (SL)' : 'Stop Loss') : (isAr ? 'وقف خروج حرج (إلغاء هبوط SL)' : 'Stop Exit Invalidation')}</span>
-                          <span className={`font-bold text-sm ${isBuy ? 'text-rose-400' : 'text-amber-400'}`}>{sl.toFixed(2)} ج.م</span>
-                        </div>
-
-                        {/* Column 2 (MIDDLE RIGHT in RTL): Target Entry Price */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'نقطة الشراء المستهدفة' : 'Target Entry Price') : (isAr ? 'نقطة البيع المستهدفة' : 'Target Sell Entry')}</span>
-                          <span className="font-bold text-white text-sm">{entry.toFixed(2)} ج.م</span>
-                        </div>
-
-                        {/* Column 3 (MIDDLE LEFT in RTL): Current Live Price */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isAr ? 'السعر الحالي (لايف)' : 'Current Price'}</span>
-                          <span className="font-bold text-cyan-400 text-sm flex items-center gap-1">
-                            {current.toFixed(2)} ج.م
-                            <span className={`text-[10px] ${isZeroChange ? 'text-zinc-400' : isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              ({isPositive ? '+' : ''}{pnlPct.toFixed(1)}%)
-                            </span>
-                          </span>
-                        </div>
-
-                        {/* Column 4 (FAR LEFT in RTL): Target 1 TP1 */}
-                        <div>
-                          <span className="text-zinc-500 block text-[11px]">{isBuy ? (isAr ? 'الهدف الأول (TP1)' : 'Target 1') : (isAr ? 'مستهدف الهبوط (TP1)' : 'Downside TP1')}</span>
-                          <span className={`font-bold text-sm ${isBuy ? 'text-emerald-400' : 'text-rose-400'}`}>{tp1.toFixed(2)} ج.م</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* ── TP1 Hit Banner: Move SL to Entry ─────────────────────── */}
-                  {tp1Hit && (
-                    <div className={`p-3 rounded-xl border text-xs font-bold flex flex-wrap items-center gap-3 ${
-                      postTp1Reversal
-                        ? 'bg-orange-500/15 border-orange-500/40 text-orange-300'
-                        : tp2Hit
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                    }`}>
-                      <span className="text-base">{tp2Hit ? '🏆' : postTp1Reversal ? '⚠️' : '🎯'}</span>
-                      <div className="flex-1">
-                        {tp2Hit ? (
-                          <span>{isAr ? `🏆 تم تحقيق الهدف الثاني الكامل! (TP2: ${tp2.toFixed(2)} ج.م) — ربح كامل +${pnlPct.toFixed(1)}%` : `TP2 Hit! Full target achieved +${pnlPct.toFixed(1)}%`}</span>
-                        ) : postTp1Reversal ? (
-                          <span>
-                            {isAr
-                              ? `⚠️ السعر تراجع بعد الوصول للهدف الأول (TP1: ${tp1.toFixed(2)} ج.م) — السعر الحالي ${current.toFixed(2)} ج.م. وقف الخسارة الآن عند سعر الدخول (${entry.toFixed(2)} ج.م) — لا خسارة.`
-                              : `Price pulled back after TP1 (${tp1.toFixed(2)} EGP). SL now at entry (${entry.toFixed(2)} EGP) — no loss.`}
-                          </span>
-                        ) : (
-                          <span>
-                            {isAr
-                              ? `🎯 تم تحقيق الهدف الأول! (TP1: ${tp1.toFixed(2)} ج.م) — انقل وقف الخسارة فوراً لسعر الدخول (${entry.toFixed(2)} ج.م) وتابع نحو TP2: ${tp2.toFixed(2)} ج.م.`
-                              : `TP1 hit! Move SL to entry (${entry.toFixed(2)} EGP) now. Target TP2: ${tp2.toFixed(2)} EGP.`}
-                          </span>
-                        )}
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
-                        postTp1Reversal ? 'bg-orange-500/20 border-orange-400 text-orange-200' : 'bg-amber-500/20 border-amber-400 text-amber-100'
-                      }`}>
-                        {postTp1Reversal ? `حركة بعد TP1 — ${pnlPct.toFixed(1)}%` : `+${pnlPct.toFixed(1)}% ربح`}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Visual Progress Scale Bar — SL ─── Entry ─── TP1 ─── TP2 */}
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                      <span>
-                        {isLimitPending
-                          ? (isAr ? (isBuy ? `مسار الهبوط لشراء الحد عند ${entry.toFixed(2)} ج.م:` : `مسار الارتداد لبيع الحد عند ${entry.toFixed(2)} ج.م:`) : 'Progress to Entry:')
-                          : isBreakoutPending
-                          ? (isAr ? (isBuy ? `مسار الصعود لاختراق المقاومة عند ${entry.toFixed(2)} ج.م:` : `مسار الهبوط لكسر الدعم عند ${entry.toFixed(2)} ج.م:`) : 'Progress to Trigger:')
-                          : (isAr ? 'مسار الصفقة نحو الهدف / الوقف:' : 'Live Trade Progress:')}
-                      </span>
-                      <span className={`font-bold ${
-                        isPendingExecution ? 'text-amber-400'
-                        : isZeroChange ? 'text-zinc-400'
-                        : tp2Hit ? 'text-emerald-300'
-                        : tp1Hit && postTp1Reversal ? 'text-orange-400'
-                        : tp1Hit ? 'text-amber-300'
-                        : isPositive ? 'text-emerald-400'
-                        : 'text-rose-400'
-                      }`}>
-                        {isLimitPending
-                          ? (isAr ? `باقي ${distToEntry.toFixed(1)}% للتنفيذ` : `${distToEntry.toFixed(1)}% to entry`)
-                          : isBreakoutPending
-                          ? (isAr ? `باقي ${distToEntry.toFixed(1)}% للتنفيذ` : `${distToEntry.toFixed(1)}% to trigger`)
-                          : isZeroChange
-                          ? (isAr ? 'لم يتغير السعر بعد' : 'Price unchanged')
-                          : tp2Hit
-                          ? (isAr ? `🏆 TP2 محقق +${pnlPct.toFixed(1)}%` : `TP2 Hit! +${pnlPct.toFixed(1)}%`)
-                          : tp1Hit
-                          ? (isAr ? `🎯 TP1 محقق — باقي ${distToTP2.toFixed(1)}% للهدف 2` : `TP1 Hit — ${distToTP2.toFixed(1)}% to TP2`)
-                          : isPositive
-                          ? `${isAr ? 'ربح' : 'Gain'} +${pnlPct.toFixed(1)}% (باقي ${distToTP1.toFixed(1)}% للهدف 1)`
-                          : `${isAr ? 'تراجع' : 'Loss'} -${Math.abs(pnlPct).toFixed(1)}% (الوقف ${effectiveSl.toFixed(2)} ج.م)`}
-                      </span>
-                    </div>
-
-                    {/* Multi-segment bar: [SL zone red] [entry] [0%→TP1 green 50%] [TP1→TP2 teal 100%] */}
-                    <div dir="ltr" className="relative w-full h-3.5 bg-zinc-800 rounded-full overflow-visible border border-white/10">
-                      {/* Filled progress bar */}
-                      <div
-                        className={`h-full transition-all duration-500 rounded-full ${
-                          isLimitPending
-                            ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
-                            : isBreakoutPending
-                            ? 'bg-gradient-to-r from-purple-500 to-indigo-400'
-                            : pointerPos < 0
-                            ? 'bg-gradient-to-r from-rose-600 to-rose-400'
-                            : tp2Hit
-                            ? 'bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-400'
-                            : tp1Hit && postTp1Reversal
-                            ? 'bg-gradient-to-r from-orange-600 via-orange-500 to-orange-300 animate-pulse'
-                            : tp1Hit
-                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-amber-400'
-                            : isZeroChange
-                            ? 'bg-zinc-600'
-                            : isPositive
-                            ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400'
-                            : 'bg-gradient-to-r from-rose-600 via-rose-500 to-rose-400'
-                        }`}
-                        style={{ width: `${Math.max(0, Math.min(100, Math.abs(pointerPos)))}%` }}
-                      />
-                      {/* TP1 midpoint marker at 50% */}
-                      {!isPendingExecution && (
-                        <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-amber-400/80 z-10"
-                          style={{ left: '50%' }}
-                          title={`TP1: ${tp1.toFixed(2)}`}
-                        />
-                      )}
-                      {/* TP1 label */}
-                      {!isPendingExecution && (
-                        <span className="absolute -top-4 text-[9px] font-bold text-amber-400 font-mono" style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                          TP1
-                        </span>
-                      )}
-                      {/* TP2 label at far right */}
-                      {!isPendingExecution && (
-                        <span className="absolute -top-4 text-[9px] font-bold text-teal-400 font-mono" style={{ right: 0 }}>
-                          TP2
-                        </span>
-                      )}
-                      {/* SL label at far left */}
-                      {!isPendingExecution && (
-                        <span className="absolute -top-4 text-[9px] font-bold text-rose-400 font-mono" style={{ left: 0 }}>
-                          SL
-                        </span>
-                      )}
-                    </div>
-
-                    {/* TP2 value display below bar */}
-                    {!isPendingExecution && (
-                      <div className="flex items-center justify-between text-[10px] font-mono mt-1">
-                        <span className="text-rose-400">{effectiveSl.toFixed(2)} ج.م</span>
-                        <span className="text-zinc-500">{entry.toFixed(2)} ج.م</span>
-                        <span className="text-amber-400">{tp1.toFixed(2)} ج.م</span>
-                        <span className="text-teal-400 font-bold">{tp2.toFixed(2)} ج.م ←TP2</span>
-                      </div>
-                    )}
-                  </div>
+                  {/* ── Interactive Trade Visualizer (5-column RTL grid + Real-Time Pin Progress Bar) ── */}
+                  <TradeVisualizer
+                    entryPrice={entry}
+                    currentPrice={current}
+                    slPrice={sl}
+                    tp1Price={tp1}
+                    tp2Price={tp2}
+                    isBuy={isBuy}
+                    status={t.status}
+                    pnlPercent={pnlPct}
+                  />
 
                   {/* Institutional Cancellation Safeguard Notice for Pending Orders */}
                   {isPendingExecution && (
