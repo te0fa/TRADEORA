@@ -1,0 +1,63 @@
+name: EGX Session Crons (Every 15 min)
+# يعمل كل 15 دقيقة من 10:00 إلى 16:00 بتوقيت القاهرة (07:00-13:00 UTC)
+# الأحد = 0، الاثنين = 1، الثلاثاء = 2، الأربعاء = 3، الخميس = 4
+# GitHub Actions يستخدم UTC — القاهرة = UTC+3
+
+on:
+  schedule:
+    # كل 15 دقيقة من 07:00 إلى 13:00 UTC (= 10:00-16:00 Cairo)
+    # الأحد إلى الخميس
+    - cron: '*/15 7-12 * * 0-4'
+  workflow_dispatch:   # تشغيل يدوي عند الحاجة
+
+jobs:
+  run-session-crons:
+    name: Run EGX Session Crons
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check EGX Session (Cairo Time)
+        id: session_check
+        run: |
+          CAIRO_HOUR=$(TZ="Africa/Cairo" date +"%H")
+          CAIRO_DAY=$(TZ="Africa/Cairo" date +"%u")  # 1=Mon, 5=Fri, 6=Sat, 7=Sun
+          echo "Cairo hour: $CAIRO_HOUR, day of week: $CAIRO_DAY"
+          
+          # EGX is open Sun-Thu (7=Sun in ISO, 1-4=Mon-Thu, 5=Fri CLOSED, 6=Sat CLOSED)
+          IS_WEEKEND=false
+          if [ "$CAIRO_DAY" = "5" ] || [ "$CAIRO_DAY" = "6" ]; then
+            IS_WEEKEND=true
+          fi
+          
+          IS_SESSION=false
+          if [ "$CAIRO_HOUR" -ge 10 ] && [ "$CAIRO_HOUR" -lt 16 ]; then
+            IS_SESSION=true
+          fi
+          
+          echo "is_weekend=$IS_WEEKEND" >> $GITHUB_OUTPUT
+          echo "is_session=$IS_SESSION" >> $GITHUB_OUTPUT
+          echo "Weekend: $IS_WEEKEND | Session: $IS_SESSION"
+
+      - name: Run Signal Monitor
+        if: steps.session_check.outputs.is_weekend == 'false' && steps.session_check.outputs.is_session == 'true'
+        run: |
+          echo "Calling signal-monitor..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.VERCEL_APP_URL }}/api/cron/signal-monitor")
+          echo "signal-monitor response: $RESPONSE"
+
+      - name: Run Sync Intraday
+        if: steps.session_check.outputs.is_weekend == 'false' && steps.session_check.outputs.is_session == 'true'
+        run: |
+          echo "Calling sync-intraday..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-intraday")
+          echo "sync-intraday response: $RESPONSE"
+
+      - name: Skip (Market Closed)
+        if: steps.session_check.outputs.is_weekend == 'true' || steps.session_check.outputs.is_session == 'false'
+        run: |
+          echo "Market closed — skipping crons."
