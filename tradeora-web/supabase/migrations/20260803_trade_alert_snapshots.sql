@@ -1,9 +1,10 @@
 -- Migration: trade_alert_snapshots
 -- تُخزّن آخر سعر تم تنبيهه لكل صفقة لتجنب إرسال تنبيهات متكررة
 -- الجدول يُستخدم من: /api/cron/signal-monitor
+-- FIX: trade_id is UUID (matching recommended_trades.id type)
 
 CREATE TABLE IF NOT EXISTS public.trade_alert_snapshots (
-  trade_id          TEXT        PRIMARY KEY REFERENCES public.recommended_trades(id) ON DELETE CASCADE,
+  trade_id          UUID          PRIMARY KEY REFERENCES public.recommended_trades(id) ON DELETE CASCADE,
   snapshotted_price NUMERIC(12, 4) NOT NULL,
   alerted_at        TIMESTAMPTZ   NOT NULL DEFAULT now(),
   alert_reason      TEXT,
@@ -32,5 +33,5 @@ CREATE TRIGGER trg_trade_alert_snapshots_updated_at
 -- RLS: Service role only (cron runs with service key)
 ALTER TABLE public.trade_alert_snapshots ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "service_role_all" ON public.trade_alert_snapshots
+CREATE POLICY IF NOT EXISTS "service_role_all" ON public.trade_alert_snapshots
   FOR ALL USING (auth.role() = 'service_role');
