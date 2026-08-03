@@ -98,7 +98,16 @@ export default function PerformancePage() {
   const [personalStats, setPersonalStats] = useState<any>(null);
 
   const activeTradesForModal = useMemo(() => {
-    return platformTrades
+    // Use tier-specific trades when a tier is selected (premier=119, standard=85, combined=204)
+    // This ensures the modal respects the currently selected evaluation tier
+    let sourceTrades: any[] = [];
+    if (tierEvaluations && tierEvaluations[evaluationTier]?.trades?.length > 0) {
+      sourceTrades = tierEvaluations[evaluationTier].trades;
+    } else {
+      sourceTrades = platformTrades;
+    }
+
+    return sourceTrades
       .filter((t: any) => t.status === 'active' || t.status === 'tp1_hit')
       .map((t: any) => ({
         id: t.id,
@@ -119,13 +128,31 @@ export default function PerformancePage() {
         trigger_condition_ar: t.trigger_condition_ar,
         is_top_pick: t.is_top_pick ?? false,
         is_shariah_compliant: t.is_shariah_compliant ?? false,
-        status: t.status,         // ✅ pass DB status so TP1 banner works
+        status: t.status,
+        is_activated: t.is_activated ?? (t.order_type === 'MARKET' || !t.order_type),  // ✅ pass activation status
+        activation_status_ar: t.activation_status_ar,
         scalp_indicators: t.scalp_indicators,
         dynamic_exit_alerts: t.dynamic_exit_alerts,
-        trade_steps_ar: t.trade_steps_ar
-
+        trade_steps_ar: t.trade_steps_ar,
+        // Pass extra enrichment fields
+        is_wyckoff_spring: t.is_wyckoff_spring,
+        wyckoff_badge_ar: t.wyckoff_badge_ar,
+        pattern_badge_ar: t.pattern_badge_ar,
+        channel_badge_ar: t.channel_badge_ar,
+        fundamental_badge_ar: t.fundamental_badge_ar,
+        fundamental_score: t.fundamental_score,
+        fundamental_tier: t.fundamental_tier,
+        smart_money_badge_ar: t.smart_money_badge_ar,
+        smart_money_score: t.smart_money_score,
+        ict_smc_badge_ar: t.ict_smc_badge_ar,
+        elliott_badge_ar: t.elliott_badge_ar,
+        price_channel: t.price_channel,
+        composite_score: t.composite_score,
+        rank: t.rank,
+        rank_tier: t.rank_tier,
       }));
-  }, [platformTrades]);
+  }, [platformTrades, tierEvaluations, evaluationTier]);
+
 
   const sellSignalsForModal = useMemo(() => {
     return platformSellSignals.map((t: any) => ({

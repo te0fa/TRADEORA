@@ -101,20 +101,43 @@ export async function GET(req: NextRequest) {
       let finalEntry = entry > 0 ? entry : safeCurrentPrice;
 
       if (snap.order_type) {
+        // ✅ Use explicitly stored order type from signal generator
         orderType = snap.order_type;
-      } else {
-        if (hashIdx % 4 === 1) {
-          orderType = 'LIMIT';
-          // For Limit BUY: Entry is support pullback level (e.g. 2% below current market price)
-          finalEntry = Number((safeCurrentPrice * (isBuy ? 0.98 : 1.02)).toFixed(2));
-        } else if (hashIdx % 4 === 2) {
-          orderType = 'BREAKOUT_TRIGGER';
-          // For Breakout BUY: Entry is resistance trigger level (e.g. 1.5% above current market price)
-          finalEntry = Number((safeCurrentPrice * (isBuy ? 1.015 : 0.985)).toFixed(2));
+        finalEntry = entry > 0 ? entry : safeCurrentPrice;
+      } else if (entry > 0 && safeCurrentPrice > 0) {
+        // ✅ Real price-based order type determination (not arbitrary hash)
+        const priceDiff = (safeCurrentPrice - entry) / entry; // positive = current > entry
+
+        if (isBuy) {
+          if (priceDiff >= 0.02) {
+            // Current price is 2%+ above entry → signal calls for pullback LIMIT buy at support
+            orderType = 'LIMIT';
+            finalEntry = entry; // use actual entry_price from DB as the limit level
+          } else if (priceDiff <= -0.015) {
+            // Current price is 1.5%+ below entry → entry is above current = breakout setup
+            orderType = 'BREAKOUT_TRIGGER';
+            finalEntry = entry; // entry is the resistance trigger level
+          } else {
+            // Price is within 2% of entry → market order (already at optimal entry zone)
+            orderType = 'MARKET';
+            finalEntry = safeCurrentPrice;
+          }
         } else {
-          orderType = 'MARKET';
-          finalEntry = safeCurrentPrice;
+          // SELL direction
+          if (priceDiff <= -0.02) {
+            orderType = 'LIMIT';
+            finalEntry = entry;
+          } else if (priceDiff >= 0.015) {
+            orderType = 'BREAKOUT_TRIGGER';
+            finalEntry = entry;
+          } else {
+            orderType = 'MARKET';
+            finalEntry = safeCurrentPrice;
+          }
         }
+      } else {
+        orderType = 'MARKET';
+        finalEntry = safeCurrentPrice;
       }
 
       let finalTp1 = Number(t.tp1 || (isBuy ? finalEntry * 1.05 : finalEntry * 0.95));
