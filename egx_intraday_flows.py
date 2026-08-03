@@ -413,12 +413,9 @@ ALLOWED_COLS = {
     'trade_date', 'source', 'pdf_url', 'created_at', 'updated_at', 'total_volume_egp',
     'foreigners_buy_egp', 'foreigners_sell_egp', 'foreigners_net_egp',
     'foreign_inst_buy_egp', 'foreign_inst_sell_egp', 'foreign_inst_net_egp',
-    'foreign_ind_buy_egp', 'foreign_ind_sell_egp', 'foreign_ind_net_egp',
     'egyptian_inst_buy_egp', 'egyptian_inst_sell_egp', 'egyptian_inst_net_egp',
     'egyptian_ind_buy_egp', 'egyptian_ind_sell_egp', 'egyptian_ind_net_egp',
     'arab_buy_egp', 'arab_sell_egp', 'arab_net_egp',
-    'arab_inst_buy_egp', 'arab_inst_sell_egp', 'arab_inst_net_egp',
-    'arab_ind_buy_egp', 'arab_ind_sell_egp', 'arab_ind_net_egp',
 }
 
 
