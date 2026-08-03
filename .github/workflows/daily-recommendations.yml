@@ -31,7 +31,6 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           pip install --upgrade pip
-          pip install git+https://github.com/twopirllc/pandas-ta.git
           pip install \
             supabase \
             python-dotenv \
@@ -40,6 +39,7 @@ jobs:
             joblib \
             xgboost \
             scikit-learn \
+            pandas-ta-classic \
             requests
 
       - name: 🧠 Generate recommendations
