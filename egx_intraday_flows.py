@@ -463,8 +463,21 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
     return result
 
 
+ALLOWED_COLS = {
+    'trade_date', 'source', 'pdf_url', 'created_at', 'updated_at', 'total_volume_egp',
+    'foreigners_buy_egp', 'foreigners_sell_egp', 'foreigners_net_egp',
+    'foreign_inst_buy_egp', 'foreign_inst_sell_egp', 'foreign_inst_net_egp',
+    'foreign_ind_buy_egp', 'foreign_ind_sell_egp', 'foreign_ind_net_egp',
+    'egyptian_inst_buy_egp', 'egyptian_inst_sell_egp', 'egyptian_inst_net_egp',
+    'egyptian_ind_buy_egp', 'egyptian_ind_sell_egp', 'egyptian_ind_net_egp',
+    'arab_buy_egp', 'arab_sell_egp', 'arab_net_egp',
+    'arab_inst_buy_egp', 'arab_inst_sell_egp', 'arab_inst_net_egp',
+    'arab_ind_buy_egp', 'arab_ind_sell_egp', 'arab_ind_net_egp',
+}
+
+
 def save_to_db(flows: dict) -> bool:
-    """Upsert all 27 flow values into Supabase daily_investor_flows."""
+    """Upsert valid flow fields into Supabase daily_investor_flows."""
     if not sb:
         logger.error("Supabase client is not initialized.")
         return False
@@ -472,7 +485,7 @@ def save_to_db(flows: dict) -> bool:
         clean = {
             k: (int(v) if isinstance(v, float) and v == int(v) else v)
             for k, v in flows.items()
-            if not k.startswith('_') and v is not None
+            if k in ALLOWED_COLS and v is not None
         }
         sb.table('daily_investor_flows') \
           .upsert(clean, on_conflict='trade_date') \
