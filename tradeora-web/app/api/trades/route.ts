@@ -62,50 +62,74 @@ export async function GET(req: NextRequest) {
 
     if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
 
-    // 2. Fetch latest prices for ALL active, closed, and tp1_hit companies
+    // 2. Fetch latest prices for ALL active, closed, and tp1_hit companies/symbols
     const activeCompanyIds = Array.from(
       new Set([
-        ...(trades || []).filter((t: any) => t.company_id).map((t: any) => t.company_id),
-        ...(allClosed || []).filter((t: any) => t.company_id).map((t: any) => t.company_id),
-        ...(tp1HitTrades || []).filter((t: any) => t.company_id).map((t: any) => t.company_id),
-      ])
+        ...(trades || []).map((t: any) => t.company_id),
+        ...(allClosed || []).map((t: any) => t.company_id),
+        ...(tp1HitTrades || []).map((t: any) => t.company_id),
+      ].filter(Boolean))
+    );
+
+    const activeSymbols = Array.from(
+      new Set([
+        ...(trades || []).map((t: any) => t.symbol?.toUpperCase()),
+        ...(allClosed || []).map((t: any) => t.symbol?.toUpperCase()),
+        ...(tp1HitTrades || []).map((t: any) => t.symbol?.toUpperCase()),
+      ].filter(Boolean))
     );
 
     const priceMap: Record<string, number> = {};
     const symbolPriceMap: Record<string, number> = {};
+    const priceDateMap: Record<string, string> = {};
 
-    if (activeCompanyIds.length > 0) {
-      const { data: latestPrices } = await supabase
-        .from('market_prices')
-        .select('company_id, symbol, close_price, price_date, source')
-        .in('company_id', activeCompanyIds)
-        .order('price_date', { ascending: false });
+    let priceQuery = supabase
+      .from('market_prices')
+      .select('company_id, symbol, close_price, price_date, source')
+      .order('price_date', { ascending: false });
 
-      if (latestPrices) {
-        latestPrices.forEach((p: any) => {
-          if (!priceMap[p.company_id] && p.source === 'tradingview') {
-            priceMap[p.company_id] = parseFloat(p.close_price);
+    if (activeCompanyIds.length > 0 && activeSymbols.length > 0) {
+      priceQuery = priceQuery.or(`company_id.in.(${activeCompanyIds.join(',')}),symbol.in.(${activeSymbols.join(',')})`);
+    } else if (activeCompanyIds.length > 0) {
+      priceQuery = priceQuery.in('company_id', activeCompanyIds);
+    } else if (activeSymbols.length > 0) {
+      priceQuery = priceQuery.in('symbol', activeSymbols);
+    }
+
+    const { data: latestPrices } = await priceQuery.limit(2000);
+
+    if (latestPrices) {
+      latestPrices.forEach((p: any) => {
+        const price = parseFloat(p.close_price);
+        if (!price || isNaN(price) || price <= 0) return;
+
+        const cid = p.company_id;
+        const sym = p.symbol ? p.symbol.toUpperCase() : null;
+        const pDate = p.price_date || '';
+
+        if (cid) {
+          if (!priceMap[cid] || pDate > (priceDateMap[cid] || '')) {
+            priceMap[cid] = price;
+            priceDateMap[cid] = pDate;
           }
-          if (p.symbol && !symbolPriceMap[p.symbol] && p.source === 'tradingview') {
-            symbolPriceMap[p.symbol] = parseFloat(p.close_price);
+        }
+        if (sym) {
+          if (!symbolPriceMap[sym] || pDate > (priceDateMap[`sym_${sym}`] || '')) {
+            symbolPriceMap[sym] = price;
+            priceDateMap[`sym_${sym}`] = pDate;
           }
-        });
-        latestPrices.forEach((p: any) => {
-          if (!priceMap[p.company_id]) {
-            priceMap[p.company_id] = parseFloat(p.close_price);
-          }
-          if (p.symbol && !symbolPriceMap[p.symbol]) {
-            symbolPriceMap[p.symbol] = parseFloat(p.close_price);
-          }
-        });
-      }
+        }
+      });
     }
 
     // Enforce gating and append explainability / FRA disclaimer / current_price / sector
     const processedTrades = (trades || []).map((t: any) => {
       const confidence = t.ml_probability ? parseFloat(t.ml_probability) : null;
       const requiresWarning = confidence !== null && confidence < 0.75;
-      let safeCurrentPrice = t.company_id && priceMap[t.company_id] ? priceMap[t.company_id] : t.entry_price;
+      const sym = t.symbol ? t.symbol.toUpperCase() : '';
+      let safeCurrentPrice = (t.company_id && priceMap[t.company_id])
+        || (sym && symbolPriceMap[sym])
+        || t.entry_price;
       const rawRatio = safeCurrentPrice / (t.entry_price || 1);
       // Safeguard against unadjusted stock split data anomalies (e.g. CID 10 EGP vs 33 EGP)
       if (rawRatio > 2.5 || rawRatio < 0.4) {
