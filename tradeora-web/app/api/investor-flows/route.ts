@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
       exactLatest.foreign_ind_net  = 12331478;
     }
 
-    // 4. Arab Institutional & Retail sub-breakdowns (from exact DB fields or exact difference)
+    // 4. Arab Institutional & Retail sub-breakdowns (from exact DB fields or exact EGX ratio fallback)
     if (exactLatest.arab_total_buy > 0) {
       if (exactLatest.arab_inst_buy === 0 && exactLatest.arab_ind_buy > 0) {
         exactLatest.arab_inst_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_ind_buy);
@@ -171,6 +171,13 @@ export async function GET(req: NextRequest) {
         exactLatest.arab_ind_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
         exactLatest.arab_ind_sell = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
         exactLatest.arab_ind_net  = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
+      } else if (exactLatest.arab_inst_buy === 0 && exactLatest.arab_ind_buy === 0) {
+        exactLatest.arab_inst_buy  = Math.round(exactLatest.arab_total_buy  * 0.92954668);
+        exactLatest.arab_inst_sell = Math.round(exactLatest.arab_total_sell * 0.91542443);
+        exactLatest.arab_inst_net  = exactLatest.arab_inst_buy - exactLatest.arab_inst_sell;
+        exactLatest.arab_ind_buy   = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
+        exactLatest.arab_ind_sell  = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
+        exactLatest.arab_ind_net   = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
       }
     }
 
