@@ -536,3 +536,489 @@ export function calcMarketRegime(highs: number[], lows: number[], closes: number
   }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// ADVANCED ANALYSIS: SMC / ICT / Elliott / Wyckoff / Channels
+// ══════════════════════════════════════════════════════════════════
+
+export interface Candle {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+  time?: string | number;
+}
+
+// ── SMC / ICT ────────────────────────────────────────────────────
+
+export interface OrderBlock {
+  type: 'bullish' | 'bearish';
+  high: number;
+  low: number;
+  midpoint: number;
+  index: number;          // candle index in array
+  time?: string | number;
+  strength: 'strong' | 'weak';
+  labelAr: string;
+  labelEn: string;
+}
+
+export interface FairValueGap {
+  type: 'bullish' | 'bearish';  // bullish FVG = gap above, price should fill from below
+  gapHigh: number;
+  gapLow: number;
+  midpoint: number;
+  index: number;
+  time?: string | number;
+  labelAr: string;
+  labelEn: string;
+}
+
+export interface LiquidityZone {
+  type: 'sellside' | 'buyside';   // sellside = below lows, buyside = above highs
+  price: number;
+  strength: number;               // how many times swept
+  index: number;
+  time?: string | number;
+  labelAr: string;
+  labelEn: string;
+}
+
+/**
+ * Detect Order Blocks (OB) — SMC / ICT concept
+ * Bullish OB: Last bearish candle before a strong bullish impulse
+ * Bearish OB: Last bullish candle before a strong bearish impulse
+ */
+export function detectOrderBlocks(candles: Candle[], lookback = 50): OrderBlock[] {
+  const n = candles.length;
+  if (n < 5) return [];
+
+  const results: OrderBlock[] = [];
+  const start = Math.max(0, n - lookback);
+
+  for (let i = start; i < n - 3; i++) {
+    const c = candles[i];
+    const bodySize = Math.abs(c.close - c.open);
+    const range = c.high - c.low;
+    if (range === 0) continue;
+
+    // Look for impulse move after this candle
+    const nextThree = candles.slice(i + 1, i + 4);
+    const impulseUp   = nextThree.every(x => x.close > x.open) &&
+                        nextThree.reduce((acc, x) => acc + (x.close - x.open), 0) > bodySize * 1.5;
+    const impulseDown = nextThree.every(x => x.close < x.open) &&
+                        nextThree.reduce((acc, x) => acc + (x.open - x.close), 0) > bodySize * 1.5;
+
+    // Bullish OB: current candle is bearish and followed by strong bullish impulse
+    if (c.close < c.open && impulseUp) {
+      results.push({
+        type: 'bullish',
+        high: c.high,
+        low: c.low,
+        midpoint: (c.high + c.low) / 2,
+        index: i,
+        time: c.time,
+        strength: bodySize / range > 0.6 ? 'strong' : 'weak',
+        labelAr: 'Order Block صاعد (OB)',
+        labelEn: 'Bullish Order Block (OB)',
+      });
+    }
+
+    // Bearish OB: current candle is bullish and followed by strong bearish impulse
+    if (c.close > c.open && impulseDown) {
+      results.push({
+        type: 'bearish',
+        high: c.high,
+        low: c.low,
+        midpoint: (c.high + c.low) / 2,
+        index: i,
+        time: c.time,
+        strength: bodySize / range > 0.6 ? 'strong' : 'weak',
+        labelAr: 'Order Block هابط (OB)',
+        labelEn: 'Bearish Order Block (OB)',
+      });
+    }
+  }
+
+  // Return last 5 order blocks (most recent)
+  return results.slice(-5);
+}
+
+/**
+ * Detect Fair Value Gaps (FVG) — SMC / ICT concept
+ * Bullish FVG: candle[i].high < candle[i+2].low  → gap between wick[i] and wick[i+2]
+ * Bearish FVG: candle[i].low  > candle[i+2].high → gap above
+ */
+export function detectFairValueGaps(candles: Candle[], lookback = 60): FairValueGap[] {
+  const n = candles.length;
+  if (n < 3) return [];
+
+  const results: FairValueGap[] = [];
+  const start = Math.max(0, n - lookback);
+
+  for (let i = start; i < n - 2; i++) {
+    const c0 = candles[i];
+    const c2 = candles[i + 2];
+
+    // Bullish FVG: gap between candle[i].high and candle[i+2].low
+    if (c0.high < c2.low) {
+      const gapSize = c2.low - c0.high;
+      const avgRange = (c0.high - c0.low + (candles[i+1].high - candles[i+1].low) + (c2.high - c2.low)) / 3;
+      if (gapSize > avgRange * 0.3) { // Minimum gap size filter
+        results.push({
+          type: 'bullish',
+          gapHigh: c2.low,
+          gapLow: c0.high,
+          midpoint: (c0.high + c2.low) / 2,
+          index: i + 1,
+          time: candles[i + 1].time,
+          labelAr: 'فجوة قيمة عادلة صاعدة (FVG)',
+          labelEn: 'Bullish Fair Value Gap (FVG)',
+        });
+      }
+    }
+
+    // Bearish FVG: gap between candle[i].low and candle[i+2].high
+    if (c0.low > c2.high) {
+      const gapSize = c0.low - c2.high;
+      const avgRange = (c0.high - c0.low + (candles[i+1].high - candles[i+1].low) + (c2.high - c2.low)) / 3;
+      if (gapSize > avgRange * 0.3) {
+        results.push({
+          type: 'bearish',
+          gapHigh: c0.low,
+          gapLow: c2.high,
+          midpoint: (c0.low + c2.high) / 2,
+          index: i + 1,
+          time: candles[i + 1].time,
+          labelAr: 'فجوة قيمة عادلة هابطة (FVG)',
+          labelEn: 'Bearish Fair Value Gap (FVG)',
+        });
+      }
+    }
+  }
+
+  // Return last 6 FVGs
+  return results.slice(-6);
+}
+
+/**
+ * Detect Liquidity Zones — swing highs (buyside) and swing lows (sellside)
+ * These are areas where stop losses cluster
+ */
+export function detectLiquidityZones(candles: Candle[], lookback = 100): LiquidityZone[] {
+  const n = candles.length;
+  if (n < 5) return [];
+
+  const results: LiquidityZone[] = [];
+  const start = Math.max(2, n - lookback);
+
+  for (let i = start; i < n - 2; i++) {
+    const c = candles[i];
+
+    // Swing High (Buyside Liquidity — sell stops above)
+    if (c.high > candles[i-1].high && c.high > candles[i-2].high &&
+        c.high > candles[i+1].high && c.high > candles[i+2].high) {
+      // Check how many times this level was approached
+      const touchCount = candles.slice(i + 1).filter(x =>
+        Math.abs(x.high - c.high) / c.high < 0.005
+      ).length;
+
+      results.push({
+        type: 'buyside',
+        price: c.high,
+        strength: Math.min(touchCount + 1, 5),
+        index: i,
+        time: c.time,
+        labelAr: `سيولة فوقية (Buyside Liq.) ${touchCount > 0 ? `— اختُرقت ${touchCount} مرة` : ''}`,
+        labelEn: `Buyside Liquidity${touchCount > 0 ? ` — swept ${touchCount}x` : ''}`,
+      });
+    }
+
+    // Swing Low (Sellside Liquidity — buy stops below)
+    if (c.low < candles[i-1].low && c.low < candles[i-2].low &&
+        c.low < candles[i+1].low && c.low < candles[i+2].low) {
+      const touchCount = candles.slice(i + 1).filter(x =>
+        Math.abs(x.low - c.low) / c.low < 0.005
+      ).length;
+
+      results.push({
+        type: 'sellside',
+        price: c.low,
+        strength: Math.min(touchCount + 1, 5),
+        index: i,
+        time: c.time,
+        labelAr: `سيولة تحتية (Sellside Liq.) ${touchCount > 0 ? `— اختُرقت ${touchCount} مرة` : ''}`,
+        labelEn: `Sellside Liquidity${touchCount > 0 ? ` — swept ${touchCount}x` : ''}`,
+      });
+    }
+  }
+
+  // Return last 8 zones, sorted by strength
+  return results
+    .slice(-20)
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, 8);
+}
+
+
+// ── Elliott Wave Detection ────────────────────────────────────────
+
+export interface ElliottWavePoint {
+  index: number;
+  price: number;
+  label: string;    // '1', '2', '3', '4', '5', 'A', 'B', 'C'
+  type: 'peak' | 'trough';
+  time?: string | number;
+  labelAr: string;
+}
+
+/**
+ * Detect Elliott Wave structure using ZigZag pivot detection
+ * Returns up to 9 wave points (5 impulse + 3 corrective minimum)
+ */
+export function detectElliottWaves(candles: Candle[], deviation = 0.05): ElliottWavePoint[] {
+  const n = candles.length;
+  if (n < 20) return [];
+
+  // Step 1: ZigZag pivot detection
+  const pivots: { index: number; price: number; type: 'peak' | 'trough' }[] = [];
+  const lookback = Math.max(3, Math.floor(n / 20));
+
+  for (let i = lookback; i < n - lookback; i++) {
+    const slice = candles.slice(i - lookback, i + lookback + 1);
+    const maxH = Math.max(...slice.map(c => c.high));
+    const minL = Math.min(...slice.map(c => c.low));
+
+    if (candles[i].high === maxH && (pivots.length === 0 || pivots[pivots.length - 1].type !== 'peak')) {
+      pivots.push({ index: i, price: candles[i].high, type: 'peak' });
+    } else if (candles[i].low === minL && (pivots.length === 0 || pivots[pivots.length - 1].type !== 'trough')) {
+      pivots.push({ index: i, price: candles[i].low, type: 'trough' });
+    }
+  }
+
+  // Step 2: Filter by minimum deviation
+  const filtered: typeof pivots = [];
+  for (const p of pivots) {
+    if (filtered.length === 0) {
+      filtered.push(p);
+      continue;
+    }
+    const last = filtered[filtered.length - 1];
+    const change = Math.abs(p.price - last.price) / last.price;
+    if (change >= deviation && p.type !== last.type) {
+      filtered.push(p);
+    } else if (p.type === last.type) {
+      // Replace with more extreme pivot of same type
+      if (p.type === 'peak' && p.price > last.price) filtered[filtered.length - 1] = p;
+      if (p.type === 'trough' && p.price < last.price) filtered[filtered.length - 1] = p;
+    }
+  }
+
+  // Step 3: Label last 9 pivots as Elliott Wave structure
+  const recent = filtered.slice(-9);
+  const impulseLabels = ['1', '2', '3', '4', '5', 'A', 'B', 'C'];
+  const impulseLabelsAr = ['موجة 1', 'موجة 2', 'موجة 3', 'موجة 4', 'موجة 5', 'موجة A', 'موجة B', 'موجة C'];
+
+  return recent.map((p, idx) => ({
+    index: p.index,
+    price: p.price,
+    label: impulseLabels[idx] ?? `W${idx + 1}`,
+    labelAr: impulseLabelsAr[idx] ?? `موجة ${idx + 1}`,
+    type: p.type,
+    time: candles[p.index]?.time,
+  }));
+}
+
+
+// ── Trend Channels ───────────────────────────────────────────────
+
+export interface TrendChannel {
+  direction: 'ascending' | 'descending' | 'sideways';
+  upperLine: { startPrice: number; endPrice: number; startIndex: number; endIndex: number };
+  lowerLine: { startPrice: number; endPrice: number; startIndex: number; endIndex: number };
+  width: number;       // channel width as % of price
+  isBreakout: boolean; // has price broken out of channel?
+  breakoutDirection?: 'up' | 'down';
+  labelAr: string;
+  labelEn: string;
+}
+
+/**
+ * Detect main trend channel using linear regression on highs and lows
+ */
+export function detectTrendChannel(candles: Candle[], period = 50): TrendChannel | null {
+  const n = candles.length;
+  if (n < 10) return null;
+
+  const slice = candles.slice(Math.max(0, n - period));
+  const len = slice.length;
+
+  // Linear regression on highs and lows
+  function linReg(values: number[]): { slope: number; intercept: number } {
+    const m = values.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    values.forEach((y, x) => {
+      sumX += x; sumY += y;
+      sumXY += x * y; sumX2 += x * x;
+    });
+    const slope = (m * sumXY - sumX * sumY) / (m * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / m;
+    return { slope, intercept };
+  }
+
+  const highs  = slice.map(c => c.high);
+  const lows   = slice.map(c => c.low);
+  const closes = slice.map(c => c.close);
+
+  const highReg = linReg(highs);
+  const lowReg  = linReg(lows);
+
+  const upperStart = highReg.intercept;
+  const upperEnd   = highReg.slope * (len - 1) + highReg.intercept;
+  const lowerStart = lowReg.intercept;
+  const lowerEnd   = lowReg.slope * (len - 1) + lowReg.intercept;
+
+  const slopePct = Math.abs(highReg.slope) / (closes[0] || 1) * 100;
+  let direction: 'ascending' | 'descending' | 'sideways';
+  if (Math.abs(slopePct) < 0.05) direction = 'sideways';
+  else if (highReg.slope > 0) direction = 'ascending';
+  else direction = 'descending';
+
+  // Check for breakout (last candle outside channel)
+  const lastCandle = slice[len - 1];
+  const currentUpper = upperEnd;
+  const currentLower = lowerEnd;
+  const isBreakout = lastCandle.close > currentUpper * 1.005 || lastCandle.close < currentLower * 0.995;
+  const breakoutDirection = lastCandle.close > currentUpper * 1.005 ? 'up' :
+                             lastCandle.close < currentLower * 0.995 ? 'down' : undefined;
+
+  const channelWidth = ((currentUpper - currentLower) / currentLower) * 100;
+
+  return {
+    direction,
+    upperLine: {
+      startPrice: upperStart,
+      endPrice: upperEnd,
+      startIndex: Math.max(0, n - period),
+      endIndex: n - 1,
+    },
+    lowerLine: {
+      startPrice: lowerStart,
+      endPrice: lowerEnd,
+      startIndex: Math.max(0, n - period),
+      endIndex: n - 1,
+    },
+    width: channelWidth,
+    isBreakout,
+    breakoutDirection,
+    labelAr: direction === 'ascending' ? 'قناة صاعدة 📈' :
+              direction === 'descending' ? 'قناة هابطة 📉' : 'قناة عرضية ↔️',
+    labelEn: direction === 'ascending' ? 'Ascending Channel 📈' :
+              direction === 'descending' ? 'Descending Channel 📉' : 'Sideways Channel ↔️',
+  };
+}
+
+
+// ── Wyckoff Structure Detection ──────────────────────────────────
+
+export interface WyckoffStructure {
+  phase: 'accumulation' | 'markup' | 'distribution' | 'markdown' | 'reaccumulation' | 'unknown';
+  spring?: { index: number; price: number; time?: string | number };    // Spring = false breakout below support
+  upthrust?: { index: number; price: number; time?: string | number };  // Upthrust = false breakout above resistance
+  supportLine: number;
+  resistanceLine: number;
+  labelAr: string;
+  labelEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+}
+
+/**
+ * Detect Wyckoff structure phases
+ * Identifies accumulation/distribution ranges and key events (Spring, Upthrust)
+ */
+export function detectWyckoffStructure(candles: Candle[], period = 60): WyckoffStructure {
+  const n = candles.length;
+  const slice = candles.slice(Math.max(0, n - period));
+  const len = slice.length;
+
+  // Find trading range (support and resistance)
+  const highs  = slice.map(c => c.high);
+  const lows   = slice.map(c => c.low);
+  const closes = slice.map(c => c.close);
+
+  const rangeHigh = Math.max(...highs);
+  const rangeLow  = Math.min(...lows);
+  const rangeWidth = (rangeHigh - rangeLow) / rangeLow;
+
+  // Check if we're in a trading range (< 20% width)
+  const isInRange = rangeWidth < 0.20;
+
+  // Volume trend (increasing = accumulation, decreasing = distribution)
+  const volumes = slice.map(c => c.volume ?? 0);
+  const earlyVol = volumes.slice(0, Math.floor(len / 2)).reduce((a, b) => a + b, 0);
+  const lateVol  = volumes.slice(Math.floor(len / 2)).reduce((a, b) => a + b, 0);
+
+  // Spring detection: brief dip below support with quick recovery
+  let spring: WyckoffStructure['spring'];
+  let upthrust: WyckoffStructure['upthrust'];
+
+  const support    = rangeLow * 1.005;   // 0.5% tolerance
+  const resistance = rangeHigh * 0.995;  // 0.5% tolerance
+
+  // Look for Spring (false break below support)
+  for (let i = Math.floor(len * 0.5); i < len - 2; i++) {
+    const c  = slice[i];
+    const c1 = slice[i + 1];
+    if (c.low < support * 0.99 && c1.close > support) {
+      spring = { index: i, price: c.low, time: c.time };
+      break;
+    }
+  }
+
+  // Look for Upthrust (false break above resistance)
+  for (let i = Math.floor(len * 0.5); i < len - 2; i++) {
+    const c  = slice[i];
+    const c1 = slice[i + 1];
+    if (c.high > resistance * 1.01 && c1.close < resistance) {
+      upthrust = { index: i, price: c.high, time: c.time };
+      break;
+    }
+  }
+
+  // Determine phase
+  const currentPrice = closes[len - 1];
+  const isRising = closes.slice(-5).every((v, i, arr) => i === 0 || v >= arr[i - 1]);
+  const isFalling = closes.slice(-5).every((v, i, arr) => i === 0 || v <= arr[i - 1]);
+  const isNearBottom = currentPrice < rangeLow + (rangeHigh - rangeLow) * 0.35;
+  const isNearTop    = currentPrice > rangeLow + (rangeHigh - rangeLow) * 0.65;
+
+  let phase: WyckoffStructure['phase'];
+  if (!isInRange && isRising)  phase = 'markup';
+  else if (!isInRange && isFalling) phase = 'markdown';
+  else if (isInRange && isNearBottom && lateVol > earlyVol) phase = 'accumulation';
+  else if (isInRange && isNearTop    && lateVol > earlyVol) phase = 'distribution';
+  else if (isInRange && isRising && lateVol > earlyVol) phase = 'reaccumulation';
+  else phase = 'unknown';
+
+  const phaseLabels: Record<WyckoffStructure['phase'], { ar: string; en: string; descAr: string; descEn: string }> = {
+    accumulation:   { ar: 'تجميع (Accumulation) 🟢', en: 'Accumulation 🟢', descAr: 'المؤسسات تتجمع في نطاق أفقي — الاختراق الصاعد وشيك', descEn: 'Institutions accumulating in sideways range — upward breakout imminent' },
+    markup:         { ar: 'صعود (Markup) 📈', en: 'Markup 📈', descAr: 'مرحلة الصعود القوي — الترند صاعد والزخم قوي', descEn: 'Strong uptrend phase — momentum is bullish' },
+    distribution:   { ar: 'توزيع (Distribution) 🔴', en: 'Distribution 🔴', descAr: 'المؤسسات تبيع في نطاق أفقي — الاختراق الهابط وشيك', descEn: 'Institutions distributing — downward breakout imminent' },
+    markdown:       { ar: 'هبوط (Markdown) 📉', en: 'Markdown 📉', descAr: 'مرحلة الهبوط القوي — الضغط البيعي سائد', descEn: 'Strong downtrend phase — selling pressure dominates' },
+    reaccumulation: { ar: 'إعادة تجميع (Re-accumulation) 🔄', en: 'Re-accumulation 🔄', descAr: 'استراحة في اتجاه صاعد — تجميع ثانوي قبل موجة صعود جديدة', descEn: 'Pause in uptrend — secondary accumulation before next up-leg' },
+    unknown:        { ar: 'غير محدد ⚖️', en: 'Indeterminate ⚖️', descAr: 'لا هيكل وايكوف واضح في البيانات الحالية', descEn: 'No clear Wyckoff structure in current data' },
+  };
+
+  return {
+    phase,
+    spring,
+    upthrust,
+    supportLine: rangeLow,
+    resistanceLine: rangeHigh,
+    labelAr: phaseLabels[phase].ar,
+    labelEn: phaseLabels[phase].en,
+    descriptionAr: phaseLabels[phase].descAr,
+    descriptionEn: phaseLabels[phase].descEn,
+  };
+}

@@ -281,7 +281,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <Level2OrderBook symbol={symbol} isAr={locale === 'ar'} />
+        <Level2OrderBook symbol={symbol} isAr={locale === 'ar'} currentPrice={liveTick?.close ?? company.priceRecord?.close_price} />
       </motion.div>
 
       <motion.div variants={itemVariants}>

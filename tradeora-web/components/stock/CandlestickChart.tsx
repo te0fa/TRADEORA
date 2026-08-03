@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { 
   createChart, 
   ColorType, 
@@ -14,6 +14,15 @@ import {
   HistogramSeries,
   Time
 } from 'lightweight-charts';
+import {
+  detectOrderBlocks,
+  detectFairValueGaps,
+  detectLiquidityZones,
+  detectElliottWaves,
+  detectTrendChannel,
+  detectWyckoffStructure,
+  type Candle,
+} from '@/lib/ta-utils';
 
 export interface SRLevel {
   price: number;
@@ -62,7 +71,7 @@ interface CandlestickChartProps {
 }
 
 const CandlestickChartInner = (
-  { data, showSMA, showBB, showVol, interval, srLevels, onCrosshairMove }: CandlestickChartProps,
+  { data, showSMA, showBB, showVol, showWyckoff, showICT: showSMC, showElliott, showChannels, interval, srLevels, onCrosshairMove }: CandlestickChartProps,
   ref: React.Ref<CandlestickChartHandle>
 ) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -442,6 +451,125 @@ const CandlestickChartInner = (
   }, [data, showSMA, showBB, showVol, interval]);
 
 
+  // ── Advanced Overlays: SMC / ICT / Elliott / Wyckoff / Channels ──
+  // These use lightweight-charts price lines to represent zones and levels
+  const overlayLinesRef = useRef<IPriceLine[]>([]);
+
+  // Prepare candle data for algorithms
+  const candles: Candle[] = useMemo(() => data
+    .filter(d => d && (d.close_price || (d as any).close))
+    .map(d => ({
+      open:   d.open_price  ?? (d as any).open  ?? d.close_price ?? 0,
+      high:   d.high_price  ?? (d as any).high  ?? d.close_price ?? 0,
+      low:    d.low_price   ?? (d as any).low   ?? d.close_price ?? 0,
+      close:  d.close_price ?? (d as any).close ?? 0,
+      volume: d.volume ?? 0,
+      time:   d.time,
+    })),
+  [data]);
+
+  useEffect(() => {
+    if (!candlestickSeriesRef.current || candles.length < 5) return;
+
+    // Clear previous overlay lines
+    overlayLinesRef.current.forEach(line => {
+      try { candlestickSeriesRef.current?.removePriceLine(line); } catch {}
+    });
+    overlayLinesRef.current = [];
+
+    const addLine = (price: number, color: string, title: string, style: LineStyle = LineStyle.Dashed, width: 1|2|3|4 = 1) => {
+      if (!candlestickSeriesRef.current || !price || !isFinite(price)) return;
+      try {
+        const line = candlestickSeriesRef.current.createPriceLine({
+          price,
+          color,
+          lineWidth: width,
+          lineStyle: style,
+          axisLabelVisible: true,
+          title,
+        });
+        if (line) overlayLinesRef.current.push(line);
+      } catch {}
+    };
+
+    // ── SMC / ICT Overlays ──────────────────────────────────────
+    if (showSMC) {
+      const obs  = detectOrderBlocks(candles);
+      const fvgs = detectFairValueGaps(candles);
+      const lzs  = detectLiquidityZones(candles);
+
+      obs.forEach(ob => {
+        const color = ob.type === 'bullish' ? '#10B981' : '#EF4444';
+        addLine(ob.high, color, `🟩 OB ${ob.type === 'bullish' ? '↑' : '↓'} H`, LineStyle.Solid, ob.strength === 'strong' ? 2 : 1);
+        addLine(ob.low,  color, `🟩 OB ${ob.type === 'bullish' ? '↑' : '↓'} L`, LineStyle.Dashed, 1);
+        addLine(ob.midpoint, `${color}88`, `⬛ OB Mid`, LineStyle.Dotted, 1);
+      });
+
+      fvgs.forEach(fvg => {
+        const color = fvg.type === 'bullish' ? '#06B6D4' : '#F97316';
+        addLine(fvg.gapHigh, color, `◻️ FVG ${fvg.type === 'bullish' ? '↑H' : '↓H'}`, LineStyle.Dashed, 1);
+        addLine(fvg.gapLow,  color, `◻️ FVG ${fvg.type === 'bullish' ? '↑L' : '↓L'}`, LineStyle.Dashed, 1);
+      });
+
+      lzs.forEach(lz => {
+        addLine(lz.price,
+          lz.type === 'buyside' ? '#A78BFA' : '#F59E0B',
+          `💧 ${lz.type === 'buyside' ? 'BSL' : 'SSL'} (${lz.strength}x)`,
+          LineStyle.Dotted, 1
+        );
+      });
+    }
+
+    // ── Elliott Wave Overlays ───────────────────────────────────
+    if (showElliott) {
+      const waves = detectElliottWaves(candles);
+      waves.forEach(w => {
+        const color = ['1','3','5'].includes(w.label)
+          ? '#10B981'   // impulse waves — green
+          : ['2','4'].includes(w.label)
+          ? '#F59E0B'   // corrective waves — amber
+          : '#EC4899';  // A, B, C — pink
+        addLine(w.price, color, `🌊 ${w.label}`, LineStyle.Solid, 2);
+      });
+    }
+
+    // ── Wyckoff Overlays ────────────────────────────────────────
+    if (showWyckoff) {
+      const wyckoff = detectWyckoffStructure(candles);
+      addLine(wyckoff.supportLine,    '#10B981', `🏛️ Wyckoff S`, LineStyle.Solid,  2);
+      addLine(wyckoff.resistanceLine, '#EF4444', `🏛️ Wyckoff R`, LineStyle.Solid,  2);
+      if (wyckoff.spring) {
+        addLine(wyckoff.spring.price,   '#06B6D4', '🌱 Spring', LineStyle.Solid,  2);
+      }
+      if (wyckoff.upthrust) {
+        addLine(wyckoff.upthrust.price, '#F97316', '🚀 Upthrust', LineStyle.Solid, 2);
+      }
+    }
+
+    // ── Trend Channel Overlays ──────────────────────────────────
+    if (showChannels) {
+      const channel = detectTrendChannel(candles);
+      if (channel) {
+        const color = channel.direction === 'ascending' ? '#10B981'
+                    : channel.direction === 'descending' ? '#EF4444' : '#9CA3AF';
+        const breakColor = channel.isBreakout
+          ? (channel.breakoutDirection === 'up' ? '#06B6D4' : '#F97316')
+          : color;
+        addLine(channel.upperLine.endPrice, breakColor, `📊 ${channel.direction === 'ascending' ? '↑' : channel.direction === 'descending' ? '↓' : '↔'} Upper`, LineStyle.Solid, 2);
+        addLine(channel.lowerLine.endPrice, breakColor, `📊 ${channel.direction === 'ascending' ? '↑' : channel.direction === 'descending' ? '↓' : '↔'} Lower`, LineStyle.Dashed, 1);
+        if (channel.isBreakout) {
+          addLine(
+            channel.breakoutDirection === 'up' ? channel.upperLine.endPrice * 1.003 : channel.lowerLine.endPrice * 0.997,
+            '#F59E0B', `⚡ Breakout ${channel.breakoutDirection === 'up' ? '↑' : '↓'}`,
+            LineStyle.Solid, 3
+          );
+        }
+      }
+    }
+
+  }, [candles, showSMC, showElliott, showWyckoff, showChannels]);
+
+
   // Resize observer
   useEffect(() => {
     if (!containerRef.current) return;
@@ -469,6 +597,41 @@ const CandlestickChartInner = (
         <span className="text-[#0EA5E9] font-bold text-[10px] tracking-wider font-sans">
           TRADEORA
         </span>
+      </div>
+
+      {/* Active Overlay Badges */}
+      <div className="absolute top-2 right-2 flex flex-col gap-1 pointer-events-none">
+        {showSMC && (
+          <span className="text-[9px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-lg">
+            📐 SMC / ICT Active
+          </span>
+        )}
+        {showElliott && (
+          <span className="text-[9px] font-bold bg-pink-500/20 text-pink-400 border border-pink-500/30 px-2 py-0.5 rounded-lg">
+            🌊 Elliott Waves Active
+          </span>
+        )}
+        {showWyckoff && (
+          <span className="text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+            🏛️ Wyckoff Active
+          </span>
+        )}
+        {showChannels && (() => {
+          const ch = detectTrendChannel(candles);
+          return ch ? (
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${
+              ch.isBreakout
+                ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                : ch.direction === 'ascending'
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                : ch.direction === 'descending'
+                ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                : 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+            }`}>
+              📊 {ch.labelEn}{ch.isBreakout ? ` ⚡ Breakout ${ch.breakoutDirection}!` : ''}
+            </span>
+          ) : null;
+        })()}
       </div>
     </div>
   );

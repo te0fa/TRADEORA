@@ -33,6 +33,7 @@ import {
   calcPositionSize,
   detectSRLevels,
   calcMarketRegime,
+  detectWyckoffStructure,
   type CandlePattern,
   type TFSignal
 } from '@/lib/ta-utils';
@@ -337,7 +338,12 @@ export function PriceChart({ symbol, companyId, historicalPrices, locale, fundam
   const [showRSI, setShowRSI] = useState(true);
   const [showMACD, setShowMACD] = useState(false);
   const [showVol, setShowVol] = useState(true);
-  const [showWyckoff, setShowWyckoff] = useState(true);
+  const [showWyckoff, setShowWyckoff] = useState(false);
+  // Analysis school toggles
+  const [showSMC, setShowSMC] = useState(false);
+  const [showElliott, setShowElliott] = useState(false);
+  const [showChannels, setShowChannels] = useState(false);
+
 
   // Crosshair sync
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
@@ -2439,27 +2445,70 @@ function buildIntradayChunk(chunk: any[]): any {
       )}
 
       {/* ── Indicator Toggles — only in Tradeora AI mode ── */}
-      {chartViewMode !== 'tradingview' && <div className="flex flex-wrap gap-2">
-
-        {[
-          { key: '🏛️ وايكوف والقنوات', active: showWyckoff, toggle: () => setShowWyckoff(!showWyckoff), color: '#F59E0B' },
-          { key: 'SMA', active: showSMA, toggle: () => setShowSMA(!showSMA), color: '#10B981' },
-          { key: 'BB', active: showBB, toggle: () => setShowBB(!showBB), color: '#6366F1' },
-          { key: 'RSI', active: showRSI, toggle: () => setShowRSI(!showRSI), color: '#A78BFA' },
-          { key: 'MACD', active: showMACD, toggle: () => setShowMACD(!showMACD), color: '#3B82F6' },
-          { key: 'Vol', active: showVol, toggle: () => setShowVol(!showVol), color: '#F59E0B' },
-        ].map(({ key, active, toggle, color }) => (
-          <button key={key} onClick={toggle}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all duration-150"
-            style={{
-              background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
-              color: active ? color : '#9CA3AF',
-              borderColor: active ? `${color}55` : 'rgba(255,255,255,0.08)',
-            }}>
-            {key}
-          </button>
-        ))}
+      {chartViewMode !== 'tradingview' && <div className="flex flex-col gap-2">
+        {/* Analysis Schools Row */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mr-2">
+            {locale === 'ar' ? 'مدارس التحليل:' : 'Analysis Schools:'}
+          </span>
+          {[
+            {
+              key: locale === 'ar' ? '📐 SMC / ICT' : '📐 SMC / ICT',
+              title: locale === 'ar' ? 'مناطق السيولة، Order Blocks، Fair Value Gaps' : 'Liquidity zones, Order Blocks, Fair Value Gaps',
+              active: showSMC, toggle: () => setShowSMC(!showSMC), color: '#F97316'
+            },
+            {
+              key: locale === 'ar' ? '🌊 إليوت' : '🌊 Elliott',
+              title: locale === 'ar' ? 'موجات إليوت (1-2-3-4-5 + A-B-C)' : 'Elliott Waves (1-2-3-4-5 + A-B-C)',
+              active: showElliott, toggle: () => setShowElliott(!showElliott), color: '#EC4899'
+            },
+            {
+              key: locale === 'ar' ? '🏛️ وايكوف' : '🏛️ Wyckoff',
+              title: locale === 'ar' ? 'مراحل التجميع والتوزيع، Spring، Upthrust' : 'Accumulation/Distribution phases, Spring, Upthrust',
+              active: showWyckoff, toggle: () => setShowWyckoff(!showWyckoff), color: '#F59E0B'
+            },
+            {
+              key: locale === 'ar' ? '📊 القنوات' : '📊 Channels',
+              title: locale === 'ar' ? 'القنوات الصاعدة والهابطة وإشارات الكسر' : 'Ascending/Descending channels + breakout signals',
+              active: showChannels, toggle: () => setShowChannels(!showChannels), color: '#06B6D4'
+            },
+          ].map(({ key, title, active, toggle, color }) => (
+            <button key={key} onClick={toggle} title={title}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all duration-150 flex items-center gap-1.5"
+              style={{
+                background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+                color: active ? color : '#9CA3AF',
+                borderColor: active ? `${color}55` : 'rgba(255,255,255,0.08)',
+              }}>
+              {key}
+            </button>
+          ))}
+        </div>
+        {/* Standard Indicators Row */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1 mr-2">
+            {locale === 'ar' ? 'المؤشرات:' : 'Indicators:'}
+          </span>
+          {[
+            { key: 'SMA', label: locale === 'ar' ? 'SMA (20/50/200)' : 'SMA (20/50/200)', title: locale === 'ar' ? 'المتوسطات المتحركة البسيطة' : 'Simple Moving Averages', active: showSMA, toggle: () => setShowSMA(!showSMA), color: '#10B981' },
+            { key: 'BB',  label: 'BB', title: locale === 'ar' ? 'نطاقات بولنجر' : 'Bollinger Bands', active: showBB, toggle: () => setShowBB(!showBB), color: '#6366F1' },
+            { key: 'RSI', label: 'RSI', title: locale === 'ar' ? 'مؤشر القوة النسبية' : 'Relative Strength Index', active: showRSI, toggle: () => setShowRSI(!showRSI), color: '#A78BFA' },
+            { key: 'MACD', label: 'MACD', title: locale === 'ar' ? 'مؤشر الماكد' : 'MACD Indicator', active: showMACD, toggle: () => setShowMACD(!showMACD), color: '#3B82F6' },
+            { key: 'Vol', label: locale === 'ar' ? 'حجم' : 'Vol', title: locale === 'ar' ? 'حجم التداول' : 'Volume', active: showVol, toggle: () => setShowVol(!showVol), color: '#F59E0B' },
+          ].map(({ key, label, title, active, toggle, color }) => (
+            <button key={key} onClick={toggle} title={title}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all duration-150"
+              style={{
+                background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+                color: active ? color : '#9CA3AF',
+                borderColor: active ? `${color}55` : 'rgba(255,255,255,0.08)',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>}
+
 
       {/* ── Main Chart Grid — only in Tradeora AI mode ── */}
       {chartViewMode !== 'tradingview' && (isIntradayLoading ? (
@@ -2498,9 +2547,11 @@ function buildIntradayChunk(chunk: any[]): any {
                 showBB={showBB}
                 showVol={showVol}
                 showWyckoff={showWyckoff}
+                showICT={showSMC}
+                showElliott={showElliott}
+                showChannels={showChannels}
                 interval={interval}
                 srLevels={chartSRLevels}
-
                 onCrosshairMove={handleCrosshairMove}
               />
               {intradayHasNoData && ['15m', '30m', '1h', '4h'].includes(interval) && (
@@ -2594,7 +2645,93 @@ function buildIntradayChunk(chunk: any[]): any {
             )}
           </div>
 
+          {/* ── Analysis School Educational Panels ── */}
+          {(showSMC || showElliott || showWyckoff || showChannels) && (
+            <div className="xl:col-span-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+
+              {/* SMC / ICT Panel */}
+              {showSMC && (
+                <div className="glass-card p-4 rounded-2xl border border-orange-500/20 bg-orange-500/5 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📐</span>
+                    <h4 className="text-xs font-black text-orange-400">{locale === 'ar' ? 'مدرسة SMC / ICT' : 'SMC / ICT School'}</h4>
+                  </div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed space-y-1.5">
+                    <p><span className="text-emerald-400 font-bold">🟩 Order Block (OB):</span> {locale === 'ar' ? 'آخر شمعة هابطة قبل حركة صاعدة قوية — مؤسسات تراكمت هنا' : 'Last bearish candle before strong bullish move — institutions loaded here'}</p>
+                    <p><span className="text-cyan-400 font-bold">◻️ FVG:</span> {locale === 'ar' ? 'فجوة بين الشموع = منطقة جذب السعر للإغلاق (Magnet Zone)' : 'Gap between candles = price magnet zone that must be filled'}</p>
+                    <p><span className="text-violet-400 font-bold">💧 Liquidity:</span> {locale === 'ar' ? 'سيولة فوقية (BSL) = وقف خسائر المشترين فوق القمم. سيولة تحتية (SSL) = وقف خسائر البائعين تحت القيعان' : 'BSL = buy stops above highs. SSL = sell stops below lows — institutional targets'}</p>
+                    <p className="text-[9px] text-slate-500 mt-1">{locale === 'ar' ? '* الخطوط على الشارت تمثل المناطق المحتسبة — الخطوط الخضراء صاعدة، الحمراء هابطة، البنفسجية سيولة' : '* Lines on chart represent computed zones — green=bullish, red=bearish, violet=liquidity'}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Elliott Wave Panel */}
+              {showElliott && (
+                <div className="glass-card p-4 rounded-2xl border border-pink-500/20 bg-pink-500/5 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🌊</span>
+                    <h4 className="text-xs font-black text-pink-400">{locale === 'ar' ? 'موجات إليوت' : 'Elliott Waves'}</h4>
+                  </div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed space-y-1.5">
+                    <p><span className="text-emerald-400 font-bold">موجات 1/3/5 (الدافعة):</span> {locale === 'ar' ? 'تسير مع الاتجاه — الموجة 3 هي الأقوى والأطول' : 'Move with trend — Wave 3 is strongest and longest'}</p>
+                    <p><span className="text-amber-400 font-bold">موجات 2/4 (التصحيحية):</span> {locale === 'ar' ? 'تسير عكس الاتجاه — فرص شراء في الموجة 2 و 4' : 'Move against trend — buying opportunities in waves 2 & 4'}</p>
+                    <p><span className="text-pink-400 font-bold">موجات A/B/C:</span> {locale === 'ar' ? 'التصحيح الكامل بعد دورة الـ 5 موجات — الموجة C أخطر مستوى' : 'Full correction after 5-wave cycle — Wave C is the most dangerous'}</p>
+                    <p className="text-[9px] text-slate-500 mt-1">{locale === 'ar' ? '* تم الكشف بخوارزمية ZigZag تلقائية — للتأكيد يُفضل التحليل اليدوي' : '* Auto-detected via ZigZag algorithm — manual confirmation recommended'}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Wyckoff Panel */}
+              {showWyckoff && (() => {
+                const wyckoffCandles = analysisCandles?.length ? analysisCandles.map((c: any) => ({
+                  open: c.open_price ?? c.open ?? c.close_price ?? 0,
+                  high: c.high_price ?? c.high ?? c.close_price ?? 0,
+                  low: c.low_price ?? c.low ?? c.close_price ?? 0,
+                  close: c.close_price ?? c.close ?? 0,
+                  volume: c.volume ?? 0,
+                })) : [];
+                const wyckoff = wyckoffCandles.length >= 10 ? detectWyckoffStructure(wyckoffCandles) : null;
+                return (
+                  <div className="glass-card p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 flex flex-col gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🏛️</span>
+                      <h4 className="text-xs font-black text-amber-400">{locale === 'ar' ? 'مدرسة وايكوف' : 'Wyckoff Method'}</h4>
+                    </div>
+                    <div className="text-[10px] text-slate-300 leading-relaxed space-y-1.5">
+                      <p><span className="text-emerald-400 font-bold">🌱 Spring:</span> {locale === 'ar' ? 'كسر مزيف تحت الدعم مع عودة سريعة = فرصة شراء ذهبية' : 'False break below support with quick recovery = golden buy signal'}</p>
+                      <p><span className="text-orange-400 font-bold">🚀 Upthrust:</span> {locale === 'ar' ? 'كسر مزيف فوق المقاومة مع عودة سريعة = فرصة بيع' : 'False break above resistance with quick recovery = sell signal'}</p>
+                      {wyckoff && (
+                        <div className="mt-2 p-2 bg-slate-900/60 rounded-lg border border-white/5">
+                          <p className="font-bold text-white">{locale === 'ar' ? 'الهيكل الحالي:' : 'Current Structure:'}</p>
+                          <p className="text-amber-300 font-bold">{locale === 'ar' ? wyckoff.labelAr : wyckoff.labelEn}</p>
+                          <p className="text-[9px] text-slate-400 mt-0.5">{locale === 'ar' ? wyckoff.descriptionAr : wyckoff.descriptionEn}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Channels Panel */}
+              {showChannels && (
+                <div className="glass-card p-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📊</span>
+                    <h4 className="text-xs font-black text-cyan-400">{locale === 'ar' ? 'تحليل القنوات' : 'Channel Analysis'}</h4>
+                  </div>
+                  <div className="text-[10px] text-slate-300 leading-relaxed space-y-1.5">
+                    <p><span className="text-emerald-400 font-bold">📈 {locale === 'ar' ? 'قناة صاعدة:' : 'Ascending Channel:'}</span> {locale === 'ar' ? 'قمم وقيعان أعلى — الشراء قرب الحد السفلي' : 'Higher highs and lows — buy near lower boundary'}</p>
+                    <p><span className="text-rose-400 font-bold">📉 {locale === 'ar' ? 'قناة هابطة:' : 'Descending Channel:'}</span> {locale === 'ar' ? 'قمم وقيعان أدنى — البيع قرب الحد العلوي' : 'Lower highs and lows — sell near upper boundary'}</p>
+                    <p><span className="text-yellow-400 font-bold">⚡ {locale === 'ar' ? 'الكسر:' : 'Breakout:'}</span> {locale === 'ar' ? 'خروج قوي من القناة = بداية اتجاه جديد — دخول بعد إعادة الاختبار' : 'Strong exit from channel = new trend start — enter after retest'}</p>
+                    <p className="text-[9px] text-slate-500 mt-1">{locale === 'ar' ? '* الخطوط تُحسب بالانحدار الخطي على آخر 50 شمعة' : '* Lines computed via linear regression on last 50 candles'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Right Column: Technical details & Recommendation sidebar */}
+
           <div className="xl:col-span-4 flex flex-col gap-4">
 
             {/* Task 2: Support & Resistance List */}
@@ -3797,6 +3934,37 @@ function buildIntradayChunk(chunk: any[]): any {
                 symbol={symbol}
                 currentPrice={currentPrice}
                 locale={locale}
+                high60d={(() => {
+                  const all = [...(dbPrices || []), ...(historicalPrices || [])];
+                  if (all.length === 0) return undefined;
+                  return Math.max(...all.map(p => Number(p.high_price || p.close_price || 0)));
+                })()}
+                low60d={(() => {
+                  const all = [...(dbPrices || []), ...(historicalPrices || [])];
+                  if (all.length === 0) return undefined;
+                  const valid = all.map(p => Number(p.low_price || p.close_price || 0)).filter(v => v > 0);
+                  return valid.length > 0 ? Math.min(...valid) : undefined;
+                })()}
+                atrVal={dealSetup?.atr ?? undefined}
+                candlePatternData={candlePattern}
+                riskReward={dealSetup?.rr ?? null}
+                volumeRatio={analysisData?.volRatio ?? null}
+                rsiValue={analysisData?.rsi ?? null}
+                macdValue={analysisData?.macd ?? null}
+                sma20={analysisData?.sma20 ?? null}
+                sma50={analysisData?.sma50 ?? null}
+                bbUpper={analysisData?.bbUpper ?? null}
+                bbLower={analysisData?.bbLower ?? null}
+                bbPos={analysisData?.bbPos ?? null}
+                stochRsi={analysisData?.stochRsi ?? null}
+                showRSI={showRSI}
+                showMACD={showMACD}
+                showSMA={showSMA}
+                showBB={showBB}
+                onToggleRSI={() => setShowRSI(!showRSI)}
+                onToggleMACD={() => setShowMACD(!showMACD)}
+                onToggleSMA={() => setShowSMA(!showSMA)}
+                onToggleBB={() => setShowBB(!showBB)}
               />
 
               {/* Stock Specific News & Disclosures Tab */}
