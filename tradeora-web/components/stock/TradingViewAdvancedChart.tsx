@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 
 interface TradingViewAdvancedChartProps {
   symbol: string;
+  interval?: string;
   locale?: string;
   theme?: 'dark' | 'light';
   height?: number | string;
@@ -12,6 +13,7 @@ interface TradingViewAdvancedChartProps {
 
 export function TradingViewAdvancedChart({
   symbol,
+  interval = '1d',
   locale = 'ar',
   theme = 'dark',
   height = 500,
@@ -22,6 +24,18 @@ export function TradingViewAdvancedChart({
     setIsMounted(true);
   }, []);
 
+  const intervalMap: Record<string, string> = {
+    '1m': '1',
+    '5m': '5',
+    '15m': '15',
+    '30m': '30',
+    '1h': '60',
+    '4h': '240',
+    '1d': 'D',
+    '1w': 'W',
+    '1M': 'M',
+  };
+  const tvInterval = intervalMap[interval] || 'D';
   const tvSymbol = `EGX:${symbol.toUpperCase()}`;
   const lang = locale === 'ar' ? 'ar' : 'en';
   const h = typeof height === 'number' ? `${height}px` : height;
@@ -30,7 +44,7 @@ export function TradingViewAdvancedChart({
     'https://www.tradingview.com/widgetembed/',
     `?frameElementId=tradingview_${symbol.toLowerCase()}`,
     `&symbol=${encodeURIComponent(tvSymbol)}`,
-    `&interval=D`,
+    `&interval=${tvInterval}`,
     `&timezone=Africa%2FCairo`,
     `&theme=${theme}`,
     `&style=1`,

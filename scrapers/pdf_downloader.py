@@ -26,7 +26,7 @@ class EGXDownloader:
         # Download Arabic report
         logger.info("Attempting to download Arabic daily report...")
         arb_path = await self._download_single_report(
-            url="https://egx.com.eg/ar/Services_Reports.aspx",
+            url="https://www.egx.com.eg/ar/Services_Reports.aspx",
             lang="arb",
             search_terms=["النشرة اليومية", "تقارير دورية"]
         )
@@ -34,7 +34,7 @@ class EGXDownloader:
         # Download English report
         logger.info("Attempting to download English daily report...")
         eng_path = await self._download_single_report(
-            url="https://egx.com.eg/en/Services_Reports.aspx",
+            url="https://www.egx.com.eg/en/Services_Reports.aspx",
             lang="eng",
             search_terms=["daily report", "Periodical Reports"]
         )

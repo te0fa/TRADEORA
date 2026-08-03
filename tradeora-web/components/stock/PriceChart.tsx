@@ -807,7 +807,15 @@ function buildIntradayChunk(chunk: any[]): any {
       const isPreMarket = cairoHour < 10; // Before 10:00 AM Cairo time
 
       const lastCandle = cleaned[cleaned.length - 1];
-      const lastDate = typeof lastCandle.time === 'string' ? lastCandle.time.split('T')[0] : '';
+      const isNumericTime = typeof lastCandle.time === 'number';
+
+      let lastDate = '';
+      if (isNumericTime) {
+        const d = new Date((lastCandle.time as number) * 1000);
+        lastDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+      } else if (typeof lastCandle.time === 'string') {
+        lastDate = lastCandle.time.split('T')[0];
+      }
 
       if (lastDate === cairoDateStr) {
         // If market is pre-session (before 10:00 AM) and no trading volume has occurred today, remove the empty candle
@@ -840,8 +848,9 @@ function buildIntradayChunk(chunk: any[]): any {
         const hasTradingVolumeToday = (liveStockPrice.volume ?? 0) > 0;
 
         if (!isEGXWeekend && hasTradingVolumeToday) {
+          const newTime = isNumericTime ? Math.floor(Date.now() / 1000) : cairoDateStr;
           cleaned.push({
-            time: cairoDateStr,
+            time: newTime,
             price_date: cairoDateStr,
             open: liveStockPrice.open || livePriceVal,
             open_price: liveStockPrice.open || livePriceVal,
@@ -2450,7 +2459,7 @@ function buildIntradayChunk(chunk: any[]): any {
 
       {chartViewMode === 'tradingview' && (
         <div className="w-full">
-          <TradingViewAdvancedChart symbol={symbol} locale={locale} height={580} />
+          <TradingViewAdvancedChart symbol={symbol} interval={interval} locale={locale} height={580} />
         </div>
       )}
 

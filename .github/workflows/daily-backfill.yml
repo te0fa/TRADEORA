@@ -44,7 +44,9 @@ jobs:
             python-dotenv \
             pandas \
             numpy \
-            requests
+            requests \
+            pytz
+
 
       - name: 🔄 Run TV Backfill (incremental)
         env:

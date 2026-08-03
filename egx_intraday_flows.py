@@ -37,20 +37,25 @@ load_dotenv()
 from supabase import create_client, Client
 url = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
 key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-sb: Client = create_client(url, key)
+sb: Client | None = create_client(url, key) if (url and key) else None
 
 INTRADAY_URL = 'https://www.egx.com.eg/ar/InvestorsTypeCharts.aspx'
 HOME_URL     = 'https://www.egx.com.eg/ar/Home.aspx'
 
 
+
+ARABIC_DIGITS_TRANS = str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789')
+
 def parse_egp(text: str) -> float | None:
-    """Convert EGP number string → float. Handles commas, Arabic negatives, brackets."""
+    """Convert EGP number string → float. Handles Eastern Arabic digits, commas, negatives."""
     if not text:
         return None
     cleaned = str(text).strip()
-    # Remove Arabic formatting chars, non-breaking spaces, RTL marks
-    cleaned = re.sub(r'[\s\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\xa0،,]', '', cleaned)
-    cleaned = cleaned.replace(',', '').replace('،', '')
+    # Convert Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) to standard ASCII digits
+    cleaned = cleaned.translate(ARABIC_DIGITS_TRANS)
+    # Remove Arabic formatting chars, non-breaking spaces, RTL marks, and commas
+    cleaned = re.sub(r'[\s\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\xa0،,٬]', '', cleaned)
+    cleaned = cleaned.replace(',', '').replace('،', '').replace('٬', '')
     # Handle bracketed negatives like (300,000)
     if cleaned.startswith('(') and cleaned.endswith(')'):
         cleaned = '-' + cleaned[1:-1]
@@ -110,10 +115,10 @@ def _try_scrape(target_date: date) -> dict | None:
         browser = p.chromium.launch(
             headless=True,
             args=[
-                '--no-sandbox', '--disable-setuid-sandbox',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
-                '--disable-web-security',
-                '--disable-dev-shm-usage',
+                '--window-size=1920,1080',
             ]
         )
         context = browser.new_context(
@@ -123,16 +128,28 @@ def _try_scrape(target_date: date) -> dict | None:
                 'Chrome/124.0.0.0 Safari/537.36'
             ),
             locale='ar-EG',
-            viewport={'width': 1600, 'height': 900},
+            ignore_https_errors=True,
+            extra_http_headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7',
+            }
         )
         page = context.new_page()
         extracted = None
 
         try:
-            # Go directly to the investor flows page
-            logger.info("Loading InvestorsTypeCharts.aspx directly...")
-            page.goto(INTRADAY_URL, timeout=60000, wait_until='domcontentloaded')
-            time.sleep(10)  # Wait for ASP.NET AJAX UpdatePanel to load all 3 tables
+            # Step 1: Open Home page first to acquire session cookies
+            logger.info("Step 1: Loading EGX Home page to acquire session cookies...")
+            try:
+                page.goto(HOME_URL, timeout=30000)
+                time.sleep(3)
+            except Exception as ex:
+                logger.warning(f"Home page load warning: {ex}")
+
+            # Step 2: Navigate to InvestorsTypeCharts.aspx
+            logger.info("Step 2: Loading InvestorsTypeCharts.aspx...")
+            page.goto(INTRADAY_URL, timeout=30000)
+            time.sleep(5)
             logger.info("  ✅ Page loaded")
 
             # Step 3: Extract ALL table data via structured JS
@@ -320,9 +337,9 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
                 'institutional' → egyptian_inst / arab_inst / foreign_inst
         """
         prefixes = {
-            'total':         ('egyptian_total', 'arab_total', 'foreigners_total'),
-            'retail':        ('egyptian_ind',   'arab_ind',   'foreign_ind'),
-            'institutional': ('egyptian_inst',  'arab_inst',  'foreign_inst'),
+            'total':         ('egyptian_total', 'arab',         'foreigners'),
+            'retail':        ('egyptian_ind',   'arab_ind',     'foreign_ind'),
+            'institutional': ('egyptian_inst',  'arab_inst',    'foreign_inst'),
         }
         eg_pre, ar_pre, fo_pre = prefixes.get(table_type, ('eg', 'ar', 'fo'))
 
@@ -370,25 +387,27 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
         return parsed
 
     # ── Try structured table parsing ──────────────────────────────────────────
-    classified = {'total': None, 'retail': None, 'institutional': None}
+    flow_tables = []
+    for tbl in tables:
+        rows = tbl.get('rows', [])
+        if 2 <= len(rows) <= 5:
+            row_text = ' '.join(str(c) for r in rows for c in r)
+            if 'مصري' in row_text and 'عرب' in row_text and 'أجانب' in row_text:
+                flow_tables.append(tbl)
 
-    for tbl in data_tables:
-        ttype = classify_table(tbl)
-        if ttype and classified[ttype] is None:
-            classified[ttype] = tbl
-            logger.info(f"  Classified Table[{tbl['index']}] as '{ttype}'")
+    logger.info(f"Detected {len(flow_tables)} flow tables by nationality content")
 
-    found_count = sum(1 for v in classified.values() if v is not None)
-    logger.info(f"Classified {found_count}/3 tables")
-
-    if found_count >= 2:
-        for ttype, tbl in classified.items():
-            if tbl:
-                parsed = parse_single_table(tbl, ttype)
-                result.update(parsed)
+    if len(flow_tables) >= 3:
+        types_order = ['total', 'retail', 'institutional']
+        for i in range(3):
+            ttype = types_order[i]
+            tbl = flow_tables[i]
+            parsed = parse_single_table(tbl, ttype)
+            result.update(parsed)
+            logger.info(f"  ✅ Parsed flow table [{i+1}/3] as '{ttype}'")
     else:
-        # Fallback: assume first 3 data tables are Total, Retail, Institutional in order
-        logger.warning("Could not classify tables by content — assuming positional order")
+        # Fallback to candidate data tables
+        logger.warning("Could not find 3 flow tables by nationality content — using candidate data tables")
         types_order = ['total', 'retail', 'institutional']
         for i, tbl in enumerate(data_tables[:3]):
             ttype = types_order[i]
@@ -446,6 +465,9 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
 
 def save_to_db(flows: dict) -> bool:
     """Upsert all 27 flow values into Supabase daily_investor_flows."""
+    if not sb:
+        logger.error("Supabase client is not initialized.")
+        return False
     try:
         clean = {
             k: (int(v) if isinstance(v, float) and v == int(v) else v)

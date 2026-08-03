@@ -31,7 +31,7 @@ jobs:
           cache: 'pip'
 
       - name: 📦 Install dependencies
-        run: pip install yfinance supabase python-dotenv pandas
+        run: pip install yfinance supabase python-dotenv pandas pytz
 
       - name: 📡 Fetch live session candles (Yahoo Finance)
         env:

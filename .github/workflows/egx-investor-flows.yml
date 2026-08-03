@@ -56,7 +56,9 @@ jobs:
             httpx \
             pypdf \
             beautifulsoup4 \
-            lxml
+            lxml \
+            pytz
+
 
       - name: 🌐 Install Playwright Chromium + system deps
         run: playwright install chromium --with-deps
