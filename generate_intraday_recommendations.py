@@ -9,6 +9,7 @@ import pandas as pd
 import joblib
 from pathlib import Path
 from dotenv import load_dotenv
+from typing import Optional
 from supabase import create_client, Client
 
 from services.canonical import get_canonical_candles
