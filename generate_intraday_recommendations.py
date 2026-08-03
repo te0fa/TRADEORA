@@ -137,7 +137,11 @@ def scan_and_generate_intraday(force: bool = False, specified_tf: Optional[str] 
             scaler = scalers[tf]
 
             # Fetch recent candles via Canonical Layer
-            candles = get_canonical_candles(sb, cid, symbol, limit=100, interval=tf)
+            try:
+                candles = get_canonical_candles(sb, cid, symbol, limit=100, interval=tf)
+            except Exception as err:
+                logger.warning(f"[{symbol} - {tf}] Network error fetching candles: {err}")
+                continue
             if not candles or len(candles) < 55:
                 continue
 
