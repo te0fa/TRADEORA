@@ -93,17 +93,17 @@ export async function GET(req: NextRequest) {
       is_today:   latest.trade_date === todayStr,
 
       // ── TABLE 1: Total by Nationality ──────────────────────────────────
-      egyptian_total_buy:  n(latest, 'egyptians_total_buy_egp', 'egyptian_total_buy_egp'),
-      egyptian_total_sell: n(latest, 'egyptians_total_sell_egp', 'egyptian_total_sell_egp'),
-      egyptian_total_net:  n(latest, 'egyptians_total_net_egp', 'egyptian_total_net_egp'),
+      egyptian_total_buy:  n(latest, 'egyptian_total_buy_egp', 'egyptians_total_buy_egp'),
+      egyptian_total_sell: n(latest, 'egyptian_total_sell_egp', 'egyptians_total_sell_egp'),
+      egyptian_total_net:  n(latest, 'egyptian_total_net_egp', 'egyptians_total_net_egp'),
 
-      arab_total_buy:  n(latest, 'arab_buy_egp', 'arab_total_buy_egp'),
-      arab_total_sell: n(latest, 'arab_sell_egp', 'arab_total_sell_egp'),
-      arab_total_net:  n(latest, 'arab_net_egp', 'arab_total_net_egp'),
+      arab_total_buy:  n(latest, 'arab_total_buy_egp', 'arab_buy_egp'),
+      arab_total_sell: n(latest, 'arab_total_sell_egp', 'arab_sell_egp'),
+      arab_total_net:  n(latest, 'arab_total_net_egp', 'arab_net_egp'),
 
-      foreigners_total_buy:  n(latest, 'foreigners_buy_egp', 'foreigners_total_buy_egp'),
-      foreigners_total_sell: n(latest, 'foreigners_sell_egp', 'foreigners_total_sell_egp'),
-      foreigners_net:        n(latest, 'foreigners_net_egp', 'foreigners_total_net_egp'),
+      foreigners_total_buy:  n(latest, 'foreigners_total_buy_egp', 'foreigners_buy_egp'),
+      foreigners_total_sell: n(latest, 'foreigners_total_sell_egp', 'foreigners_sell_egp'),
+      foreigners_net:        n(latest, 'foreigners_total_net_egp', 'foreigners_net_egp'),
 
       // ── TABLE 2: Retail Investors ─────────────────────────────────────
       egyptian_ind_buy:  n(latest, 'egyptian_ind_buy_egp'),
@@ -135,33 +135,21 @@ export async function GET(req: NextRequest) {
     };
 
     // ── Derive missing values dynamically ─────────────────────────────────────
-    // 1. Total Egyptians (if only ind + inst exist)
+    // 1. Total Egyptians (if total is zero but ind + inst exist)
     if (exactLatest.egyptian_total_buy === 0 && exactLatest.egyptian_ind_buy > 0) {
       exactLatest.egyptian_total_buy  = exactLatest.egyptian_ind_buy  + exactLatest.egyptian_inst_buy;
       exactLatest.egyptian_total_sell = exactLatest.egyptian_ind_sell + exactLatest.egyptian_inst_sell;
       exactLatest.egyptian_total_net  = exactLatest.egyptian_ind_net  + exactLatest.egyptian_inst_net;
     }
 
-    // 2. Total Arabs (fallback to exact EGX numbers if zero)
-    if (exactLatest.arab_total_buy === 0) {
-      exactLatest.arab_total_buy  = Number(latest?.arab_buy_egp  || 726017149);
-      exactLatest.arab_total_sell = Number(latest?.arab_sell_egp || 1026919159);
-      exactLatest.arab_total_net  = Number(latest?.arab_net_egp  || -300902011);
-    }
-
-    // 3. Retail Foreigners = Total Foreigners - Institutional Foreigners
-    if (exactLatest.foreigners_total_buy > 0) {
+    // 2. Retail Foreigners = Total Foreigners - Institutional Foreigners (if ind is 0)
+    if (exactLatest.foreign_ind_buy === 0 && exactLatest.foreigners_total_buy > exactLatest.foreign_inst_buy) {
       exactLatest.foreign_ind_buy  = Math.max(0, exactLatest.foreigners_total_buy  - exactLatest.foreign_inst_buy);
       exactLatest.foreign_ind_sell = Math.max(0, exactLatest.foreigners_total_sell - exactLatest.foreign_inst_sell);
       exactLatest.foreign_ind_net  = exactLatest.foreigners_net        - exactLatest.foreign_inst_net;
     }
-    if (exactLatest.foreign_ind_buy === 0) {
-      exactLatest.foreign_ind_buy  = 18919856;
-      exactLatest.foreign_ind_sell = 6588378;
-      exactLatest.foreign_ind_net  = 12331478;
-    }
 
-    // 4. Arab Institutional & Retail sub-breakdowns (from exact DB fields or exact EGX ratio fallback)
+    // 3. Arab sub-breakdowns calculation if missing
     if (exactLatest.arab_total_buy > 0) {
       if (exactLatest.arab_inst_buy === 0 && exactLatest.arab_ind_buy > 0) {
         exactLatest.arab_inst_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_ind_buy);
@@ -171,13 +159,6 @@ export async function GET(req: NextRequest) {
         exactLatest.arab_ind_buy  = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
         exactLatest.arab_ind_sell = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
         exactLatest.arab_ind_net  = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
-      } else if (exactLatest.arab_inst_buy === 0 && exactLatest.arab_ind_buy === 0) {
-        exactLatest.arab_inst_buy  = Math.round(exactLatest.arab_total_buy  * 0.92954668);
-        exactLatest.arab_inst_sell = Math.round(exactLatest.arab_total_sell * 0.91542443);
-        exactLatest.arab_inst_net  = exactLatest.arab_inst_buy - exactLatest.arab_inst_sell;
-        exactLatest.arab_ind_buy   = Math.max(0, exactLatest.arab_total_buy  - exactLatest.arab_inst_buy);
-        exactLatest.arab_ind_sell  = Math.max(0, exactLatest.arab_total_sell - exactLatest.arab_inst_sell);
-        exactLatest.arab_ind_net   = exactLatest.arab_total_net  - exactLatest.arab_inst_net;
       }
     }
 
