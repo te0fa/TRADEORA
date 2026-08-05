@@ -800,10 +800,26 @@ function buildIntradayChunk(chunk: any[]): any {
     // Merge live tick into last candle or append today's live candle
     const livePriceVal = liveStockPrice?.close ?? Number(priceRecord?.close_price || 0);
     if (cleaned.length > 0 && livePriceVal > 0) {
-      // Get Cairo local date string (YYYY-MM-DD)
-      const cairoDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
-      const cairoTimeString = new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
-      const cairoHour = new Date(cairoTimeString).getHours();
+      // Get Cairo local date string (YYYY-MM-DD) and hour cleanly via Intl.DateTimeFormat
+      const cairoParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Africa/Cairo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: 'numeric',
+        hour12: false,
+        weekday: 'short'
+      }).formatToParts(new Date());
+
+      const cairoMap: Record<string, string> = {};
+      cairoParts.forEach(p => cairoMap[p.type] = p.value);
+
+      const cairoDateStr = `${cairoMap.year}-${cairoMap.month}-${cairoMap.day}`;
+      const rawHour = parseInt(cairoMap.hour ?? '0', 10);
+      const cairoHour = rawHour === 24 ? 0 : rawHour;
+      const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      const currentDay = dayMap[cairoMap.weekday] ?? 1;
+      const isEGXWeekend = currentDay === 5 || currentDay === 6;
       const isPreMarket = cairoHour < 10; // Before 10:00 AM Cairo time
 
       const lastCandle = cleaned[cleaned.length - 1];
@@ -812,7 +828,15 @@ function buildIntradayChunk(chunk: any[]): any {
       let lastDate = '';
       if (isNumericTime) {
         const d = new Date((lastCandle.time as number) * 1000);
-        lastDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+        const dParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'Africa/Cairo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).formatToParts(d);
+        const dMap: Record<string, string> = {};
+        dParts.forEach(p => dMap[p.type] = p.value);
+        lastDate = `${dMap.year}-${dMap.month}-${dMap.day}`;
       } else if (typeof lastCandle.time === 'string') {
         lastDate = lastCandle.time.split('T')[0];
       }
@@ -842,9 +866,6 @@ function buildIntradayChunk(chunk: any[]): any {
         }
       } else if (liveStockPrice && !isPreMarket) {
         // Prevent appending synthetic live candle on weekends OR official holidays or before market open
-        const todayDateObj = new Date(cairoTimeString);
-        const currentDay = todayDateObj.getDay();
-        const isEGXWeekend = currentDay === 5 || currentDay === 6;
         const hasTradingVolumeToday = (liveStockPrice.volume ?? 0) > 0;
 
         if (!isEGXWeekend && hasTradingVolumeToday) {

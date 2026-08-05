@@ -8,9 +8,12 @@ import { QualityDot } from '../ui/QualityDot';
 import { Badge } from '../ui/Badge';
 import { formatPrice, formatRelativeTime } from '@/lib/formatters';
 
+import type { LiveStockTick } from '@/app/[locale]/stock/[symbol]/page';
+
 interface DataSourcesPanelProps {
   company: CompanyWithPrice;
   historicalPrices: PriceRecord[]; // holds EOD & official
+  latestSourcePrices?: Record<string, PriceRecord>;
   intradayPoints: {
     time: string;
     consensus: number | null;
@@ -20,36 +23,37 @@ interface DataSourcesPanelProps {
   }[];
   intradayDate?: string | null;
   locale: string;
+  liveTick?: LiveStockTick | null;
 }
 
 export function DataSourcesPanel({ 
   company, 
   historicalPrices, 
+  latestSourcePrices = {},
   intradayPoints, 
   intradayDate = null,
-  locale 
+  locale,
+  liveTick = null
 }: DataSourcesPanelProps) {
   const t = useTranslations('stockDetail');
   const tGlobal = useTranslations();
 
-  const consensusPrice = company.priceRecord?.close_price || null;
+  // Prefer real-time liveTick close if available, fallback to company priceRecord
+  const consensusPrice = liveTick?.close ?? company.priceRecord?.close_price ?? null;
 
   // We want to extract the latest recorded price for each of the 4 main sources
-  // Let's check both intraday points and historical records to find the latest for each source
   const sourcesToCompare = ['egx_bulletin', 'tradingview', 'mubasher', 'investing'] as const;
 
   const { resolvedSources, mostRecentSource, hasBigDifference } = useMemo(() => {
-    // 1. Gather all unique latest prices from historical prices list
-    // This handles official daily bulletin & EOD fallbacks
-    const latestFromHistory: Record<string, PriceRecord> = {};
+    // 1. Gather all unique latest prices from latestSourcePrices & historicalPrices
+    const latestFromHistory: Record<string, PriceRecord> = { ...latestSourcePrices };
     historicalPrices.forEach(p => {
       if (!latestFromHistory[p.source]) {
         latestFromHistory[p.source] = p;
       }
     });
 
-    // 2. Also check if there's latest intraday points (which are today's)
-    // We can simulate a PriceRecord or extract price directly
+    // 2. Also check if there's latest intraday points
     const latestIntradayPrice: Record<string, number | null> = {};
     const latestIntradayTime: Record<string, string | null> = {};
     
@@ -64,6 +68,8 @@ export function DataSourcesPanel({
       latestIntradayTime['investing'] = lastPoint.time;
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+
     const list = sourcesToCompare.map(source => {
       let price: number | null = null;
       let priceDate: string | null = null;
@@ -71,11 +77,17 @@ export function DataSourcesPanel({
       let flag: string | null = null;
       let isIntraday = false;
 
-      // Extract details
-      if (source !== 'egx_bulletin' && latestIntradayPrice[source] !== null && latestIntradayPrice[source] !== undefined) {
+      // Real-time live tick override (highest priority for tradingview)
+      if (source === 'tradingview' && liveTick && liveTick.close > 0) {
+        price = liveTick.close;
+        priceDate = todayStr;
+        fetchedAt = new Date().toISOString();
+        flag = 'VERIFIED';
+        isIntraday = true;
+      } else if (source !== 'egx_bulletin' && latestIntradayPrice[source] !== null && latestIntradayPrice[source] !== undefined) {
         price = latestIntradayPrice[source];
-        priceDate = intradayDate || company.priceRecord?.price_date || null;
-        fetchedAt = company.priceRecord?.fetched_at || null; // use today's update time
+        priceDate = intradayDate || company.priceRecord?.price_date || todayStr;
+        fetchedAt = company.priceRecord?.fetched_at || new Date().toISOString();
         flag = company.priceRecord?.data_quality_flag || null;
         isIntraday = true;
       } else {
@@ -133,7 +145,7 @@ export function DataSourcesPanel({
     }
 
     return { resolvedSources: list, mostRecentSource, hasBigDifference };
-  }, [historicalPrices, intradayPoints, consensusPrice, company.priceRecord, intradayDate]);
+  }, [historicalPrices, latestSourcePrices, intradayPoints, consensusPrice, company.priceRecord, intradayDate, liveTick]);
 
   const formatGregorianDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';

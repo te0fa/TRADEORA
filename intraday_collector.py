@@ -39,8 +39,8 @@ def main():
 
     # Load env
     load_dotenv()
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_KEY") # Ensure this is service_role key
+    supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     
     if not supabase_url or not supabase_key:
         logger.error("Supabase credentials not found in environment.")
@@ -72,7 +72,11 @@ def main():
         return
 
     cairo_tz = pytz.timezone('Africa/Cairo')
-    snapshot_time = datetime.now(cairo_tz).isoformat()
+    now_dt = datetime.now(cairo_tz)
+    # Align snapshot_time to 15-minute boundary e.g. 10:00, 10:15, 10:30, 10:45...
+    minute_15 = (now_dt.minute // 15) * 15
+    aligned_dt = now_dt.replace(minute=minute_15, second=0, microsecond=0)
+    snapshot_time = aligned_dt.isoformat()
     
     payloads = []
     for r in records:
@@ -89,7 +93,7 @@ def main():
             "high_price": r.get("high_price"),
             "low_price": r.get("low_price"),
             "volume": r.get("volume"),
-            "source": "TradingView"
+            "source": "tradingview_15m"
         })
 
     if not payloads:

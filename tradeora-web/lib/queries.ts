@@ -535,6 +535,45 @@ export async function fetchPriceHistoryTable(companyId: string): Promise<PriceRe
   return data;
 }
 
+/**
+ * Fetches the most recent price record for each distinct source for a company.
+ */
+export async function fetchLatestPricesBySource(companyId: string): Promise<Record<string, PriceRecord>> {
+  const { data, error } = await supabase
+    .from('market_prices')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('price_date', { ascending: false });
+
+  if (error || !data) {
+    console.error('Error fetching latest prices by source:', error);
+    return {};
+  }
+
+  const latestBySource: Record<string, PriceRecord> = {};
+  data.forEach((p: any) => {
+    if (!latestBySource[p.source]) {
+      latestBySource[p.source] = {
+        id: p.id || `${p.company_id}-${p.source}`,
+        company_id: p.company_id,
+        open_price: p.open_price != null ? Number(p.open_price) : null,
+        high_price: p.high_price != null ? Number(p.high_price) : null,
+        low_price:  p.low_price  != null ? Number(p.low_price)  : null,
+        close_price: Number(p.close_price),
+        change_value: p.change_value !== null ? Number(p.change_value) : null,
+        change_percent: p.change_percent !== null ? Number(p.change_percent) : null,
+        volume: p.volume !== null ? Number(p.volume) : null,
+        source: p.source,
+        price_date: p.price_date,
+        data_quality_flag: p.data_quality_flag,
+        fetched_at: p.fetched_at
+      };
+    }
+  });
+
+  return latestBySource;
+}
+
 export interface SignalStat {
   id: string;
   company_id: string;

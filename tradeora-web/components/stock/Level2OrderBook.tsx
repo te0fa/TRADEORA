@@ -10,13 +10,14 @@ import {
 
 interface Level2OrderBookProps {
   symbol: string;
+  companyId?: string;
   isAr?: boolean;
   currentPrice?: number;
 }
 
 const REFRESH_INTERVAL_MS = 30_000; // 30 ثانية
 
-export function Level2OrderBook({ symbol, isAr = true, currentPrice }: Level2OrderBookProps) {
+export function Level2OrderBook({ symbol, companyId, isAr = true, currentPrice }: Level2OrderBookProps) {
   const [orderbook, setOrderbook]   = useState<any>(null);
   const [vpData, setVpData]         = useState<any>(null);
   const [loading, setLoading]       = useState(true);
@@ -31,9 +32,10 @@ export function Level2OrderBook({ symbol, isAr = true, currentPrice }: Level2Ord
   const fetchData = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
     try {
+      const qParams = `symbol=${encodeURIComponent(symbol)}&company_id=${encodeURIComponent(companyId || '')}&price=${encodeURIComponent(currentPrice?.toString() || '')}&t=${Date.now()}`;
       const [obRes, vpRes] = await Promise.all([
-        fetch(`/api/orderbook?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`),
-        fetch(`/api/volume-profile?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`),
+        fetch(`/api/orderbook?${qParams}`),
+        fetch(`/api/volume-profile?${qParams}`),
       ]);
 
       const obJson = await obRes.json();
@@ -51,7 +53,7 @@ export function Level2OrderBook({ symbol, isAr = true, currentPrice }: Level2Ord
       setLoading(false);
       setRefreshing(false);
     }
-  }, [symbol]);
+  }, [symbol, companyId, currentPrice]);
 
   // Initial load
   useEffect(() => {
@@ -121,7 +123,7 @@ export function Level2OrderBook({ symbol, isAr = true, currentPrice }: Level2Ord
             <div className="flex items-center gap-2">
               <span className="text-xl">📊</span>
               <h2 className="text-lg font-bold text-white">
-                {isAr ? 'عمق السوق اللحظي وحجم التداول' : 'Live Depth of Market & Volume Profile'}
+                {isAr ? 'تحليل عمق السيولة ونقاط التمركز (Volume Profile & DOM)' : 'Volume Profile & Order Flow Analysis'}
               </h2>
               {/* Live indicator */}
               <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -130,12 +132,12 @@ export function Level2OrderBook({ symbol, isAr = true, currentPrice }: Level2Ord
                   : 'bg-red-500/15 text-red-400 border-red-500/30'
               }`}>
                 {isLive ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
-                {isLive ? 'LIVE' : 'OFFLINE'}
+                {isLive ? 'ديناميكي' : 'OFFLINE'}
               </span>
             </div>
             <div className="flex items-center gap-3 mt-1">
               <p className="text-xs text-zinc-400">
-                {isAr ? 'الشاشة الثانية، طلبات الشراء، عروض البيع، ونقاط التحكم السيولية (VPOC).' : 'Live 5-Level DOM, Order Flow Imbalance, and VPOC analysis.'}
+                {isAr ? 'حسابات خوارزمية لحظية لمستويات نقطة التحكم (VPOC) ومناطق القيمة والتمركز السعري.' : 'Algorithmic calculations for VPOC, Value Area, and Order Flow balance.'}
               </p>
               <span className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono">
                 <Clock className="w-3 h-3" />

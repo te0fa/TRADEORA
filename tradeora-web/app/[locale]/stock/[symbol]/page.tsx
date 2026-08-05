@@ -41,7 +41,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
   const tGlobal = useTranslations();
   const tTooltip = useTranslations('sourceTooltips');
   
-  const { company, intradayData, historicalPrices, loading, error, refetch } = useStockDetail(symbol);
+  const { company, intradayData, historicalPrices, latestSourcePrices, loading, error, refetch } = useStockDetail(symbol);
 
   // ── Shared real-time live price (TradingView WebSocket + REST fallback) ──
   const [liveTick, setLiveTick] = useState<LiveStockTick | null>(null);
@@ -317,7 +317,7 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <Level2OrderBook symbol={symbol} isAr={locale === 'ar'} currentPrice={liveTick?.close ?? company.priceRecord?.close_price} />
+        <Level2OrderBook symbol={symbol} companyId={company.id} isAr={locale === 'ar'} currentPrice={liveTick?.close ?? company.priceRecord?.close_price} />
       </motion.div>
 
       <motion.div variants={itemVariants}>
@@ -340,9 +340,11 @@ export default function StockDetailPage({ params }: StockDetailPageProps) {
         <DataSourcesPanel
           company={company}
           historicalPrices={historicalPrices}
+          latestSourcePrices={latestSourcePrices}
           intradayPoints={intradayData?.points || []}
           intradayDate={intradayData?.date || null}
           locale={locale}
+          liveTick={liveTick}
         />
       </motion.div>
 

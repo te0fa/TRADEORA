@@ -5,6 +5,7 @@ import {
   fetchStockDetail, 
   fetchIntradayPrices, 
   fetchHistoricalPrices, 
+  fetchLatestPricesBySource,
   CompanyWithPrice 
 } from '@/lib/queries';
 import { PriceRecord } from '@/lib/market-utils';
@@ -22,6 +23,7 @@ export function useStockDetail(symbol: string) {
     }[];
   } | null>(null);
   const [historicalPrices, setHistoricalPrices] = useState<PriceRecord[]>([]);
+  const [latestSourcePrices, setLatestSourcePrices] = useState<Record<string, PriceRecord>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<any>(null);
 
@@ -34,14 +36,16 @@ export function useStockDetail(symbol: string) {
       }
       setCompany(detail);
 
-      // Fetch intraday and historical concurrently
-      const [intraday, historical] = await Promise.all([
+      // Fetch intraday, historical, and latest by source concurrently
+      const [intraday, historical, sourcePrices] = await Promise.all([
         fetchIntradayPrices(detail.id),
-        fetchHistoricalPrices(detail.id, 500)
+        fetchHistoricalPrices(detail.id, 500),
+        fetchLatestPricesBySource(detail.id)
       ]);
 
       setIntradayData(intraday);
       setHistoricalPrices(historical);
+      setLatestSourcePrices(sourcePrices);
       setError(null);
     } catch (err: any) {
       console.error(`Failed to load stock detail for ${symbol}:`, err);
@@ -68,6 +72,7 @@ export function useStockDetail(symbol: string) {
     company,
     intradayData,
     historicalPrices,
+    latestSourcePrices,
     loading,
     error,
     refetch: () => loadData(false)

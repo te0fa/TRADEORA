@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/sync-intraday",
+      "schedule": "*/15 7-12 * * 0-4"
+    },
+    {
       "path": "/api/cron/intraday-analysis",
       "schedule": "0 14 * * *"
     },

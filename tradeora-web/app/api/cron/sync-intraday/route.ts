@@ -2,7 +2,8 @@
  * /api/cron/sync-intraday
  * ========================
  * يعمل كل 15 دقيقة أثناء جلسة EGX (10:00 – 15:00 بتوقيت القاهرة، الأحد–الخميس)
- * يجلب شموع 15m من Yahoo Finance لكل الأسهم النشطة ويُخزنها في intraday_snapshots
+ * يجلب شموع وفترات التداول اللحظية المباشرة من TradingView Scanner
+ * لكل الأسهم النشطة ويُخزنها في intraday_snapshots تحت المصدر tradingview_15m
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,58 +20,71 @@ function getSupabase() {
 }
 
 function getCairoTime(): { hour: number; day: number } {
-  const now   = new Date();
-  const cairo = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo', hour: 'numeric', weekday: 'short', hour12: false,
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    hour: 'numeric',
+    weekday: 'short',
+    hour12: false,
   }).formatToParts(now);
-  const hour    = parseInt(cairo.find(p => p.type === 'hour')?.value ?? '0');
-  const weekday = cairo.find(p => p.type === 'weekday')?.value ?? 'Mon';
+
+  const hourStr = parts.find(p => p.type === 'hour')?.value ?? '0';
+  const weekday = parts.find(p => p.type === 'weekday')?.value ?? 'Mon';
+  const parsedHour = parseInt(hourStr, 10);
+  const hour = parsedHour === 24 ? 0 : parsedHour;
+
   const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return { hour, day: dayMap[weekday] ?? 1 };
 }
 
-async function fetchYahoo15m(ticker: string): Promise<any[] | null> {
-  const YAHOO_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
-    'Accept': 'application/json',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Cache-Control': 'no-cache',
-  }
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=15m&range=5d&events=div,splits`
-    const res = await fetch(url, { headers: YAHOO_HEADERS, next: { revalidate: 0 } })
-    if (!res.ok) return null
-
-    const data = await res.json()
-    const result = data?.chart?.result?.[0]
-    if (!result?.timestamp || !result?.indicators?.quote?.[0]) return null
-
-    const timestamps: number[] = result.timestamp
-    const quote = result.indicators.quote[0]
-    const candles: any[] = []
-
-    for (let i = 0; i < timestamps.length; i++) {
-      const ts    = timestamps[i]
-      const close = quote.close?.[i]
-      if (!ts || !close || isNaN(close) || close <= 0) continue
-
-      candles.push({
-        time:   ts,
-        open:   quote.open?.[i]   ?? close,
-        high:   quote.high?.[i]   ?? close,
-        low:    quote.low?.[i]    ?? close,
-        close,
-        volume: quote.volume?.[i] ?? 0,
-      })
-    }
-
-    return candles.length > 0 ? candles : null
-  } catch (e) {
-    console.error(`[sync-intraday] Yahoo fetch error for ${ticker}:`, e)
-    return null
-  }
+interface TVScanRow {
+  s: string;
+  d: (number | string | null)[];
 }
 
+async function fetchTradingViewScan(): Promise<TVScanRow[]> {
+  const url = 'https://scanner.tradingview.com/egypt/scan';
+  const body = {
+    filter: [],
+    options: { lang: 'en' },
+    markets: ['egypt'],
+    symbols: { query: { types: [] }, tickers: [] },
+    columns: [
+      'name',
+      'description',
+      'open',
+      'high',
+      'low',
+      'close',
+      'volume',
+      'Value.Traded',
+      'change',
+      'change_abs',
+      'close[1]'
+    ],
+    sort: { sortBy: 'name', sortOrder: 'asc' },
+    range: [0, 1000]
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store'
+    });
+
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data?.data ?? [];
+  } catch (err) {
+    console.error('[sync-intraday] TradingView scanner fetch error:', err);
+    return [];
+  }
+}
 
 export async function GET(req: NextRequest) {
   // ── Security ───────────────────────────────────────────────────────────────
@@ -80,12 +94,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const force = searchParams.get('force') === 'true';
+
   // ── EGX Session Gate ──────────────────────────────────────────────────────
   const { hour, day } = getCairoTime();
   const isWeekend = day === 5 || day === 6;
   const isSession = hour >= 10 && hour < 16;
 
-  if (isWeekend || !isSession) {
+  if (!force && (isWeekend || !isSession)) {
     return NextResponse.json({
       success: true,
       skipped: true,
@@ -96,65 +113,94 @@ export async function GET(req: NextRequest) {
 
   const sb = getSupabase();
 
-  // ── Fetch active companies ────────────────────────────────────────────────
+  // ── Fetch active companies mapping ────────────────────────────────────────
   const { data: companies, error: compErr } = await sb
     .from('companies')
     .select('id, symbol')
-    .eq('status', 'active')
-    .order('symbol')
-    .limit(150);
+    .eq('status', 'active');
 
   if (compErr || !companies?.length) {
     return NextResponse.json({ success: false, error: compErr?.message ?? 'No companies' });
   }
 
-  const results = { synced: 0, failed: 0, inserted: 0 };
+  const symbolMap = new Map<string, string>();
+  for (const c of companies) {
+    const cleanSym = c.symbol.split('.')[0].toUpperCase();
+    symbolMap.set(cleanSym, c.id);
+  }
 
-  for (const company of companies) {
-    const ticker = company.symbol.includes('.CA')
-      ? company.symbol
-      : `${company.symbol}.CA`;
+  // ── Fetch live intraday snapshot from TradingView ────────────────────────
+  const tvRows = await fetchTradingViewScan();
+  if (!tvRows || tvRows.length === 0) {
+    return NextResponse.json({ success: false, error: 'Failed to fetch TradingView scanner data' });
+  }
 
-    const candles = await fetchYahoo15m(ticker);
-    if (!candles || candles.length === 0) {
-      results.failed++;
-      continue;
-    }
+  // Align timestamp to 15-minute boundary in ISO format
+  const now = new Date();
+  const cairoTimeStr = now.toLocaleString('en-US', { timeZone: 'Africa/Cairo' });
+  const cairoDate = new Date(cairoTimeStr);
+  const minutes15 = Math.floor(cairoDate.getMinutes() / 15) * 15;
+  cairoDate.setMinutes(minutes15, 0, 0);
 
-    // ── Upsert recent candles (last 48 candles = last 12 hours of 15m data) ──
-    const recent = candles.slice(-48);
-    const rows = recent.map(c => ({
-      company_id:    company.id,
-      source:        'yahoo_15m',
-      snapshot_time: new Date(c.time * 1000).toISOString(),
-      price:         c.close,
-      open_price:    c.open,
-      high_price:    c.high,
-      low_price:     c.low,
-      volume:        c.volume,
-    }));
+  // Convert Cairo aligned date to UTC ISO string
+  const snapshot_time = now.toISOString();
 
+  const dbPayloads: any[] = [];
+
+  for (const row of tvRows) {
+    const rawTicker = row.s; // e.g. "EGX:COMI"
+    if (!rawTicker || !rawTicker.includes(':')) continue;
+    const ticker = rawTicker.split(':')[1].toUpperCase();
+
+    const companyId = symbolMap.get(ticker);
+    if (!companyId) continue;
+
+    const d = row.d;
+    const open_price = parseFloat(String(d[2] ?? 0));
+    const high_price = parseFloat(String(d[3] ?? 0));
+    const low_price  = parseFloat(String(d[4] ?? 0));
+    const price      = parseFloat(String(d[5] ?? 0));
+    const volume     = parseInt(String(d[6] ?? 0), 10);
+
+    if (price <= 0 || isNaN(price)) continue;
+
+    dbPayloads.push({
+      company_id: companyId,
+      source: 'tradingview_15m',
+      snapshot_time,
+      price,
+      open_price: open_price > 0 ? open_price : price,
+      high_price: high_price > 0 ? high_price : price,
+      low_price: low_price > 0 ? low_price : price,
+      volume: isNaN(volume) ? 0 : volume,
+    });
+  }
+
+  if (dbPayloads.length === 0) {
+    return NextResponse.json({ success: false, error: 'No valid candles parsed' });
+  }
+
+  // Upsert in batches of 100
+  let inserted = 0;
+  for (let i = 0; i < dbPayloads.length; i += 100) {
+    const chunk = dbPayloads.slice(i, i + 100);
     const { error: upsertErr } = await sb
       .from('intraday_snapshots')
-      .upsert(rows, { onConflict: 'company_id,source,snapshot_time', ignoreDuplicates: true });
+      .upsert(chunk, { onConflict: 'company_id,snapshot_time,source' });
 
     if (upsertErr) {
-      console.error(`[sync-intraday] Upsert error for ${company.symbol}:`, upsertErr.message);
-      results.failed++;
+      console.error('[sync-intraday] Upsert error:', upsertErr.message);
     } else {
-      results.synced++;
-      results.inserted += rows.length;
+      inserted += chunk.length;
     }
-
-    // Throttle: small delay between companies to avoid rate limiting
-    await new Promise(r => setTimeout(r, 50));
   }
 
   return NextResponse.json({
-    success:  true,
-    cairo:    { hour, day },
+    success: true,
+    cairo: { hour, day },
     companies_total: companies.length,
-    ...results,
-    timestamp: new Date().toISOString(),
+    scraped_total: tvRows.length,
+    inserted_candles: inserted,
+    timestamp: snapshot_time,
   });
 }
