@@ -105,11 +105,14 @@ def backfill_symbol_interval(tv, symbol: str, company_id: str, interval_key: str
                 last_dt = datetime.fromisoformat(str(last)[:10]).date()
                 days_missing = (date.today() - last_dt).days
 
-                if days_missing <= 1:
+                if days_missing <= 1 and interval_key == '1d':
                     logger.debug(f"[{symbol}] {source_name}: up-to-date. Skip.")
                     return 'skipped', 0
 
-                bars_needed = min(days_missing + 5, cfg['bars'])
+                if interval_key != '1d':
+                    bars_needed = 50
+                else:
+                    bars_needed = min(days_missing + 5, cfg['bars'])
                 logger.info(f"[{symbol}] {source_name}: fetching last {bars_needed} bars ({days_missing} days missing)")
             except Exception as e:
                 logger.warning(f"[{symbol}] Could not parse last date '{last}': {e}. Fetching full {bars_needed} bars.")
@@ -121,7 +124,8 @@ def backfill_symbol_interval(tv, symbol: str, company_id: str, interval_key: str
 
     for attempt in range(1, 4):
         try:
-            df = tv.get_hist(
+            current_tv = get_tv()
+            df = current_tv.get_hist(
                 symbol=tv_symbol,
                 exchange='EGX',
                 interval=INTERVAL_MAP[interval_key],

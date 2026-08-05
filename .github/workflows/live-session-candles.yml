@@ -33,14 +33,14 @@ jobs:
       - name: 📦 Install dependencies
         run: pip install yfinance supabase python-dotenv pandas pytz
 
-      - name: 📡 Fetch live session candles (Yahoo Finance)
+      - name: 📡 Fetch live session candles (TradingView Scanner)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          INTERVALS="${{ github.event.inputs.intervals || '15m,1h' }}"
-          echo "📡 Fetching live candles: $INTERVALS"
-          python yf_backfill.py --intervals $INTERVALS --live
+          echo "📡 Fetching live TradingView intraday snapshots..."
+          python intraday_collector.py --force
 
       - name: 📋 Upload logs on failure
         if: failure()

@@ -42,19 +42,21 @@ jobs:
       - name: Run Signal Monitor
         if: steps.session_check.outputs.is_weekend == 'false' && steps.session_check.outputs.is_session == 'true'
         run: |
-          echo "Calling signal-monitor..."
+          APP_URL="${{ secrets.VERCEL_APP_URL || 'https://tradeora-dusky.vercel.app' }}"
+          echo "Calling signal-monitor at $APP_URL..."
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.VERCEL_APP_URL }}/api/cron/signal-monitor")
+            "$APP_URL/api/cron/signal-monitor")
           echo "signal-monitor response: $RESPONSE"
 
       - name: Run Sync Intraday
         if: steps.session_check.outputs.is_weekend == 'false' && steps.session_check.outputs.is_session == 'true'
         run: |
-          echo "Calling sync-intraday..."
+          APP_URL="${{ secrets.VERCEL_APP_URL || 'https://tradeora-dusky.vercel.app' }}"
+          echo "Calling sync-intraday at $APP_URL..."
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.VERCEL_APP_URL }}/api/cron/sync-intraday")
+            "$APP_URL/api/cron/sync-intraday")
           echo "sync-intraday response: $RESPONSE"
 
       - name: Skip (Market Closed)

@@ -111,15 +111,31 @@ def _try_scrape(target_date: date) -> dict | None:
         return None
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
-                '--window-size=1920,1080',
-            ]
-        )
+        try:
+            browser = p.chromium.launch(
+                channel='chrome',
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-http2',
+                    '--window-size=1920,1080',
+                ]
+            )
+            logger.info("Using system Google Chrome channel with --disable-http2")
+        except Exception:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-http2',
+                    '--window-size=1920,1080',
+                ]
+            )
+            logger.info("Using Playwright Chromium fallback with --disable-http2")
         context = browser.new_context(
             user_agent=(
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -127,42 +143,61 @@ def _try_scrape(target_date: date) -> dict | None:
                 'Chrome/124.0.0.0 Safari/537.36'
             ),
             locale='ar-EG',
+            timezone_id='Africa/Cairo',
             ignore_https_errors=True,
             extra_http_headers={
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                 'Accept-Language': 'ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
             }
         )
         page = context.new_page()
+        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
         extracted = None
 
         try:
             # Step 1: Open Home page first to acquire session cookies
             logger.info("Step 1: Loading EGX Home page to acquire session cookies...")
             try:
-                page.goto(HOME_URL, timeout=30000)
+                page.goto(HOME_URL, timeout=30000, wait_until='domcontentloaded')
                 time.sleep(3)
             except Exception as ex:
                 logger.warning(f"Home page load warning: {ex}")
 
-            # Step 2: Navigate to InvestorsTypeCharts.aspx with retries
+            # Step 2: Navigate to InvestorsTypeCharts.aspx
             logger.info("Step 2: Loading InvestorsTypeCharts.aspx...")
             loaded = False
             for nav_attempt in range(1, 4):
                 try:
                     page.goto(INTRADAY_URL, timeout=45000, wait_until='domcontentloaded')
-                    time.sleep(4)
-                    loaded = True
-                    break
+                    
+                    # Wait for F5 WAF TSPD challenge reload to finish and tables to render
+                    for wait_sec in range(1, 16):
+                        time.sleep(1)
+                        try:
+                            url = page.url
+                            if 'chrome-error' in url:
+                                continue
+                            tbl_cnt = page.evaluate("() => document.querySelectorAll('table').length")
+                            if tbl_cnt >= 3:
+                                logger.info(f"  ✅ {tbl_cnt} tables rendered in DOM after {wait_sec}s")
+                                loaded = True
+                                break
+                        except Exception:
+                            # Context destroyed during challenge reload
+                            pass
+                    
+                    if loaded:
+                        break
                 except Exception as ex:
                     logger.warning(f"  Navigation attempt {nav_attempt} warning: {ex}")
                     time.sleep(3)
 
             if not loaded:
-                logger.error("  ❌ Failed to load page after 3 navigation attempts")
+                logger.error("  ❌ Failed to load page/tables after 3 navigation attempts")
                 return None
-
-            logger.info("  ✅ Page loaded")
 
             # Step 3: Extract ALL table data via structured JS
             logger.info("Step 3: Extracting all 3 tables from DOM...")
@@ -360,13 +395,24 @@ def parse_egx_tables(extracted: dict, target_date: date) -> dict | None:
             result[f'{pre}_sell_egp'] = sell
             result[f'{pre}_buy_egp']  = buy
             result[f'{pre}_net_egp']  = net
+            # Also populate egyptians_total_* aliases so both naming variants are present
+            if pre == 'egyptian_total':
+                result[f'egyptians_total_sell_egp'] = sell
+                result[f'egyptians_total_buy_egp']  = buy
+                result[f'egyptians_total_net_egp']  = net
             logger.info(f"  ✅ [{ttype}] {pre}: sell={sell:,.0f} buy={buy:,.0f} net={net:,.0f}")
 
     # Compute totals if total table was missing or needs calculation
     if not result.get('egyptian_total_buy_egp') and result.get('egyptian_ind_buy_egp') and result.get('egyptian_inst_buy_egp'):
-        result['egyptian_total_buy_egp']  = result['egyptian_ind_buy_egp']  + result['egyptian_inst_buy_egp']
-        result['egyptian_total_sell_egp'] = result.get('egyptian_ind_sell_egp', 0) + result.get('egyptian_inst_sell_egp', 0)
-        result['egyptian_total_net_egp']  = result.get('egyptian_ind_net_egp', 0)  + result.get('egyptian_inst_net_egp', 0)
+        b = result['egyptian_ind_buy_egp']  + result['egyptian_inst_buy_egp']
+        s = result.get('egyptian_ind_sell_egp', 0) + result.get('egyptian_inst_sell_egp', 0)
+        n = result.get('egyptian_ind_net_egp', 0)  + result.get('egyptian_inst_net_egp', 0)
+        result['egyptian_total_buy_egp']  = b
+        result['egyptian_total_sell_egp'] = s
+        result['egyptian_total_net_egp']  = n
+        result['egyptians_total_buy_egp']  = b
+        result['egyptians_total_sell_egp'] = s
+        result['egyptians_total_net_egp']  = n
         logger.info("  📐 Computed egyptian_total from ind+inst")
 
     if not result.get('arab_buy_egp') and result.get('arab_ind_buy_egp') and result.get('arab_inst_buy_egp'):
@@ -423,6 +469,7 @@ ALLOWED_COLS = {
     'foreign_ind_buy_egp', 'foreign_ind_sell_egp', 'foreign_ind_net_egp',
     'egyptian_inst_buy_egp', 'egyptian_inst_sell_egp', 'egyptian_inst_net_egp',
     'egyptian_ind_buy_egp', 'egyptian_ind_sell_egp', 'egyptian_ind_net_egp',
+    'egyptian_total_buy_egp', 'egyptian_total_sell_egp', 'egyptian_total_net_egp',
     'egyptians_total_buy_egp', 'egyptians_total_sell_egp', 'egyptians_total_net_egp',
     'arab_buy_egp', 'arab_sell_egp', 'arab_net_egp',
     'arab_total_buy_egp', 'arab_total_sell_egp', 'arab_total_net_egp',
