@@ -495,7 +495,7 @@ def save_to_db(flows: dict) -> bool:
         logger.info(f"✅ Saved {len(clean)} fields to Supabase for {flows['trade_date']}")
 
         # Also sync directly to CockroachDB if DATABASE_URL is present
-        cr_url = os.getenv("DATABASE_URL") or "postgresql://tradeora:gdW77s_jShDK8nChydbbCg@raw-donkey-30500.j77.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb?sslmode=require"
+        cr_url = os.getenv("DATABASE_URL")
         try:
             import psycopg2
             conn = psycopg2.connect(cr_url)

@@ -2,8 +2,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { Pool } = require('pg');
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kdjsguozssxvtmlmqhpz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkanNndW96c3N4dnRtbG1xaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzg3MzQwMywiZXhwIjoyMDk5NDQ5NDAzfQ.sCyCHFnLo7MWKeUmAb6s5j0zT5PzNBBnVAls1LcPclM';
-const COCKROACH_URL = process.env.DATABASE_URL || 'postgresql://tradeora:gdW77s_jShDK8nChydbbCg@raw-donkey-30500.j77.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const COCKROACH_URL = process.env.DATABASE_URL;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const pgPool = new Pool({

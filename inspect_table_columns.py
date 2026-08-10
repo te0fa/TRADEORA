@@ -2,7 +2,7 @@ import os, psycopg2
 from dotenv import load_dotenv
 
 load_dotenv()
-COCKROACH_URL = (os.getenv("DATABASE_URL") or "postgresql://tradeora:gdW77s_jShDK8nChydbbCg@raw-donkey-30500.j77.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb").replace("sslmode=verify-full", "sslmode=require")
+COCKROACH_URL = (os.getenv("DATABASE_URL")).replace("sslmode=verify-full", "sslmode=require")
 
 conn = psycopg2.connect(COCKROACH_URL)
 cur = conn.cursor()

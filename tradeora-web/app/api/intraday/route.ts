@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const daysBack = parseInt(req.nextUrl.searchParams.get('days') ?? '90')
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseKey || !symbol) {
     return NextResponse.json({ candles: [], source: 'none', count: 0, fallback: true })

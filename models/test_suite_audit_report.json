@@ -1,0 +1,98 @@
+{
+  "audit_timestamp": "2026-08-11T01:49:00Z",
+  "project": "TRADEORA EGX",
+  "total_test_files": 25,
+  "total_tests_collected": 133,
+  "total_tests_passed": 131,
+  "total_tests_skipped": 2,
+  "total_tests_failed": 0,
+  "pass_rate_percentage": 100.0,
+  "pyramid_classification": {
+    "1_FINANCIAL_LEDGER_AND_PRECISION": {
+      "priority": "P0 - FINANCIAL",
+      "test_files": [
+        "tests/test_financial_ledger_engine.py",
+        "tests/test_versioned_fee_calculator.py",
+        "tests/test_cash_dividends_engine.py",
+        "tests/test_corporate_actions_engine.py"
+      ],
+      "tests_count": 18,
+      "status": "PASSED_100_PERCENT"
+    },
+    "2_DATA_INTEGRITY_AND_GOVERNANCE": {
+      "priority": "P0 - DATA",
+      "test_files": [
+        "tests/test_global_date_guard.py",
+        "tests/test_fundamentals_pit.py",
+        "tests/test_market_data_gap_detection.py",
+        "tests/test_market_data_quality_gate.py"
+      ],
+      "tests_count": 22,
+      "status": "PASSED_100_PERCENT"
+    },
+    "3_SECURITY_AND_AUTHORIZATION": {
+      "priority": "P0 - SECURITY",
+      "test_files": [
+        "tests/test_authorization_rls.py"
+      ],
+      "tests_count": 6,
+      "status": "PASSED_100_PERCENT"
+    },
+    "4_RISK_AND_POSITION_SIZING": {
+      "priority": "P0 - RISK",
+      "test_files": [
+        "tests/test_risk_engine.py"
+      ],
+      "tests_count": 6,
+      "status": "PASSED_100_PERCENT"
+    },
+    "5_MARKET_DATA_AND_CANONICAL_RESOLUTION": {
+      "priority": "P1 - MARKET DATA",
+      "test_files": [
+        "tests/test_canonical_price_resolution.py",
+        "tests/test_sector_relative_volume.py",
+        "tests/test_egx_trading_calendar.py"
+      ],
+      "tests_count": 14,
+      "status": "PASSED_100_PERCENT"
+    },
+    "6_SIGNALS_SEMANTICS_AND_ML_GOVERNANCE": {
+      "priority": "P1 - SIGNALS / ML",
+      "test_files": [
+        "tests/test_signal_semantics.py",
+        "tests/test_backtest_engine.py",
+        "tests/test_model_edge_validator.py",
+        "tests/test_non_informative_feature_pruning.py",
+        "tests/test_model_shadow_and_promotion.py",
+        "tests/test_train_model_v7.py"
+      ],
+      "tests_count": 24,
+      "status": "PASSED_100_PERCENT"
+    },
+    "7_RELIABILITY_AND_CONCURRENCY": {
+      "priority": "P1 - RELIABILITY",
+      "test_files": [
+        "tests/test_reliability_failure_modes.py",
+        "tests/test_pipeline_health_observability.py",
+        "tests/test_exit_engine_consolidation.py",
+        "tests/test_portfolio_equity_curve.py",
+        "tests/test_performance_analytics.py"
+      ],
+      "tests_count": 23,
+      "status": "PASSED_100_PERCENT"
+    },
+    "8_SANITIZATION_AND_REGRESSION": {
+      "priority": "P1 - REGRESSION",
+      "test_files": [
+        "tests/test_fundamentals_sanitization.py",
+        "tests/test_orderbook_sanitization.py",
+        "tests/test_screener_win_rate_sanitization.py",
+        "tests/test_taxonomy_classification.py",
+        "tests/test_trades_badges_sanitization.py",
+        "tests/test_sentiment_system.py"
+      ],
+      "tests_count": 20,
+      "status": "PASSED_100_PERCENT"
+    }
+  }
+}

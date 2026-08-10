@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { PriceRecord, resolveLatestPrice } from './market-utils';
 import { normalizeEgxSector, isSmeStock } from './egx-sectors';
 import { getShariahAudit, ShariahSourceAudit } from './shariah-data';
+import { fetchCanonicalLatestPrices } from './canonical-price';
 
 export interface Company {
   id: string;
@@ -57,49 +58,8 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
     throw compError;
   }
 
-  // Call the database RPC function to retrieve the resolved latest price for each company
-  let prices = null;
-  try {
-    const { data: rpcPrices } = await supabase.rpc('get_latest_prices');
-    prices = rpcPrices;
-  } catch (rpcErr) {
-    console.warn('RPC get_latest_prices failed in fetchCompaniesWithPrices, fallback activated.', rpcErr);
-  }
-
-  // Group latest price records by company_id for quick lookup
-  const priceMap = new Map<string, any>();
-  if (prices) {
-    prices.forEach((p: any) => {
-      priceMap.set(p.company_id, p);
-    });
-  }
-
-  // Override with the absolute freshest prices from the last 3 days of market_prices
-  try {
-    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
-    const { data: recentPrices } = await supabase
-      .from('market_prices')
-      .select('*')
-      .gte('price_date', threeDaysAgo)
-      .order('fetched_at', { ascending: false });
-
-    if (recentPrices) {
-      recentPrices.forEach((p: any) => {
-        if (!priceMap.has(p.company_id)) {
-          priceMap.set(p.company_id, p);
-        } else {
-          const existing = priceMap.get(p.company_id);
-          const existingTime = existing.fetched_at ? new Date(existing.fetched_at).getTime() : 0;
-          const newTime = p.fetched_at ? new Date(p.fetched_at).getTime() : 0;
-          if (newTime > existingTime) {
-            priceMap.set(p.company_id, p);
-          }
-        }
-      });
-    }
-  } catch (err) {
-    console.warn('Error overriding with recent prices:', err);
-  }
+  // Retrieve the resolved authoritative latest prices for all companies
+  const priceMap = await fetchCanonicalLatestPrices(supabase);
 
   return (companies || []).map((item: any) => {
     const rawPrice = priceMap.get(item.id);
@@ -203,28 +163,9 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     console.warn('Fundamentals table not loaded or missing:', err);
   }
 
-  // Get the latest resolved price for this specific company using RPC with fallback
-  let rawPrice = null;
-  try {
-    const { data: prices, error: rpcError } = await supabase.rpc('get_latest_prices');
-    if (!rpcError && prices) {
-      rawPrice = (prices || []).find((p: any) => p.company_id === company.id);
-    }
-  } catch (rpcErr) {
-    console.warn('RPC get_latest_prices failed, using direct query fallback.', rpcErr);
-  }
-
-  // Fallback to direct market_prices lookup if RPC didn't return a price
-  if (!rawPrice) {
-    const { data: directPrice } = await supabase
-      .from('market_prices')
-      .select('*')
-      .eq('company_id', company.id)
-      .order('fetched_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    rawPrice = directPrice;
-  }
+  // Get the latest resolved price for this specific company using canonical price resolver
+  const singlePriceMap = await fetchCanonicalLatestPrices(supabase, [company.id]);
+  const rawPrice = singlePriceMap.get(company.id) || null;
 
   let priceRecord: PriceRecord | null = null;
   let labelAr = '';
@@ -312,16 +253,20 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     // Keep existing priceRecord
   }
 
-  // Map fundamentals property names and defaults
+  // Map fundamentals property names and defaults (strictly null when missing)
   if (fundamentals) {
-    fundamentals.debt_equity = fundamentals.debt_to_equity;
+    fundamentals.debt_equity = fundamentals.debt_to_equity ?? fundamentals.debt_equity ?? null;
     if (fundamentals.profit_margin === null && fundamentals.net_income && fundamentals.revenue) {
       fundamentals.profit_margin = Number(((fundamentals.net_income / fundamentals.revenue) * 100).toFixed(2));
     }
-    fundamentals.debt_equity = fundamentals.debt_equity ?? 0.38; // standard healthy ratio
-    fundamentals.profit_margin = fundamentals.profit_margin ?? 18.5; // typical Cairo stock margin
-    fundamentals.revenue_growth = fundamentals.revenue_growth ?? 11.2;
-    fundamentals.earnings_growth = fundamentals.earnings_growth ?? 14.6;
+    fundamentals.debt_equity = fundamentals.debt_equity ?? null;
+    fundamentals.profit_margin = fundamentals.profit_margin ?? null;
+    fundamentals.revenue_growth = fundamentals.revenue_growth ?? null;
+    fundamentals.earnings_growth = fundamentals.earnings_growth ?? null;
+    fundamentals.pe_ratio = fundamentals.pe_ratio != null ? Number(fundamentals.pe_ratio) : null;
+    fundamentals.eps = fundamentals.eps != null ? Number(fundamentals.eps) : null;
+    fundamentals.dividend_yield = fundamentals.dividend_yield != null ? Number(fundamentals.dividend_yield) : null;
+    fundamentals.fair_value = fundamentals.fair_value != null ? Number(fundamentals.fair_value) : null;
   }
 
   return {
@@ -341,10 +286,10 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     sourceLabelEn: labelEn,
     fundamentals,
     shariah_audit: {
-      egx33: company.is_shariah_compliant ? '✅ مدرج في EGX 33' : '❌ غير مدرج في EGX 33',
-      boubyan: company.is_shariah_compliant ? '✅ متوافق مع الضوابط الشرعية' : '⚠️ يحتاج تطهير / مراجعة نسب الديون',
-      kasheif: company.is_shariah_compliant ? '✅ سهم حلال متوافق 100%' : '🟡 سهم مختلط (نسبة تطهير)',
-      purification_ratio: company.is_shariah_compliant ? 0.0 : 1.5
+      egx33: company.is_egx33_shariah ? '✅ مدرج في مؤشر الشريعة EGX 33' : (company.is_shariah_compliant ? '✅ متوافق مع الضوابط الشرعية' : '❌ غير مدرج في EGX 33'),
+      boubyan: company.is_boubyan_compliant ? '✅ متوافق مع معايير بنك بوبيان' : (company.is_shariah_compliant ? '✅ متوافق شرعياً' : '⚠️ يحتاج تطهير / مراجعة نسب الديون'),
+      kasheif: company.is_shariah_compliant ? '✅ سهم حلال متوافق' : '🟡 سهم مختلط (نسبة تطهير)',
+      purification_ratio: company.purification_ratio != null ? Number(company.purification_ratio) : (company.is_shariah_compliant ? 0.0 : null)
     }
   };
 }

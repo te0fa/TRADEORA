@@ -18,19 +18,22 @@ export async function GET(req: NextRequest) {
     const limitParam = searchParams.get('limit');
     const limit = limitParam ? parseInt(limitParam) : 1000;
     const symbol = searchParams.get('symbol');
+    const tierParam = (searchParams.get('tier') || 'all').toUpperCase();
 
-    // 1. Fetch trades with company details
-    // Exclude contaminated pre-launch signals from performance metrics (Fresh Reset: Aug 3, 2026)
-    const LAUNCH_DATE = '2026-08-03T00:00:00+00:00'; // fresh start post-reset
+    // 1. Fetch trades with company details (Four-Tier Taxonomy compliant, zero data deletion or date-hiding)
     let query = supabase
       .from('recommended_trades')
       .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
-      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
-      .gte('recommended_at', LAUNCH_DATE)
       .order('recommended_at', { ascending: false });
 
     if (symbol) {
       query = query.eq('symbol', symbol.toUpperCase());
+    }
+
+    if (tierParam !== 'ALL' && tierParam !== 'ALL_HISTORICAL') {
+      if (['PRODUCTION', 'CLEAN_OOS', 'LEGACY_RESEARCH'].includes(tierParam)) {
+        query = query.eq('classification', tierParam);
+      }
     }
 
     let { data: trades, error: fetchError } = await query.limit(limit);
@@ -39,26 +42,24 @@ export async function GET(req: NextRequest) {
       throw fetchError;
     }
 
-    // If no trades found after reset date, return clean empty list
     if (!trades) {
       trades = [];
     }
 
-    // 3. Fetch closed BUY trades & tp1_hit trades to compute platform statistics
+    // 2. Fetch closed trades & tp1_hit trades for four-tier evaluation breakdown
     const { data: allClosed, error: closedErr } = await supabase
       .from('recommended_trades')
-      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
-      .eq('status', 'closed')
-      .or('exit_reason.is.null,exit_reason.neq.pre_launch_reset')
-      .gte('recommended_at', LAUNCH_DATE);
+      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, classification, companies(name_ar, name_en)')
+      .eq('status', 'closed');
 
     if (closedErr) console.error('Error fetching allClosed:', closedErr);
 
     const { data: tp1HitTrades, error: tp1Err } = await supabase
       .from('recommended_trades')
-      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, companies(name_ar, name_en)')
-      .eq('status', 'tp1_hit')
-      .gte('recommended_at', LAUNCH_DATE);
+      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, classification, companies(name_ar, name_en)')
+      .eq('status', 'tp1_hit');
+
+    if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
 
     if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
 
@@ -186,7 +187,6 @@ export async function GET(req: NextRequest) {
 
       const entry = Number(t.entry_price || 0);
 
-      const hashIdx = (t.symbol || '').split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
       const normalizedDirection = (t.direction || 'buy').toLowerCase();
       const isBuy = normalizedDirection === 'buy';
 
@@ -195,56 +195,39 @@ export async function GET(req: NextRequest) {
       let finalEntry = entry > 0 ? entry : safeCurrentPrice;
 
       // ── Multi-Factor Smart Order Type Classification ───────────────────────────
-      // 1. Respect explicit LIMIT/BREAKOUT from signal generator if present
-      // 2. Override snap.order_type='MARKET' using RSI + Volume + ML multi-factor logic
-      // RSI & Vol fallback: deterministic hash per symbol (consistent across API calls)
-      const snapRsi = snap.rsi_14
-        ? parseFloat(snap.rsi_14)
-        : (isBuy ? 58 + (hashIdx % 12) : 38 - (hashIdx % 10));
-      const snapVol = snap.vol_ratio
-        ? parseFloat(snap.vol_ratio)
-        : parseFloat((1.1 + (hashIdx % 8) * 0.1).toFixed(1));
-      const snapConfirm = snap.confirmation_count ? parseInt(snap.confirmation_count) : 4;
-      const mlProb = t.ml_probability ? parseFloat(t.ml_probability) : 0.75;
+      // Strictly use verified snapshot values without pseudo-random fallbacks
+      const snapRsi = snap.rsi_14 != null ? parseFloat(snap.rsi_14) : null;
+      const snapVol = snap.vol_ratio != null ? parseFloat(snap.vol_ratio) : null;
+      const snapConfirm = snap.confirmation_count != null ? parseInt(snap.confirmation_count) : null;
+      const mlProb = t.ml_probability != null ? parseFloat(t.ml_probability) : null;
 
       if (snap.order_type && snap.order_type !== 'MARKET') {
         // Explicit LIMIT or BREAKOUT_TRIGGER stored by signal generator – use as-is
         orderType = snap.order_type;
         finalEntry = entry > 0 ? entry : safeCurrentPrice;
-      } else {
-        // Apply multi-factor classification (RSI + Volume momentum + ML band)
+      } else if (snapRsi != null && snapVol != null && mlProb != null) {
+        // Apply multi-factor classification only when genuine indicators are present
         if (isBuy) {
-          // ─ LIMIT BUY: 2 required factors ───────────────────────────────────
-          // Factor 1: RSI approaching/at overbought (≥65) – price is extended
-          // Factor 2: Volume declining/below surge (<1.35×) – no momentum backing the move
-          // Combined: price extended without volume = likely pullback to support
-          const limitFactor1_RSI   = snapRsi >= 65;         // overbought RSI
-          const limitFactor2_Vol   = snapVol < 1.35;        // no volume surge
+          const limitFactor1_RSI   = snapRsi >= 65;
+          const limitFactor2_Vol   = snapVol < 1.35;
           const isLimitCandidate   = limitFactor1_RSI && limitFactor2_Vol;
 
-          // ─ BREAKOUT BUY: 3 required factors ─────────────────────────────
-          // Factor 1: Volume surge (≥1.5× average) – strong institutional participation
-          // Factor 2: RSI in bullish build zone (52–67) – not overbought, has room to run
-          // Factor 3: ML confidence in high band (≥0.82) – model supports breakout conviction
-          const brkFactor1_Vol    = snapVol >= 1.50;        // institutional volume surge
-          const brkFactor2_RSI    = snapRsi >= 52 && snapRsi < 68; // bullish building zone
-          const brkFactor3_ML     = mlProb >= 0.82;         // model confidence supports it
+          const brkFactor1_Vol    = snapVol >= 1.50;
+          const brkFactor2_RSI    = snapRsi >= 52 && snapRsi < 68;
+          const brkFactor3_ML     = mlProb >= 0.82;
           const isBreakoutCandidate = brkFactor1_Vol && brkFactor2_RSI && brkFactor3_ML;
 
           if (isLimitCandidate) {
             orderType  = 'LIMIT';
-            // Entry = 2.5% below current = typical support pullback zone
             finalEntry = Number((safeCurrentPrice * 0.975).toFixed(2));
           } else if (isBreakoutCandidate) {
             orderType  = 'BREAKOUT_TRIGGER';
-            // Entry = 1.8% above current = resistance confirmation level
             finalEntry = Number((safeCurrentPrice * 1.018).toFixed(2));
           } else {
             orderType  = 'MARKET';
             finalEntry = entry > 0 ? entry : safeCurrentPrice;
           }
         } else {
-          // SELL direction
           const isLimitSell    = snapRsi <= 35 && snapVol < 1.35;
           const isBreakoutSell = snapVol >= 1.50 && snapRsi <= 55 && snapRsi > 32 && mlProb >= 0.82;
           if (isLimitSell) {
@@ -258,6 +241,9 @@ export async function GET(req: NextRequest) {
             finalEntry = entry > 0 ? entry : safeCurrentPrice;
           }
         }
+      } else {
+        orderType = 'MARKET';
+        finalEntry = entry > 0 ? entry : safeCurrentPrice;
       }
 
       let finalTp1 = Number(t.tp1 || (isBuy ? finalEntry * 1.05 : finalEntry * 0.95));
@@ -281,15 +267,17 @@ export async function GET(req: NextRequest) {
         : `توصية بيع وتخفيف مراكز لسهم ${companyNameStr} (${t.symbol}) بناءً على ضغط البيع الفني وكسر الدعم عند ${finalEntry} ج.م، مع مستهدف هبوط ${finalTp1} ج.م ووقف خسارة خروج ${finalSl} ج.م.`;
 
       const triggerCondAr = snap.trigger_condition_ar || (
-        orderType === 'BREAKOUT_TRIGGER'
-          ? (isBuy
-              ? `دخول مشروط باختراق المقاومة: حجم تداول استثنائي (${snapVol.toFixed(1)}× المتوسط) + RSI بناءي (${Math.round(snapRsi)}) + ثقة نموذج ${Math.round(mlProb * 100)}% = 3 عوامل تؤكد كسر المقاومة عند ${finalEntry.toFixed(2)} ج.م`
-              : `بيع مشروط بكسر الدعم: حجم (${snapVol.toFixed(1)}×) + RSI (${Math.round(snapRsi)}) + ثقة ${Math.round(mlProb * 100)}% يعزز كسر الدعم عند ${finalEntry.toFixed(2)} ج.م`)
-          : orderType === 'LIMIT'
-          ? (isBuy
-              ? `أمر شراء معلق عند منطقة الدعم: RSI ممتد (${Math.round(snapRsi)}) بدون زخم حجم (${snapVol.toFixed(1)}×) = تراجع متوقع للدعم عند ${finalEntry.toFixed(2)} ج.م`
-              : `بيع بسعر محدد عند الارتداد: RSI (${Math.round(snapRsi)}) + تراجع حجم (${snapVol.toFixed(1)}×) = فرصة بيع عند ${finalEntry.toFixed(2)} ج.م`)
-          : null
+        (snapVol != null && snapRsi != null && mlProb != null) ? (
+          orderType === 'BREAKOUT_TRIGGER'
+            ? (isBuy
+                ? `دخول مشروط باختراق المقاومة: حجم تداول استثنائي (${snapVol.toFixed(1)}× المتوسط) + RSI بناءي (${Math.round(snapRsi)}) + ثقة نموذج ${Math.round(mlProb * 100)}% = 3 عوامل تؤكد كسر المقاومة عند ${finalEntry.toFixed(2)} ج.م`
+                : `بيع مشروط بكسر الدعم: حجم (${snapVol.toFixed(1)}×) + RSI (${Math.round(snapRsi)}) + ثقة ${Math.round(mlProb * 100)}% يعزز كسر الدعم عند ${finalEntry.toFixed(2)} ج.م`)
+            : orderType === 'LIMIT'
+            ? (isBuy
+                ? `أمر شراء معلق عند منطقة الدعم: RSI ممتد (${Math.round(snapRsi)}) بدون زخم حجم (${snapVol.toFixed(1)}×) = تراجع متوقع للدعم عند ${finalEntry.toFixed(2)} ج.م`
+                : `بيع بسعر محدد عند الارتداد: RSI (${Math.round(snapRsi)}) + تراجع حجم (${snapVol.toFixed(1)}×) = فرصة بيع عند ${finalEntry.toFixed(2)} ج.م`)
+            : null
+        ) : null
       );
       const dynamicExpDate = snap.expected_target_date || expectedTargetDate;
 
@@ -299,24 +287,24 @@ export async function GET(req: NextRequest) {
       const tradeStyle = isScalp ? 'scalp' : 'swing';
       const tradeStyleAr = isScalp ? '⚡ مضاربة سريعة (Scalp)' : '📈 صفقة متأرجحة (Swing)';
 
-      const numVol = parseFloat(snap.vol_ratio || (1.1 + (hashIdx % 8) * 0.1).toFixed(1));
-      const numAtr = parseFloat(snap.atr_14 ? ((snap.atr_14 / (entry || 1)) * 100).toFixed(1) : (1.6 + (hashIdx % 5) * 0.3).toFixed(1));
-      const rsiVal = snap.rsi_14 ? Math.round(snap.rsi_14) : (isBuy ? 58 + (hashIdx % 12) : 38 - (hashIdx % 10));
+      const numVol = snap.vol_ratio != null ? parseFloat(snap.vol_ratio) : null;
+      const numAtr = snap.atr_14 != null && entry > 0 ? parseFloat(((snap.atr_14 / entry) * 100).toFixed(1)) : null;
+      const rsiVal = snap.rsi_14 != null ? Math.round(snap.rsi_14) : null;
 
       const scalpIndicators = isScalp ? {
-        volume_surge_ar: (snap.volume_surge_ar || numVol >= 1.4) ? `🔥 سيولة تجميعية مرتفعة (${numVol}x)` : null,
-        volatility_ar: (snap.volatility_ar || numAtr >= 2.0) ? `⚡ تذبذب نشط لخطف الأرباح (ATR ${numAtr}%)` : null,
-        momentum_velocity_ar: (snap.momentum_velocity_ar || (isBuy ? rsiVal >= 62 : rsiVal <= 38)) ? `🚀 زخم خاطف (RSI ${rsiVal})` : null,
-        news_catalyst_ar: snap.news_catalyst_ar || (hashIdx % 5 === 0 ? `📰 محفز إخباري إيجابي مؤخراً` : null),
+        volume_surge_ar: (snap.volume_surge_ar || (numVol != null && numVol >= 1.4)) ? `🔥 سيولة تجميعية مرتفعة (${numVol ?? ''}x)` : null,
+        volatility_ar: (snap.volatility_ar || (numAtr != null && numAtr >= 2.0)) ? `⚡ تذبذب نشط لخطف الأرباح (ATR ${numAtr ?? ''}%)` : null,
+        momentum_velocity_ar: (snap.momentum_velocity_ar || (rsiVal != null ? (isBuy ? rsiVal >= 62 : rsiVal <= 38) : false)) ? `🚀 زخم خاطف (RSI ${rsiVal ?? ''})` : null,
+        news_catalyst_ar: snap.news_catalyst_ar || null,
         is_confirmed_scalp: true
       } : null;
 
       // Dynamic Indicator Exit Triggers
       const currentPnlPct = isBuy ? ((safeCurrentPrice - finalEntry) / finalEntry) * 100 : ((finalEntry - safeCurrentPrice) / finalEntry) * 100;
-      const isRsiExhausted = isBuy && rsiVal >= 75 && currentPnlPct >= 3.0;
-      const isMacdDeadCross = snap.is_macd_dead_cross ?? (hashIdx % 11 === 0 && currentPnlPct >= 2.5);
-      const isBollingerUpperTouch = snap.is_bollinger_upper_touch ?? (hashIdx % 13 === 0 && currentPnlPct >= 3.5);
-      const isDeadMoneyStagnant = snap.is_dead_money_stagnant ?? (hashIdx % 17 === 0 && Math.abs(currentPnlPct) < 0.5);
+      const isRsiExhausted = rsiVal != null && isBuy && rsiVal >= 75 && currentPnlPct >= 3.0;
+      const isMacdDeadCross = Boolean(snap.is_macd_dead_cross);
+      const isBollingerUpperTouch = Boolean(snap.is_bollinger_upper_touch);
+      const isDeadMoneyStagnant = Boolean(snap.is_dead_money_stagnant);
 
       const dynamicExitAlerts = {
         is_rsi_exhausted: isRsiExhausted,
@@ -358,23 +346,19 @@ export async function GET(req: NextRequest) {
         }
       ];
 
-      const isWyckoffSpring = snap.is_wyckoff_spring ?? (hashIdx % 7 === 0);
+      const isWyckoffSpring = Boolean(snap.is_wyckoff_spring);
       const wyckoffBadgeAr = isWyckoffSpring ? (snap.wyckoff_badge_ar || '🏛️ تجميع وايكوف مؤسسي (Spring)') : null;
-      const priceChannel = snap.price_channel || {
-        upper: Number((finalEntry * 1.08).toFixed(2)),
-        lower: Number((finalEntry * 0.94).toFixed(2)),
-        median: Number((finalEntry * 1.01).toFixed(2))
-      };
+      const priceChannel = snap.price_channel || null;
 
-      const patternBadgeAr = snap.pattern_badge_ar || (hashIdx % 5 === 0 ? '☕ نموذج الكوب والعروة (مستهدف صعود)' : hashIdx % 9 === 0 ? '📉 W قاع مزدوج مؤكد' : null);
-      const channelBadgeAr = snap.channel_badge_ar || (priceChannel?.badge_ar) || (hashIdx % 6 === 0 ? '🚀 اختراق سقف القناة الصاعدة' : '📊 قناة سعرية صاعدة');
-      const fundamentalBadgeAr = snap.fundamental_badge_ar || '💎 خصم 28% عن القيمة العادلة';
-      const fundamentalScore = snap.fundamental_score || 78.5;
-      const fundamentalTier = snap.fundamental_tier || '💎 ممتازة (نمو وقيمة)';
-      const smartMoneyBadgeAr = snap.smart_money_badge_ar || (hashIdx % 3 === 0 ? '🏦 تجميع مؤسسي كثيف' : '📈 تدفق سيولة إيجابي');
-      const smartMoneyScore = snap.smart_money_score || 82.0;
-      const ictSmcBadgeAr = snap.ict_smc_badge_ar || (hashIdx % 4 === 0 ? '🎯 SMC: كُتلة أوامر OB + كسر هيكل MSS' : '✨ ICT: فجوة سعرية عادلة (Bullish FVG)');
-      const elliottBadgeAr = snap.elliott_badge_ar || (hashIdx % 7 === 0 ? '🚀 إليوت: انطلاق الموجة 3 الداَفعة' : '⏳ انعطاف زمني متوقع (دورة فيبوناتشي)');
+      const patternBadgeAr = snap.pattern_badge_ar || null;
+      const channelBadgeAr = snap.channel_badge_ar || (priceChannel?.badge_ar) || null;
+      const fundamentalBadgeAr = snap.fundamental_badge_ar || null;
+      const fundamentalScore = snap.fundamental_score != null ? Number(snap.fundamental_score) : null;
+      const fundamentalTier = snap.fundamental_tier || null;
+      const smartMoneyBadgeAr = snap.smart_money_badge_ar || null;
+      const smartMoneyScore = snap.smart_money_score != null ? Number(snap.smart_money_score) : null;
+      const ictSmcBadgeAr = snap.ict_smc_badge_ar || null;
+      const elliottBadgeAr = snap.elliott_badge_ar || null;
 
       // Compute activation status:
       let isActivated = true;
@@ -398,8 +382,17 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const classification = (t.classification || (t.source === 'clean_oos_backtest' ? 'CLEAN_OOS' : (t.source === 'live_production' ? 'PRODUCTION' : 'LEGACY_RESEARCH'))).toUpperCase();
+      const classificationBadgeAr = classification === 'PRODUCTION' 
+        ? '🟢 أداء حي معتمد (Live Production)' 
+        : classification === 'CLEAN_OOS' 
+        ? '🔬 تقييم خارج العينة (Clean OOS)' 
+        : '📜 أبحاث سابقة (Legacy Research)';
+
       return {
         ...t,
+        classification: classification,
+        classification_badge_ar: classificationBadgeAr,
         entry_price: finalEntry,
         tp1: finalTp1,
         tp2: finalTp2,
@@ -650,19 +643,100 @@ export async function GET(req: NextRequest) {
     const premierQualityMetrics  = buildQualityMetrics(closedPremierTrades, tp1HitPremier);
     const standardQualityMetrics = buildQualityMetrics(closedStandardTrades, tp1HitStandard);
     const combinedQualityMetrics = buildQualityMetrics(closedBuyTrades, tp1HitBuy);
+    const allClosedList = (allClosed || []).map(mapTradeDetails);
+    const allTp1List = (tp1HitTrades || []).map(mapTradeDetails);
 
-    const closedPremierCount = closedPremierTrades.length;
-    const premierWinRate = closedPremierCount > 0 ? (closedPremierTrades.filter((t: any) => Number(t.pnl_percent) > 0).length / closedPremierCount) * 100 : 0;
-    const premierTotalPnl = closedPremierCount > 0 ? closedPremierTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 0;
-    const premierAvgPnl = closedPremierCount > 0 ? premierTotalPnl / closedPremierCount : 0;
+    // ── FOUR-TIER TAXONOMY SEGREGATION (Strictly unmerged) ────────────────────
+    // Tier 1: PRODUCTION (Live certified post-remediation trades only)
+    const prodActive = buyTrades.filter((t: any) => t.classification === 'PRODUCTION');
+    const prodClosed = allClosedList.filter((t: any) => t.classification === 'PRODUCTION');
+    const prodWins = prodClosed.filter((t: any) => Number(t.pnl_percent || 0) > 0).length;
+    const prodLosses = prodClosed.filter((t: any) => Number(t.pnl_percent || 0) < 0).length;
+    const prodTotalPnl = prodClosed.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0);
+    const prodWinRate = prodClosed.length >= 30 ? parseFloat(((prodWins / prodClosed.length) * 100).toFixed(1)) : null;
+    const prodAvgPnl = prodClosed.length > 0 ? parseFloat((prodTotalPnl / prodClosed.length).toFixed(2)) : null;
 
-    const closedStandardCount = closedStandardTrades.length;
-    const standardWinRate = closedStandardCount > 0 ? (closedStandardTrades.filter((t: any) => Number(t.pnl_percent) > 0).length / closedStandardCount) * 100 : 0;
-    const standardTotalPnl = closedStandardCount > 0 ? closedStandardTrades.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0) : 0;
-    const standardAvgPnl = closedStandardCount > 0 ? standardTotalPnl / closedStandardCount : 0;
+    // Tier 2: CLEAN_OOS (Strict out-of-sample backtest evaluations from Task 10.1/10.2)
+    const oosActive = buyTrades.filter((t: any) => t.classification === 'CLEAN_OOS');
+    const oosClosed = allClosedList.filter((t: any) => t.classification === 'CLEAN_OOS');
+    const oosWins = oosClosed.filter((t: any) => Number(t.pnl_percent || 0) > 0).length;
+    const oosLosses = oosClosed.filter((t: any) => Number(t.pnl_percent || 0) < 0).length;
+    const oosTotalPnl = oosClosed.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0);
+    const oosWinRate = oosClosed.length >= 30 ? parseFloat(((oosWins / oosClosed.length) * 100).toFixed(1)) : null;
+    const oosAvgPnl = oosClosed.length > 0 ? parseFloat((oosTotalPnl / oosClosed.length).toFixed(2)) : null;
 
+    // Tier 3: LEGACY_RESEARCH (Pre-remediation trades - reference/audit only, not certified)
+    const legacyActive = buyTrades.filter((t: any) => t.classification === 'LEGACY_RESEARCH');
+    const legacyClosed = allClosedList.filter((t: any) => t.classification === 'LEGACY_RESEARCH');
+    const legacyWins = legacyClosed.filter((t: any) => Number(t.pnl_percent || 0) > 0).length;
+    const legacyLosses = legacyClosed.filter((t: any) => Number(t.pnl_percent || 0) < 0).length;
+    const legacyTotalPnl = legacyClosed.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0);
+    const legacyWinRate = legacyClosed.length > 0 ? parseFloat(((legacyWins / legacyClosed.length) * 100).toFixed(1)) : 0;
+    const legacyAvgPnl = legacyClosed.length > 0 ? parseFloat((legacyTotalPnl / legacyClosed.length).toFixed(2)) : 0;
+
+    // Tier 4: ALL_HISTORICAL (Complete uncurated archive for full transparency)
+    const allHistoricalTradesCount = processedTrades.length + allClosedList.length;
 
     return NextResponse.json({
+      // ── Four-Tier Taxonomy (Strictly unmerged) ───────────────────────────
+      taxonomy: {
+        production: {
+          tier_id: 'PRODUCTION',
+          label_ar: '🟢 الأداء الحي المعتمد (Certified Live Production)',
+          description_ar: 'الصفقات الحية الفعلية بعد اعتماد النظام واكتمال بوابة الجودة Gate 5.',
+          is_certified: true,
+          total_trades: prodActive.length + prodClosed.length,
+          active_trades: prodActive.length,
+          closed_trades: prodClosed.length,
+          winning_trades: prodWins,
+          losing_trades: prodLosses,
+          win_rate: prodWinRate,
+          total_pnl: parseFloat(prodTotalPnl.toFixed(1)),
+          avg_pnl: prodAvgPnl,
+          trades: prodActive,
+        },
+        clean_oos: {
+          tier_id: 'CLEAN_OOS',
+          label_ar: '🔬 تقييم خارج العينة النظيف (Clean OOS Backtest)',
+          description_ar: 'نتائج التقييم المستقل للنموذج على فترات خارج عينة التدريب (Tasks 10.1/10.2) للتحقق من تفوق النموذج (Edge).',
+          is_certified: true,
+          total_trades: oosActive.length + oosClosed.length,
+          active_trades: oosActive.length,
+          closed_trades: oosClosed.length,
+          winning_trades: oosWins,
+          losing_trades: oosLosses,
+          win_rate: oosWinRate,
+          total_pnl: parseFloat(oosTotalPnl.toFixed(1)),
+          avg_pnl: oosAvgPnl,
+          trades: oosActive,
+        },
+        legacy_research: {
+          tier_id: 'LEGACY_RESEARCH',
+          label_ar: '📜 الأبحاث السابقة غير المعتمدة (Legacy Research)',
+          description_ar: 'بيانات الصفقات السابقة قبل اكتمال برنامج الإصلاح، محفوظة كمرجع تاريخي وتدقيقي ولا تُحتسب ضمن الأداء الحي المعتمد.',
+          is_certified: false,
+          disclaimer_ar: '⚠️ هذه البيانات لأغراض التدقيق والأرشيف فقط ولا تمثل أداءً حياً معتمداً.',
+          total_trades: legacyActive.length + legacyClosed.length,
+          active_trades: legacyActive.length,
+          closed_trades: legacyClosed.length,
+          winning_trades: legacyWins,
+          losing_trades: legacyLosses,
+          win_rate: parseFloat(legacyWinRate.toFixed(1)),
+          total_pnl: parseFloat(legacyTotalPnl.toFixed(1)),
+          avg_pnl: parseFloat(legacyAvgPnl.toFixed(2)),
+          trades: legacyActive,
+        },
+        all_historical: {
+          tier_id: 'ALL_HISTORICAL',
+          label_ar: '📋 سجل التدقيق الشامل (All Historical Audit Log)',
+          description_ar: 'السجل الكامل لكافة الصفقات المسجلة بقاعدة البيانات منذ التأسيس بدون أي حذف.',
+          is_certified: false,
+          total_trades: allHistoricalTradesCount,
+          closed_trades: allClosedList.length,
+          active_trades: processedTrades.length,
+        }
+      },
+
       // ── Primary: Top premier picks (sorted by composite_score) ────────────
       trades:          premierBuyTrades.length > 0 ? premierBuyTrades : primaryBuyTrades,
       all_buy_trades:  primaryBuyTrades,      // Primary unique stock trades
@@ -676,55 +750,6 @@ export async function GET(req: NextRequest) {
       // ── Quality Metrics: TP1 vs TP2 vs SL breakdown ──────────────────────
       quality_metrics: combinedQualityMetrics,
 
-      // ── Dual-Tier Evaluation Breakdown ───────────────────────────────────
-      tier_evaluations: {
-        premier_elite: {
-          label_ar: '👑 صفقات النخبة الذهبية',
-          confidence_range_ar: 'ثقة نموذج v6: 88% - 99% [الرئيسي]',
-          total_signals: premierBuyTrades.length,
-          active_trades: premierBuyTrades.length,
-          activated_trades: premierBuyTrades.filter((t: any) => t.is_activated).length,
-          pending_trades: premierBuyTrades.filter((t: any) => !t.is_activated).length,
-          closed_trades: closedPremierCount,
-          win_rate: parseFloat(premierWinRate.toFixed(1)),
-          total_pnl: parseFloat(premierTotalPnl.toFixed(1)),
-          avg_pnl: parseFloat(premierAvgPnl.toFixed(2)),
-          quality_metrics: premierQualityMetrics,
-          trades: premierBuyTrades,
-          closed_trades_list: [...closedPremierTrades, ...tp1HitPremier],
-        },
-        standard_market: {
-          label_ar: '🌐 إشارات السوق (ثقة 65% - 87%)',
-          confidence_range_ar: 'ثقة نموذج v6: 65% - 87%',
-          total_signals: standardBuyTrades.length,
-          active_trades: standardBuyTrades.length,
-          activated_trades: standardBuyTrades.filter((t: any) => t.is_activated).length,
-          pending_trades: standardBuyTrades.filter((t: any) => !t.is_activated).length,
-          closed_trades: closedStandardCount,
-          win_rate: parseFloat(standardWinRate.toFixed(1)),
-          total_pnl: parseFloat(standardTotalPnl.toFixed(1)),
-          avg_pnl: parseFloat(standardAvgPnl.toFixed(2)),
-          quality_metrics: standardQualityMetrics,
-          trades: standardBuyTrades,
-          closed_trades_list: [...closedStandardTrades, ...tp1HitStandard],
-        },
-        combined: {
-          label_ar: '📊 التقييم الشامل المدمج (كافة الإشارات)',
-          confidence_range_ar: 'كافة درجات الثقة: 65% - 99%',
-          total_signals: buyTrades.length,
-          active_trades: buyTrades.length,
-          activated_trades: buyTrades.filter((t: any) => t.is_activated).length,
-          pending_trades: buyTrades.filter((t: any) => !t.is_activated).length,
-          closed_trades: closedCount,
-          win_rate: parseFloat(winRate.toFixed(1)),
-          total_pnl: parseFloat(totalPnl.toFixed(1)),
-          avg_pnl: parseFloat(avgPnl.toFixed(2)),
-          quality_metrics: combinedQualityMetrics,
-          trades: buyTrades,
-          closed_trades_list: [...closedBuyTrades, ...tp1HitBuy],
-        }
-      },
-
       // ── Ranking metadata ────────────────────────────────────────────────
       ranking: {
         total_active:   primaryBuyTrades.length,
@@ -733,19 +758,20 @@ export async function GET(req: NextRequest) {
         formula:        'ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)',
       },
 
-      // ── Platform performance stats (Defaults to Premier Elite) ─────────
+      // ── Certified Live Production Performance stats (Strictly Gate 5+) ──
       stats: {
-        total_trades:    premierBuyTrades.length + closedPremierCount,
-        active_trades:   premierBuyTrades.length,
-        activated_trades: premierBuyTrades.filter((t: any) => t.is_activated).length,
-        pending_trades:  premierBuyTrades.filter((t: any) => !t.is_activated).length,
-        closed_trades:   closedPremierCount,
-        winning_trades:  closedPremierTrades.filter((t: any) => Number(t.pnl_percent || 0) > 0).length,
-        losing_trades:   closedPremierTrades.filter((t: any) => Number(t.pnl_percent || 0) < 0).length,
-        win_rate:        parseFloat(premierWinRate.toFixed(1)),
-        total_pnl:       parseFloat(premierTotalPnl.toFixed(1)),
-        avg_pnl:         parseFloat(premierAvgPnl.toFixed(2)),
-        confidence_range_ar: 'ثقة نموذج v6: 88% - 99% [الرئيسي]',
+        total_trades:    prodActive.length + prodClosed.length,
+        active_trades:   prodActive.length,
+        activated_trades: prodActive.filter((t: any) => t.is_activated).length,
+        pending_trades:  prodActive.filter((t: any) => !t.is_activated).length,
+        closed_trades:   prodClosed.length,
+        winning_trades:  prodWins,
+        losing_trades:   prodLosses,
+        win_rate:        prodWinRate,
+        total_pnl:       parseFloat(prodTotalPnl.toFixed(1)),
+        avg_pnl:         prodAvgPnl,
+        is_certified:    true,
+        tier:            'PRODUCTION'
       }
     });
   } catch (error: any) {

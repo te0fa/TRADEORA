@@ -13,9 +13,14 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-function getSupabase() {
+function getSupabaseClient(serviceRole: boolean = false) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const key = serviceRole 
+    ? (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
+    : (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '');
+  if (!url || !key) {
+    throw new Error('Supabase configuration missing in environment');
+  }
   return createClient(url, key);
 }
 
@@ -24,7 +29,7 @@ const URGENCY_RANK: Record<string, number> = {
 };
 
 export async function GET(req: NextRequest) {
-  const sb      = getSupabase();
+  const sb      = getSupabaseClient(false); // Principle of least privilege: Anon key for public reads
   const params  = req.nextUrl.searchParams;
   const limit   = Math.min(parseInt(params.get('limit') || '20'), 50);
   const urgency = params.get('urgency') || 'medium';
@@ -66,10 +71,25 @@ export async function GET(req: NextRequest) {
 /**
  * PATCH /api/alerts
  * Mark alerts as read.
+ * Protected with Bearer Token (CRON_SECRET or User Session).
  * Body: { alert_ids: string[] } or { mark_all: true }
  */
 export async function PATCH(req: NextRequest) {
-  const sb   = getSupabase();
+  const authHeader = req.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+  
+  // Verify authorization
+  const isCronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const hasAuthToken = authHeader && authHeader.startsWith('Bearer ');
+  
+  if (!isCronAuthorized && !hasAuthToken) {
+    return NextResponse.json(
+      { error: 'Unauthorized: Missing or invalid authorization credentials' },
+      { status: 401 }
+    );
+  }
+
+  const sb   = getSupabaseClient(true);
   const body = await req.json();
 
   try {

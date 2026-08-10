@@ -14,8 +14,11 @@ const NO_CACHE = {
 };
 
 function getSb() {
-  const supabaseUrl = 'https://kdjsguozssxvtmlmqhpz.supabase.co';
-  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkanNndW96c3N4dnRtbG1xaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzg3MzQwMywiZXhwIjoyMDk5NDQ5NDAzfQ.sCyCHFnLo7MWKeUmAb6s5j0zT5PzNBBnVAls1LcPclM';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase credentials missing from environment variables');
+  }
   return createClient(supabaseUrl, supabaseKey, {
     global: { fetch: (url, options) => fetch(url, { ...options, cache: 'no-store' }) }
   });

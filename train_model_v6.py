@@ -35,8 +35,8 @@ sb = create_client(
 COCKROACH_URL_RAW = os.getenv("DATABASE_URL")
 if not COCKROACH_URL_RAW:
     raise EnvironmentError(
-        "DATABASE_URL not set in .env\n"
-        "Add: DATABASE_URL=postgresql://tradeora:PASSWORD@host:26257/defaultdb"
+        "DATABASE_URL not set in environment\n"
+        "Please provide DATABASE_URL in .env"
     )
 COCKROACH_URL = COCKROACH_URL_RAW.replace("sslmode=verify-full", "sslmode=require")
 

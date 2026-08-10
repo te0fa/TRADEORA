@@ -1,0 +1,52 @@
+{
+  "gate_status": "APPROVED",
+  "block_reasons": [],
+  "backtest_summary": {
+    "start_date": "2026-05-01",
+    "end_date": "2026-05-20",
+    "initial_capital": 100000.0,
+    "final_equity": 100000.0,
+    "total_return_pct": 0.0,
+    "total_trades": 0,
+    "overall_win_rate": 0.0,
+    "total_friction_paid_egp": 0.0,
+    "forbidden_sources_filtered": [
+      "intraday_consensus",
+      "investing",
+      "mubasher"
+    ],
+    "folds_summary": [
+      {
+        "fold_index": 1,
+        "oos_period": "2026-05-17 to 2026-05-20",
+        "trades_count": 0,
+        "win_rate": 0.0,
+        "net_pnl_egp": 0.0
+      }
+    ]
+  },
+  "expectancy_metrics": {
+    "expectancy_pct": 0.0,
+    "avg_win_pct": 0.0,
+    "avg_loss_pct": 0.0,
+    "win_rate": 0.0
+  },
+  "profit_factor": 0.0,
+  "bootstrap_95_ci": {
+    "ci_lower_95": 0.0,
+    "ci_upper_95": 0.0,
+    "mean_expectancy": 0.0
+  },
+  "monte_carlo_test": {
+    "p_value": 1.0,
+    "random_mean_return": 0.0,
+    "statistically_significant": false
+  },
+  "fold_stability_std": 0.0,
+  "baselines_compared": {
+    "random_monte_carlo": 0.0,
+    "buy_and_hold": "0.0% (Equal Weight)",
+    "egx30_total_return": "0.0% (Indexed)",
+    "cbe_t_bills_annual_rate": "22.5%"
+  }
+}

@@ -2,7 +2,7 @@ import os, datetime
 from supabase import create_client
 
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://kdjsguozssxvtmlmqhpz.supabase.co"
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkanNndW96c3N4dnRtbG1xaHB6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzg3MzQwMywiZXhwIjoyMDk5NDQ5NDAzfQ.sCyCHFnLo7MWKeUmAb6s5j0zT5PzNBBnVAls1LcPclM"
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 today_str = datetime.date.today().isoformat() # 2026-08-02

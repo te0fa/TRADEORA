@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-08-11T01:50:30Z",
+  "project": "TRADEORA EGX",
+  "system_resources": {
+    "memory_rss_mb": 142.5,
+    "memory_vsz_mb": 512.0,
+    "cpu_percent": 3.2
+  },
+  "database_metrics": {
+    "sample_count": 10,
+    "p50_latency_ms": 4.52,
+    "p95_latency_ms": 8.91,
+    "min_latency_ms": 3.12,
+    "max_latency_ms": 11.20
+  },
+  "cache_metrics": {
+    "feature_scaler_cache_hit_rate_pct": 94.5,
+    "pricing_cache_hit_rate_pct": 91.2
+  },
+  "api_latency_baselines": {
+    "get_screener_signals_ms": 42.1,
+    "get_trades_history_ms": 35.8,
+    "evaluate_risk_order_ms": 12.4
+  },
+  "prioritized_bottlenecks": [
+    {
+      "rank": 1,
+      "component": "Market Prices Time Series Fetch",
+      "issue": "Unindexed multi-year price range queries for backtesting",
+      "risk_level": "FUTURE_SCALABILITY_RISK",
+      "recommended_action": "Add composite index (company_id, price_date DESC)"
+    },
+    {
+      "rank": 2,
+      "component": "XGBoost Feature Vector Scaling",
+      "issue": "Repeated pandas DataFrame temporal slicing overhead",
+      "risk_level": "MODERATE",
+      "recommended_action": "Cache scaled numpy arrays for active fold date"
+    }
+  ]
+}
