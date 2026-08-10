@@ -17,9 +17,15 @@ class TradeNewsInterpreter:
         sb = get_db_client()
         if not sb:
             return {
-                "summary": "التقييم الفني محايد لعدم الاتصال بقاعدة البيانات.",
+                "symbol": symbol,
+                "direction": direction,
+                "explanation": "التقييم الفني محايد لعدم الاتصال بقاعدة البيانات.",
                 "corporate_sentiment": "neutral",
-                "macro_regime": "مستقر"
+                "macro_regime": "مستقر",
+                "pos_corp_count": 0,
+                "neg_corp_count": 0,
+                "macro_summary": "غير متصل",
+                "probability_adjustment": 0.0
             }
 
         cairo_tz = pytz.timezone('Africa/Cairo')

@@ -1,0 +1,17 @@
+import os
+import psycopg2
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
+conn = psycopg2.connect(os.getenv('DATABASE_URL'))
+conn.autocommit = True
+
+sql_file = Path(__file__).parent.parent / 'migrations' / '08_2_create_model_shadow_predictions.sql'
+sql = sql_file.read_text(encoding='utf-8')
+
+with conn.cursor() as cur:
+    cur.execute(sql)
+    print("✅ Migration 08_2_create_model_shadow_predictions.sql applied successfully!")
+
+conn.close()

@@ -1,6 +1,6 @@
 const { Pool } = require('pg');
 
-const COCKROACH_URL = process.env.DATABASE_URL || 'postgresql://tradeora:gdW77s_jShDK8nChydbbCg@raw-donkey-30500.j77.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full';
+const COCKROACH_URL = process.env.DATABASE_URL;
 
 async function main() {
   console.log('Adding foreign_ownership_pct and free_float_pct columns to company_fundamentals...');

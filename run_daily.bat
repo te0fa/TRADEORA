@@ -3,10 +3,9 @@ cd /d "E:\zaora\TRADEORA"
 set PYTHONPATH=E:\zaora\TRADEORA
 python main.py
 echo Main finished at %date% %time% >> logs\scheduler.log
-python track_trades.py
-echo Track trades finished at %date% %time% >> logs\scheduler.log
-python signal_guardian.py
-echo Guardian finished at %date% %time% >> logs\scheduler.log
+REM Canonical Exit Engine (Replaces legacy track_trades.py and signal_guardian.py)
+python trade_monitor.py
+echo Canonical Trade Monitor finished at %date% %time% >> logs\scheduler.log
 
 echo [%TIME%] Running TV Backfill (daily candles)...
 python tv_backfill.py --incremental

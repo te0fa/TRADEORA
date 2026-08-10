@@ -68,6 +68,8 @@ export default function PerformancePage() {
   const [platformTrades, setPlatformTrades] = useState<any[]>([]);
   const [platformSellSignals, setPlatformSellSignals] = useState<any[]>([]);
   const [platformStats, setPlatformStats] = useState<any>(null);
+  const [taxonomyData, setTaxonomyData] = useState<any>(null);
+  const [taxonomyTier, setTaxonomyTier] = useState<'production' | 'clean_oos' | 'legacy_research' | 'all_historical'>('production');
   const [tierEvaluations, setTierEvaluations] = useState<any>(null);
   const [qualityMetrics, setQualityMetrics] = useState<any>(null);
   const [evaluationTier, setEvaluationTier] = useState<'premier_elite' | 'standard_market' | 'combined'>('premier_elite');
@@ -98,11 +100,9 @@ export default function PerformancePage() {
   const [personalStats, setPersonalStats] = useState<any>(null);
 
   const activeTradesForModal = useMemo(() => {
-    // Use tier-specific trades when a tier is selected (premier=119, standard=85, combined=204)
-    // This ensures the modal respects the currently selected evaluation tier
     let sourceTrades: any[] = [];
-    if (tierEvaluations && tierEvaluations[evaluationTier]?.trades?.length > 0) {
-      sourceTrades = tierEvaluations[evaluationTier].trades;
+    if (taxonomyData && taxonomyData[taxonomyTier]?.trades?.length > 0) {
+      sourceTrades = taxonomyData[taxonomyTier].trades;
     } else {
       sourceTrades = platformTrades;
     }
@@ -129,12 +129,11 @@ export default function PerformancePage() {
         is_top_pick: t.is_top_pick ?? false,
         is_shariah_compliant: t.is_shariah_compliant ?? false,
         status: t.status,
-        is_activated: t.is_activated ?? (t.order_type === 'MARKET' || !t.order_type),  // ✅ pass activation status
+        is_activated: t.is_activated ?? (t.order_type === 'MARKET' || !t.order_type),
         activation_status_ar: t.activation_status_ar,
         scalp_indicators: t.scalp_indicators,
         dynamic_exit_alerts: t.dynamic_exit_alerts,
         trade_steps_ar: t.trade_steps_ar,
-        // Pass extra enrichment fields
         is_wyckoff_spring: t.is_wyckoff_spring,
         wyckoff_badge_ar: t.wyckoff_badge_ar,
         pattern_badge_ar: t.pattern_badge_ar,
@@ -150,9 +149,10 @@ export default function PerformancePage() {
         composite_score: t.composite_score,
         rank: t.rank,
         rank_tier: t.rank_tier,
+        classification: t.classification,
+        classification_badge_ar: t.classification_badge_ar,
       }));
-  }, [platformTrades, tierEvaluations, evaluationTier]);
-
+  }, [platformTrades, taxonomyData, taxonomyTier]);
 
   const sellSignalsForModal = useMemo(() => {
     return platformSellSignals.map((t: any) => ({
@@ -194,6 +194,7 @@ export default function PerformancePage() {
           setPlatformTrades(platData.all_buy_trades || platData.trades || []);
           setPlatformSellSignals(platData.sell_signals || []);
           setPlatformStats(platData.stats || null);
+          setTaxonomyData(platData.taxonomy || null);
           setTierEvaluations(platData.tier_evaluations || null);
           setQualityMetrics(platData.quality_metrics || null);
 
@@ -230,20 +231,19 @@ export default function PerformancePage() {
   };
 
   const activeStats = useMemo(() => {
-    if (tierEvaluations && tierEvaluations[evaluationTier]) {
-      return tierEvaluations[evaluationTier];
+    if (taxonomyData && taxonomyData[taxonomyTier]) {
+      return taxonomyData[taxonomyTier];
     }
     return platformStats || {
-      win_rate: 0,
+      win_rate: null,
       total_pnl: 0,
-      total_signals: 0,
+      total_trades: 0,
       active_trades: 0,
       activated_trades: 0,
       closed_trades: 0,
-      avg_pnl: 0,
-      confidence_range_ar: 'ثقة نموذج v6: 85% - 99%'
+      avg_pnl: null,
     };
-  }, [tierEvaluations, evaluationTier, platformStats]);
+  }, [taxonomyData, taxonomyTier, platformStats]);
 
   const platformPieData = useMemo(() => {
     if (!activeStats) return [];
@@ -369,35 +369,95 @@ export default function PerformancePage() {
           >
             {platformStats ? (
               <>
-                {/* Dual-Tier Evaluation Dropdown Selector */}
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-zinc-900/90 p-4 rounded-2xl border border-zinc-800 font-sans">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">👑</span>
-                    <div>
-                      <span className="text-sm font-bold text-white block">اختر نطاق تقييم أداء المنصة والنموذج:</span>
-                      <span className="text-xs text-amber-400 font-mono font-bold">
-                        {activeStats?.confidence_range_ar || 'ثقة النموذج: 85% - 99%'}
+                {/* Four-Tier Taxonomy Selector Tabs */}
+                <div className="flex flex-col gap-3 mb-6">
+                  <div className="flex flex-wrap items-center gap-2 bg-zinc-900/90 p-2 rounded-2xl border border-zinc-800 font-sans">
+                    <button
+                      onClick={() => setTaxonomyTier('production')}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        taxonomyTier === 'production'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-lg'
+                          : 'text-zinc-400 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <span>🟢</span>
+                      <span>الأداء الحي المعتمد (Production)</span>
+                      {taxonomyData?.production?.closed_trades != null && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-black/40 text-[10px] font-mono">
+                          {taxonomyData.production.closed_trades}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setTaxonomyTier('clean_oos')}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        taxonomyTier === 'clean_oos'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-lg'
+                          : 'text-zinc-400 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <span>🔬</span>
+                      <span>تقييم خارج العينة (Clean OOS)</span>
+                      {taxonomyData?.clean_oos?.closed_trades != null && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-black/40 text-[10px] font-mono">
+                          {taxonomyData.clean_oos.closed_trades}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setTaxonomyTier('legacy_research')}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        taxonomyTier === 'legacy_research'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-lg'
+                          : 'text-zinc-400 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <span>📜</span>
+                      <span>أبحاث سابقة (Legacy Research)</span>
+                      {taxonomyData?.legacy_research?.closed_trades != null && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-black/40 text-[10px] font-mono">
+                          {taxonomyData.legacy_research.closed_trades}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setTaxonomyTier('all_historical')}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                        taxonomyTier === 'all_historical'
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-lg'
+                          : 'text-zinc-400 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <span>📋</span>
+                      <span>سجل التدقيق الشامل (All Historical)</span>
+                      {taxonomyData?.all_historical?.total_trades != null && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-black/40 text-[10px] font-mono">
+                          {taxonomyData.all_historical.total_trades}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {taxonomyTier === 'legacy_research' && (
+                    <div className="px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+                      <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        <strong>تنبيه الشفافية والامتثال:</strong> هذه البيانات لأغراض الأرشيف والتدقيق التاريخي فقط، وتم تسجيلها قبل اكتمال برنامج الإصلاح، ولا تُعد دليلاً على الأداء الحي المعتمد.
                       </span>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                    <select
-                      value={evaluationTier}
-                      onChange={(e) => setEvaluationTier(e.target.value as any)}
-                      className="px-4 py-2 bg-black border border-amber-500/40 rounded-xl text-amber-400 font-bold text-xs focus:outline-none cursor-pointer hover:border-amber-400 transition-colors shadow-lg"
-                    >
-                      <option value="premier_elite">👑 صفقات النخبة الذهبية (درجة ثقة 88% - 99%) [الرئيسي] ({tierEvaluations?.premier_elite?.total_signals || 0} صفقة)</option>
-                      <option value="standard_market">🌐 إشارات السوق (ثقة 65% - 87%) ({tierEvaluations?.standard_market?.total_signals || 0} صفقة)</option>
-                      <option value="combined">📊 التقييم الشامل (كافة الأسهم الرئيسية - {tierEvaluations?.combined?.total_signals || 0} صفقة)</option>
-                    </select>
+                  )}
 
-                    {tierEvaluations?.sub_trades_count ? (
-                      <div className="px-3.5 py-2 bg-purple-500/15 border border-purple-500/40 rounded-xl text-purple-300 font-bold text-xs flex items-center gap-1.5 shadow-lg">
-                        <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-                        <span>{tierEvaluations.sub_trades_label_ar || `+${tierEvaluations.sub_trades_count} صفقة مضاربة فرعية`}</span>
-                      </div>
-                    ) : null}
-                  </div>
+                  {taxonomyTier === 'production' && (
+                    <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                      <span className="text-base">🛡️</span>
+                      <span>
+                        <strong>الأداء الحي المعتمد:</strong> يتم اعتماد الصفقات الحية رسمياً بعد اجتياز بوابة الاعتماد Gate 5 بموجب مقاييس الأداء الصارمة.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">

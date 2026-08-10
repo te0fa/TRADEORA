@@ -247,53 +247,28 @@ export default function DashboardPage({ params }: Props) {
 
           const open = price?.open_price ? Number(price.open_price) : 0;
           const close = price?.close_price ? Number(price.close_price) : 0;
-          let changePercent = open > 0 && close > 0 ? Number((((close - open) / open) * 100).toFixed(2)) : 0;
+          const changePercent = open > 0 && close > 0 ? Number((((close - open) / open) * 100).toFixed(2)) : 0;
 
-          if (changePercent === 0 && close > 0) {
-            const hash = s.companies.symbol.charCodeAt(0);
-            changePercent = Number(((hash % 7) - 3.2).toFixed(2));
-          }
-
-          const rawWinRate = s.win_rate_tp1 !== null && s.win_rate_tp1 !== undefined ? Number(s.win_rate_tp1) : 78;
-          const winRateVal = rawWinRate > 1 ? rawWinRate : rawWinRate * 100;
+          const rawWinRate = s.win_rate_tp1 !== null && s.win_rate_tp1 !== undefined ? Number(s.win_rate_tp1) : null;
+          const winRateVal = rawWinRate != null ? (rawWinRate > 1 ? rawWinRate : rawWinRate * 100) : null;
 
           return {
             symbol: s.companies.symbol,
             name: (isAr ? s.companies.name_ar : s.companies.name_en) || s.companies.symbol,
             signal: 'buy',
-            price: close || 24.50,
+            price: close || null,
             change: changePercent,
-            winRate: Math.round(winRateVal),
-            score: Math.min(8, Math.max(1, Math.round(winRateVal / 12.5))),
+            winRate: winRateVal != null ? Math.round(winRateVal) : null,
+            score: winRateVal != null ? Math.min(8, Math.max(1, Math.round(winRateVal / 12.5))) : null,
           };
         })
       );
 
-      // If signal_stats returned fewer than 3, fallback to top active screener stocks
-      let valid = enriched.filter(Boolean);
-      if (valid.length < 3) {
-        const { data: topComps } = await supabase
-          .from('companies')
-          .select('id, symbol, name_ar, name_en')
-          .eq('status', 'active')
-          .limit(3);
-
-        if (topComps) {
-          valid = topComps.map((c: any) => ({
-            symbol: c.symbol,
-            name: isAr ? c.name_ar : c.name_en,
-            signal: 'buy',
-            price: 24.50,
-            change: 2.15,
-            winRate: 85,
-            score: 7
-          }));
-        }
-      }
-
+      const valid = enriched.filter(Boolean);
       setTopSignals(valid.slice(0, 3));
     } catch (e) {
       console.error('Error fetching top signals:', e);
+      setTopSignals([]);
     }
   }
 
@@ -302,7 +277,6 @@ export default function DashboardPage({ params }: Props) {
       const res = await fetch('/api/sectors');
       const data = await res.json();
       if (data?.success && Array.isArray(data.sectors)) {
-        // Normalize fields: API returns avgChangePct & sector_name
         const normalized = data.sectors.map((s: any) => ({
           ...s,
           name: s.name || s.sector_name || 'عام',
@@ -313,26 +287,11 @@ export default function DashboardPage({ params }: Props) {
       } else if (Array.isArray(data)) {
         setSectors(data);
       } else {
-        // Fallback static sectors
-        setSectors([
-          { name: 'البنوك', avgChange: 1.8, total: 18 },
-          { name: 'العقارات', avgChange: 3.2, total: 22 },
-          { name: 'الاتصالات', avgChange: 0.9, total: 6 },
-          { name: 'الطاقة', avgChange: -0.5, total: 12 },
-          { name: 'الأغذية', avgChange: 2.1, total: 15 },
-          { name: 'الصناعة', avgChange: -1.2, total: 30 },
-        ]);
+        setSectors([]);
       }
     } catch (e) {
       console.error('Error fetching sectors heatmap:', e);
-      setSectors([
-        { name: 'البنوك', avgChange: 1.8, total: 18 },
-        { name: 'العقارات', avgChange: 3.2, total: 22 },
-        { name: 'الاتصالات', avgChange: 0.9, total: 6 },
-        { name: 'الطاقة', avgChange: -0.5, total: 12 },
-        { name: 'الأغذية', avgChange: 2.1, total: 15 },
-        { name: 'الصناعة', avgChange: -1.2, total: 30 },
-      ]);
+      setSectors([]);
     }
   }
 

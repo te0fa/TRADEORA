@@ -26,3 +26,8 @@ scratch_test.py
 tradeora-web/env.vercel*
 tradeora-web/models/
 supabase/.temp/
+
+.env*.local
+.env.production
+tradeora-web/.env*
+*.env

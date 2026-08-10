@@ -11,7 +11,7 @@ url = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
 key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
 sb = create_client(url, key)
 
-COCKROACH_URL = (os.getenv("DATABASE_URL") or "postgresql://tradeora:gdW77s_jShDK8nChydbbCg@raw-donkey-30500.j77.aws-eu-central-1.cockroachlabs.cloud:26257/defaultdb").replace("sslmode=verify-full", "sslmode=require")
+COCKROACH_URL = (os.getenv("DATABASE_URL")).replace("sslmode=verify-full", "sslmode=require")
 
 print("🌱 Seeding missing data across Supabase & CockroachDB...")
 
