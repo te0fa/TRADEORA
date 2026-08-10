@@ -80,8 +80,8 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
         volume: rawPrice.volume !== null ? Number(rawPrice.volume) : null,
         source: rawPrice.source,
         price_date: rawPrice.price_date,
-        data_quality_flag: rawPrice.data_quality_flag,
-        fetched_at: rawPrice.fetched_at
+        data_quality_flag: rawPrice.data_quality_flag ?? null,
+        fetched_at: rawPrice.fetched_at ?? null
       };
 
       // Set translations based on source
@@ -184,8 +184,8 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
       volume: rawPrice.volume !== null ? Number(rawPrice.volume) : null,
       source: rawPrice.source,
       price_date: rawPrice.price_date,
-      data_quality_flag: rawPrice.data_quality_flag,
-      fetched_at: rawPrice.fetched_at
+      data_quality_flag: rawPrice.data_quality_flag ?? null,
+      fetched_at: rawPrice.fetched_at ?? null
     };
 
     if (rawPrice.source === 'egx_bulletin') {

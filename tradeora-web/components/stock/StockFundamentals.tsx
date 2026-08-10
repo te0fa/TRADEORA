@@ -257,7 +257,7 @@ export function StockFundamentals({ fundamentals, currentPrice, locale }: StockF
               <div className="flex justify-between items-start mb-2">
                 <span className="text-xl">{m.icon}</span>
                 {m.status && (
-                  <Badge variant={m.status.color as any} size="sm">
+                  <Badge variant={m.status.color as any}>
                     {m.status.label}
                   </Badge>
                 )}

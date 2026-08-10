@@ -52,7 +52,8 @@ export interface RawPriceRecord {
   change_percent?: number | string | null;
   price_date: string;
   source: string;
-  fetched_at?: string;
+  fetched_at?: string | null;
+  data_quality_flag?: string | null;
 }
 
 export interface CanonicalPriceRecord {
@@ -66,7 +67,8 @@ export interface CanonicalPriceRecord {
   change_percent: number;
   price_date: string;
   source: string;
-  fetched_at?: string;
+  fetched_at?: string | null;
+  data_quality_flag?: string | null;
   is_stale: boolean;
 }
 

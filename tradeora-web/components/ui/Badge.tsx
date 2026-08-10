@@ -4,12 +4,14 @@ import { motion, HTMLMotionProps } from 'framer-motion';
 export interface BadgeProps extends HTMLMotionProps<"span"> {
   variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'glass';
   pulsing?: boolean;
+  size?: 'sm' | 'md' | 'lg' | string;
 }
 
 export function Badge({ 
   children, 
   variant = 'glass', 
   pulsing = false,
+  size,
   className = '',
   ...props 
 }: BadgeProps) {

@@ -74,7 +74,7 @@ export interface PriceRecord {
   source: string;
   price_date: string;
   data_quality_flag: string | null;
-  fetched_at: string;
+  fetched_at: string | null;
 }
 
 /**
