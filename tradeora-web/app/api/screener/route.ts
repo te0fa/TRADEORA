@@ -59,17 +59,18 @@ export async function GET() {
     const { data: closedTrades } = await sb
       .from('recommended_trades')
       .select('company_id, pnl_percent')
-      .eq('status', 'closed')
-      .not('pnl_percent', 'is', null);
+      .eq('status', 'closed');
 
     const statsMap: Record<string, { total: number; wins: number }> = {};
     for (const ct of closedTrades ?? []) {
-      if (!statsMap[ct.company_id]) {
-        statsMap[ct.company_id] = { total: 0, wins: 0 };
-      }
-      statsMap[ct.company_id].total += 1;
-      if (Number(ct.pnl_percent) > 0) {
-        statsMap[ct.company_id].wins += 1;
+      if (ct.pnl_percent != null) {
+        if (!statsMap[ct.company_id]) {
+          statsMap[ct.company_id] = { total: 0, wins: 0 };
+        }
+        statsMap[ct.company_id].total += 1;
+        if (Number(ct.pnl_percent) > 0) {
+          statsMap[ct.company_id].wins += 1;
+        }
       }
     }
 
