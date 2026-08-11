@@ -141,6 +141,6 @@ export async function GET() {
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error in GET /api/screener:', error);
-    return NextResponse.json({ error: 'حدث خطأ، حاول مرة أخرى' }, { status: 500 });
+    return NextResponse.json({ error: error.message || String(error), details: error.stack }, { status: 500 });
   }
 }
