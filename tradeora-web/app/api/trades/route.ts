@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
           LEFT JOIN companies c ON r.company_id = c.id
           ${whereSql}
           ORDER BY r.recommended_at DESC
-          LIMIT ${limit};
+          LIMIT 1000;
         `, params);
 
         trades = rows.map((r: any) => ({
@@ -419,7 +419,7 @@ export async function GET(req: NextRequest) {
       const ictSmcBadgeAr = snap.ict_smc_badge_ar || null;
       const elliottBadgeAr = snap.elliott_badge_ar || null;
 
-      // Compute activation status:
+      // Compute activation status & Auto-Invalidation check
       let isActivated = true;
       let activationStatusAr = '⚡ صفقة مفعلة (سعر السوق المباشر)';
 
@@ -438,6 +438,23 @@ export async function GET(req: NextRequest) {
         } else {
           isActivated = safeCurrentPrice <= finalEntry * 1.005;
           activationStatusAr = isActivated ? '⚡ صفقة مفعلة (اختراق وتأكيد الدخول)' : '🎯 أمر مشروط معلق (بانتظار كسر الدعم)';
+        }
+      }
+
+      // Auto-invalidation for unactivated (pending) orders:
+      let isInvalidated = t.status === 'cancelled' || t.status === 'cancelled_before_entry';
+      let invalidationReasonAr = t.invalidation_reason || null;
+
+      if (!isActivated && !isInvalidated) {
+        if (isBuy && safeCurrentPrice <= finalSl) {
+          isInvalidated = true;
+          invalidationReasonAr = '⚠️ تم كسر وقف الخسارة قبل تفعيل الدخول - إلغاء تلقائي بدون احتساب خروج بنسبة نجاح/خسارة';
+        } else if (!isBuy && safeCurrentPrice >= finalSl) {
+          isInvalidated = true;
+          invalidationReasonAr = '⚠️ تم كسر وقف الخسارة قبل تفعيل الدخول - إلغاء تلقائي بدون احتساب خروج بنسبة نجاح/خسارة';
+        } else if (isBuy && safeCurrentPrice >= finalTp1) {
+          isInvalidated = true;
+          invalidationReasonAr = '⚠️ وصل السعر للمستهدف قبل الوصول لسعر الدخول - إلغاء تلقائي لمنع التعليق';
         }
       }
 
@@ -488,12 +505,15 @@ export async function GET(req: NextRequest) {
         trigger_condition_ar: triggerCondAr,
         is_activated: isActivated,
         activation_status_ar: activationStatusAr,
+        is_invalidated: isInvalidated,
+        invalidation_reason_ar: invalidationReasonAr
       };
     });
 
-    // Separate BUY trades and SELL signals
-    const buyTrades = processedTrades.filter((t: any) => t.direction === 'buy');
-    const sellTrades = processedTrades.filter((t: any) => t.direction === 'sell');
+    // Separate BUY trades and SELL signals (excluding invalidated pending orders)
+    const validProcessed = processedTrades.filter((t: any) => !t.is_invalidated);
+    const buyTrades = validProcessed.filter((t: any) => t.direction === 'buy');
+    const sellTrades = validProcessed.filter((t: any) => t.direction === 'sell');
 
     // ── COMPOSITE SCORE RANKING (Backtest-validated formula) ─────────────────
     // composite_score = ML(40%) + Confirmations(30%) + R:R(20%) + Timeframe(10%)

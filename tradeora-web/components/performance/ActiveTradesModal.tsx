@@ -86,10 +86,29 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
   const [signalMode, setSignalMode] = useState<'BUY' | 'SELL'>('BUY');
   const [viewScope, setViewScope] = useState<'TOP_PICKS' | 'ALL_MARKET'>('TOP_PICKS');
   const [shariahOnly, setShariahOnly] = useState(false);
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | 'ACTIVATED' | 'MARKET' | 'LIMIT' | 'BREAKOUT_TRIGGER'>('ALL');
   const [strategyFilter, setStrategyFilter] = useState<'ALL' | 'DAY_TRADING' | 'SWING_POSITION'>('ALL');
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+
+  // Load dismissed trade IDs & watchlist from localStorage
+  React.useEffect(() => {
+    try {
+      const storedDismissed = localStorage.getItem('tradeora_dismissed_trades');
+      if (storedDismissed) setDismissedIds(JSON.parse(storedDismissed));
+    } catch {}
+  }, []);
+
+  const handleDismissTrade = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDismissedIds(prev => {
+      const updated = [...prev, id];
+      try { localStorage.setItem('tradeora_dismissed_trades', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
 
   // Base list depending on signal mode tab
   const baseTradesList = useMemo(() => {
@@ -128,7 +147,19 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
 
   // Filtered trades
   const filteredTrades = useMemo(() => {
+    let userWatchlist: string[] = [];
+    try {
+      const storedW = localStorage.getItem('tradeora_watchlist');
+      if (storedW) userWatchlist = JSON.parse(storedW).map((s: string) => s.toUpperCase());
+    } catch {}
+
     return scopedTrades.filter((t) => {
+      // Exclude dismissed trades
+      if (dismissedIds.includes(t.id)) return false;
+
+      // Watchlist Filter
+      if (watchlistOnly && (!t.symbol || !userWatchlist.includes(t.symbol.toUpperCase()))) return false;
+
       // 0. Shariah Compliance Filter
       if (shariahOnly && !t.is_shariah_compliant) return false;
 
@@ -164,7 +195,7 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
 
       return true;
     });
-  }, [scopedTrades, shariahOnly, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
+  }, [scopedTrades, dismissedIds, watchlistOnly, shariahOnly, orderTypeFilter, strategyFilter, selectedSector, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -303,6 +334,17 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
               }`}
             >
               <span>🕌 {isAr ? 'أسهم الشريعة فقط (EGX33)' : 'Shariah Only'}</span>
+            </button>
+
+            <button
+              onClick={() => setWatchlistOnly(!watchlistOnly)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                watchlistOnly
+                  ? 'bg-amber-500/25 text-amber-300 border-amber-500/40 font-black shadow'
+                  : 'bg-white/5 text-zinc-300 border-white/10 hover:border-amber-500/30'
+              }`}
+            >
+              <span>⭐ {isAr ? 'أسهمي المفضلة فقط' : 'Watchlist Only'}</span>
             </button>
           </div>
 
@@ -687,6 +729,15 @@ export function ActiveTradesModal({ isOpen, onClose, trades, sellSignals = [] }:
                           ⚡ {Math.round(t.ml_probability * 100)}% {isAr ? 'ثقة' : 'Conf'}
                         </span>
                       )}
+
+                      <button
+                        onClick={(e) => handleDismissTrade(t.id, e)}
+                        className="px-2.5 py-1 text-[11px] font-bold text-rose-400 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 rounded-lg transition cursor-pointer flex items-center gap-1"
+                        title={isAr ? "إلغاء الصفقة وإخفائها من قائمة الترشيحات" : "Dismiss trade"}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>{isAr ? 'إلغاء الصفقة' : 'Dismiss'}</span>
+                      </button>
 
                       <Link
                         href={`/${locale}/stock/${t.symbol}`}
