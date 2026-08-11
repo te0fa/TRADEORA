@@ -15,18 +15,20 @@ export async function GET(req: NextRequest) {
     if (process.env.DATABASE_URL) {
       try {
         const { rows } = await pool.query(`
-          WITH latest_prices AS (
-            SELECT DISTINCT ON (company_id) company_id, close_price, open_price, price_date
-            FROM market_prices
-            WHERE price_date >= CURRENT_DATE - INTERVAL '14 days'
-            ORDER BY company_id, price_date DESC
+          WITH latest_canonical AS (
+            SELECT DISTINCT ON (c.id) 
+              c.id, mp.close_price, mp.open_price, mp.change_percent
+            FROM companies c
+            JOIN market_prices mp ON c.id = mp.company_id
+            WHERE mp.close_price > 0
+            ORDER BY c.id, mp.price_date DESC
           )
           SELECT 
-            COUNT(CASE WHEN close_price > open_price THEN 1 END) as advance,
-            COUNT(CASE WHEN close_price < open_price THEN 1 END) as decline,
-            COUNT(CASE WHEN close_price = open_price THEN 1 END) as unchanged,
+            COUNT(CASE WHEN change_percent > 0 OR (change_percent IS NULL AND close_price > open_price) THEN 1 END) as advance,
+            COUNT(CASE WHEN change_percent < 0 OR (change_percent IS NULL AND close_price < open_price) THEN 1 END) as decline,
+            COUNT(CASE WHEN change_percent = 0 OR (change_percent IS NULL AND close_price = open_price) THEN 1 END) as unchanged,
             COUNT(*) as total
-          FROM latest_prices;
+          FROM latest_canonical;
         `);
         if (rows && rows.length > 0) {
           advance_count = parseInt(rows[0].advance || '0');

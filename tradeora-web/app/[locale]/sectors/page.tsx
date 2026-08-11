@@ -35,7 +35,8 @@ export default function SectorsPage() {
     fetch('/api/sectors')
       .then(r => r.json())
       .then(d => {
-        setSectors(Array.isArray(d) ? d : []);
+        const list = Array.isArray(d) ? d : (d?.sectors || []);
+        setSectors(list);
         setLoading(false);
       })
       .catch(e => {
@@ -73,9 +74,9 @@ export default function SectorsPage() {
   const sortedSectors = useMemo(() => {
     const list = [...sectors];
     if (sectorSort === 'gainers') {
-      list.sort((a, b) => (b.avgChange ?? b.avg_change ?? 0) - (a.avgChange ?? a.avg_change ?? 0));
+      list.sort((a, b) => (b.avgChangePct ?? b.avgChange ?? b.avg_change ?? 0) - (a.avgChangePct ?? a.avgChange ?? a.avg_change ?? 0));
     } else if (sectorSort === 'losers') {
-      list.sort((a, b) => (a.avgChange ?? a.avg_change ?? 0) - (b.avgChange ?? b.avg_change ?? 0));
+      list.sort((a, b) => (a.avgChangePct ?? a.avgChange ?? a.avg_change ?? 0) - (b.avgChangePct ?? b.avgChange ?? b.avg_change ?? 0));
     } else if (sectorSort === 'count') {
       list.sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
     }
@@ -85,18 +86,18 @@ export default function SectorsPage() {
   // Chart data covering ALL sectors
   const chartData = useMemo(() => {
     return sortedSectors.map(s => {
-      const avgChg = Number(s.avgChange ?? s.avg_change ?? 0);
-      const netStr = Number(s.strength ?? s.net_strength ?? (s.rising - s.falling));
-      const val = chartMetric === 'avg_change' ? avgChg : chartMetric === 'net_strength' ? netStr : s.total;
+      const avgChg = Number(s.avgChangePct ?? s.avgChange ?? s.avg_change ?? 0);
+      const netStr = Number(s.strength ?? s.net_strength ?? ((s.rising ?? 0) - (s.falling ?? 0)));
+      const val = chartMetric === 'avg_change' ? avgChg : chartMetric === 'net_strength' ? netStr : (s.total || 0);
 
       return {
-        name: s.sector || s.name,
+        name: s.sector_name || s.sector || s.name,
         value: val,
         avgChange: avgChg,
         netStrength: netStr,
-        rising: s.rising,
-        falling: s.falling,
-        total: s.total,
+        rising: s.rising || 0,
+        falling: s.falling || 0,
+        total: s.total || 0,
         winRate: s.win_rate || s.avgWinRate || 68.5,
         raw: s
       };
