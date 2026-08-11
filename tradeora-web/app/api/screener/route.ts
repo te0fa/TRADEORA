@@ -14,7 +14,7 @@ export async function GET() {
     // 1. Fetch all active companies
     const { data: companies, error: compError } = await sb
       .from('companies')
-      .select('id, symbol, name_ar, name_en, sector, is_shariah_compliant, is_egx33_shariah')
+      .select('id, symbol, name_ar, name_en, sector, is_shariah_compliant')
       .order('symbol');
 
     if (compError) throw compError;
