@@ -39,7 +39,7 @@ export const FORBIDDEN_SOURCES = [
   'tradingview_provider',
 ] as const;
 
-export const FRESHNESS_WINDOW_DAYS = 10;
+export const FRESHNESS_WINDOW_DAYS = 45;
 
 export interface RawPriceRecord {
   company_id: string;

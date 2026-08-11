@@ -25,15 +25,30 @@ export async function GET() {
       .order('symbol');
 
     if (compError) throw compError;
-    if (!companies) return NextResponse.json([]);
-
     const ids = companies.map(c => c.id);
 
-    // 2. Fetch authoritative canonical latest prices (Strictly filters out forbidden sources)
+    // 2. Fetch authoritative canonical latest prices with fallback query
     const canonicalPriceMap = await fetchCanonicalLatestPrices(sb, ids);
     const priceMap: Record<string, any> = {};
     for (const [cid, p] of canonicalPriceMap.entries()) {
       priceMap[cid] = p;
+    }
+
+    // Direct fallback for missing price map entries
+    const missingIds = ids.filter((id: string) => !priceMap[id]);
+    if (missingIds.length > 0) {
+      const { data: fallbackPrices } = await sb
+        .from('market_prices')
+        .select('company_id, close_price, open_price, volume, change_percent, price_date')
+        .in('company_id', missingIds)
+        .order('price_date', { ascending: false })
+        .limit(1000);
+
+      (fallbackPrices || []).forEach((p: any) => {
+        if (!priceMap[p.company_id] && p.close_price > 0) {
+          priceMap[p.company_id] = p;
+        }
+      });
     }
 
     // 3. Fetch active high-conviction ML trades
