@@ -119,9 +119,9 @@ export async function GET(req: Request) {
             ORDER BY c.id, mp.price_date DESC
           )
           SELECT 
-            COUNT(CASE WHEN change_percent > 0 THEN 1 END) as advance,
-            COUNT(CASE WHEN change_percent < 0 THEN 1 END) as decline,
-            COUNT(CASE WHEN change_percent = 0 OR change_percent IS NULL THEN 1 END) as unchanged,
+            COUNT(CASE WHEN change_percent > 0 OR (change_percent IS NULL AND close_price > open_price) THEN 1 END) as advance,
+            COUNT(CASE WHEN change_percent < 0 OR (change_percent IS NULL AND close_price < open_price) THEN 1 END) as decline,
+            COUNT(CASE WHEN change_percent = 0 OR (change_percent IS NULL AND close_price = open_price) THEN 1 END) as unchanged,
             COUNT(*) as total
           FROM canonical;
         `);
