@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import pool from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { normalizeEgxSector, isSmeStock } from '@/lib/egx-sectors';
 import { fetchCanonicalLatestPrices } from '@/lib/canonical-price';
@@ -6,14 +7,46 @@ import { fetchCanonicalLatestPrices } from '@/lib/canonical-price';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Statistical sample threshold: at least 30 closed trades required to display win rate
 const MIN_SAMPLE_SIZE_THRESHOLD = 30;
 
 export async function GET() {
   try {
-    const sb = supabase;
-    // 1. Fetch all active companies
-    const { data: companies, error: compError } = await sb
+    const priceMap: Record<string, any> = {};
+
+    // 1. Primary DB Query: CockroachDB / PostgreSQL Pool for authoritative prices & change_percent
+    if (process.env.DATABASE_URL) {
+      try {
+        const { rows } = await pool.query(`
+          WITH canonical AS (
+            SELECT DISTINCT ON (c.id) 
+              c.id as company_id, c.symbol, c.name_ar, c.name_en, c.sector, c.is_shariah_compliant,
+              mp.close_price, mp.open_price, mp.volume, mp.price_date,
+              COALESCE(mp.change_percent, CASE WHEN mp.open_price > 0 THEN ((mp.close_price - mp.open_price)/mp.open_price)*100 ELSE 0 END) as change_percent
+            FROM companies c
+            JOIN market_prices mp ON c.id = mp.company_id
+            WHERE mp.close_price > 0
+            ORDER BY c.id, mp.price_date DESC
+          )
+          SELECT * FROM canonical;
+        `);
+
+        (rows || []).forEach((r: any) => {
+          priceMap[r.company_id] = {
+            company_id: r.company_id,
+            close_price: parseFloat(r.close_price || '0'),
+            open_price: parseFloat(r.open_price || '0'),
+            volume: parseFloat(r.volume || '0'),
+            change_percent: parseFloat(r.change_percent || '0'),
+            price_date: r.price_date
+          };
+        });
+      } catch (dbErr) {
+        console.error('CockroachDB query in screener route error:', dbErr);
+      }
+    }
+
+    // 2. Fetch all active companies from Supabase
+    const { data: companies, error: compError } = await supabase
       .from('companies')
       .select('id, symbol, name_ar, name_en, sector, is_shariah_compliant')
       .order('symbol');
@@ -21,32 +54,16 @@ export async function GET() {
     if (compError) throw compError;
     const ids = companies.map((c: any) => c.id);
 
-    // 2. Fetch authoritative canonical latest prices with fallback query
-    const canonicalPriceMap = await fetchCanonicalLatestPrices(sb, ids);
-    const priceMap: Record<string, any> = {};
-    for (const [cid, p] of canonicalPriceMap.entries()) {
-      priceMap[cid] = p;
-    }
-
-    // Direct fallback for missing price map entries
-    const missingIds = ids.filter((id: string) => !priceMap[id]);
-    if (missingIds.length > 0) {
-      const { data: fallbackPrices } = await sb
-        .from('market_prices')
-        .select('company_id, close_price, open_price, volume, change_percent, price_date')
-        .in('company_id', missingIds)
-        .order('price_date', { ascending: false })
-        .limit(1000);
-
-      (fallbackPrices || []).forEach((p: any) => {
-        if (!priceMap[p.company_id] && p.close_price > 0) {
-          priceMap[p.company_id] = p;
-        }
-      });
+    // If CockroachDB didn't populate priceMap, fallback to Supabase canonical price engine
+    if (Object.keys(priceMap).length === 0) {
+      const canonicalPriceMap = await fetchCanonicalLatestPrices(supabase, ids);
+      for (const [cid, p] of canonicalPriceMap.entries()) {
+        priceMap[cid] = p;
+      }
     }
 
     // 3. Fetch active high-conviction ML trades
-    const { data: activeTrades } = await sb
+    const { data: activeTrades } = await supabase
       .from('recommended_trades')
       .select('company_id, direction, ml_probability')
       .eq('status', 'active');
@@ -57,7 +74,7 @@ export async function GET() {
     }
 
     // 4. Fetch historical closed trades to calculate real statistical win rate
-    const { data: closedTrades } = await sb
+    const { data: closedTrades } = await supabase
       .from('recommended_trades')
       .select('company_id, pnl_percent')
       .eq('status', 'closed');
@@ -81,27 +98,19 @@ export async function GET() {
         const p = priceMap[c.id];
         if (!p) return null;
 
-        const rawChange = p.change_percent ?? 0;
-        const change = rawChange !== 0 ? rawChange : (p.open_price > 0 ? parseFloat((((p.close_price - p.open_price) / p.open_price) * 100).toFixed(2)) : 0);
+        const change = p.change_percent != null ? Number(p.change_percent) : 0;
         const activeTrade = tradeMap[c.id];
 
         let signal: 'buy' | 'sell' | 'neutral' = 'neutral';
         let signalType: 'price_momentum_rule' | 'ml_model_v6' = 'price_momentum_rule';
 
-        // Signal Classification: clearly distinguish price momentum vs verified ML model signal
         if (activeTrade && (activeTrade.ml_probability ?? 0) >= 0.82) {
           signal = activeTrade.direction === 'sell' ? 'sell' : 'buy';
           signalType = 'ml_model_v6';
-        } else if (change >= 2.2) {
+        } else if (change > 0) {
           signal = 'buy';
           signalType = 'price_momentum_rule';
-        } else if (change <= -2.2) {
-          signal = 'sell';
-          signalType = 'price_momentum_rule';
-        } else if (change > 0.5) {
-          signal = 'buy';
-          signalType = 'price_momentum_rule';
-        } else if (change < -0.5) {
+        } else if (change < 0) {
           signal = 'sell';
           signalType = 'price_momentum_rule';
         } else {
@@ -109,7 +118,6 @@ export async function GET() {
           signalType = 'price_momentum_rule';
         }
 
-        // Statistical Win Rate Resolution (Strictly null if sample size < MIN_SAMPLE_SIZE_THRESHOLD)
         const compStats = statsMap[c.id] || { total: 0, wins: 0 };
         const isSignificant = compStats.total >= MIN_SAMPLE_SIZE_THRESHOLD;
         const winRate = isSignificant 
@@ -125,7 +133,7 @@ export async function GET() {
           is_sme:                       isSmeStock(c),
           is_shariah_compliant:         Boolean(c.is_shariah_compliant),
           price:                        p.close_price,
-          change:                       change,
+          change:                       Number(change.toFixed(2)),
           volume:                       p.volume,
           date:                         p.price_date,
           signal:                       signal,
