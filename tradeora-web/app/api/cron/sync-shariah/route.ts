@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     // 1. Fetch companies
     const { data: companies, error: compErr } = await sb
       .from('companies')
-      .select('id, symbol, is_shariah_compliant, is_egx33_shariah, is_boubyan_compliant, purification_ratio');
+      .select('id, symbol, is_shariah_compliant, is_boubyan_compliant, purification_ratio');
 
     if (compErr || !companies) {
       return NextResponse.json({ error: 'Failed to fetch companies' }, { status: 500 });
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       const { error: updateErr } = await sb
         .from('companies')
         .update({
-          is_egx33_shariah: isEgx33,
+          is_shariah_compliant: Boolean(co.is_shariah_compliant ?? isEgx33),
           is_boubyan_compliant: isBoubyan,
           purification_ratio: ratio
         })

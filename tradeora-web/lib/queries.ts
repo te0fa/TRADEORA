@@ -47,7 +47,6 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
       market_type,
       currency,
       is_shariah_compliant,
-      is_egx33_shariah,
       is_boubyan_compliant,
       purification_ratio,
       listing_status
@@ -111,7 +110,7 @@ export async function fetchCompaniesWithPrices(): Promise<CompanyWithPrice[]> {
       currency: item.currency,
       is_shariah_compliant: item.is_shariah_compliant,
       is_sme: isSmeStock(item),
-      is_egx33_shariah: item.is_egx33_shariah,
+      is_egx33_shariah: Boolean(item.is_shariah_compliant),
       is_boubyan_compliant: item.is_boubyan_compliant,
       purification_ratio: item.purification_ratio,
       shariahAudit: getShariahAudit(item),
@@ -286,7 +285,7 @@ export async function fetchStockDetail(symbol: string): Promise<any | null> {
     sourceLabelEn: labelEn,
     fundamentals,
     shariah_audit: {
-      egx33: company.is_egx33_shariah ? '✅ مدرج في مؤشر الشريعة EGX 33' : (company.is_shariah_compliant ? '✅ متوافق مع الضوابط الشرعية' : '❌ غير مدرج في EGX 33'),
+      egx33: company.is_shariah_compliant ? '✅ متوافق مع الضوابط الشرعية' : '❌ غير متوافق شرعياً',
       boubyan: company.is_boubyan_compliant ? '✅ متوافق مع معايير بنك بوبيان' : (company.is_shariah_compliant ? '✅ متوافق شرعياً' : '⚠️ يحتاج تطهير / مراجعة نسب الديون'),
       kasheif: company.is_shariah_compliant ? '✅ سهم حلال متوافق' : '🟡 سهم مختلط (نسبة تطهير)',
       purification_ratio: company.purification_ratio != null ? Number(company.purification_ratio) : (company.is_shariah_compliant ? 0.0 : null)
