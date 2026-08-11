@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import pool from '@/lib/db';
 import { calcMarketRegime } from '@/lib/ta-utils';
 import { TradeRiskLevelsEvaluator, MarketDataEvaluator, TechnicalIndicatorEvaluator } from '@/lib/domain';
 
@@ -20,48 +21,106 @@ export async function GET(req: NextRequest) {
     const symbol = searchParams.get('symbol');
     const tierParam = (searchParams.get('tier') || 'all').toUpperCase();
 
-    // 1. Fetch trades with company details (Four-Tier Taxonomy compliant, zero data deletion or date-hiding)
-    let query = supabase
-      .from('recommended_trades')
-      .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
-      .order('recommended_at', { ascending: false });
+    let trades: any[] = [];
+    let allClosed: any[] = [];
+    let tp1HitTrades: any[] = [];
 
-    if (symbol) {
-      query = query.eq('symbol', symbol.toUpperCase());
-    }
+    // 1. Primary Query: Direct CockroachDB / PostgreSQL Pool Connection
+    if (process.env.DATABASE_URL) {
+      try {
+        let whereClauses: string[] = [];
+        let params: any[] = [];
+        let pIdx = 1;
 
-    if (tierParam !== 'ALL' && tierParam !== 'ALL_HISTORICAL') {
-      if (['PRODUCTION', 'CLEAN_OOS', 'LEGACY_RESEARCH'].includes(tierParam)) {
-        query = query.eq('classification', tierParam);
+        if (symbol) {
+          whereClauses.push(`r.symbol = $${pIdx++}`);
+          params.push(symbol.toUpperCase());
+        }
+        if (tierParam !== 'ALL' && tierParam !== 'ALL_HISTORICAL') {
+          if (['PRODUCTION', 'CLEAN_OOS', 'LEGACY_RESEARCH'].includes(tierParam)) {
+            whereClauses.push(`r.classification = $${pIdx++}`);
+            params.push(tierParam);
+          }
+        }
+
+        const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+        const { rows } = await pool.query(`
+          SELECT r.*, c.name_ar, c.name_en, c.sector, c.is_shariah_compliant
+          FROM recommended_trades r
+          LEFT JOIN companies c ON r.company_id = c.id
+          ${whereSql}
+          ORDER BY r.recommended_at DESC
+          LIMIT ${limit};
+        `, params);
+
+        trades = rows.map((r: any) => ({
+          ...r,
+          companies: {
+            name_ar: r.name_ar,
+            name_en: r.name_en,
+            sector: r.sector,
+            is_shariah_compliant: r.is_shariah_compliant
+          }
+        }));
+
+        const { rows: closedRows } = await pool.query(`
+          SELECT r.*, c.name_ar, c.name_en
+          FROM recommended_trades r
+          LEFT JOIN companies c ON r.company_id = c.id
+          WHERE r.status = 'closed';
+        `);
+        allClosed = closedRows.map((r: any) => ({
+          ...r,
+          companies: { name_ar: r.name_ar, name_en: r.name_en }
+        }));
+
+        const { rows: tp1Rows } = await pool.query(`
+          SELECT r.*, c.name_ar, c.name_en
+          FROM recommended_trades r
+          LEFT JOIN companies c ON r.company_id = c.id
+          WHERE r.status = 'tp1_hit';
+        `);
+        tp1HitTrades = tp1Rows.map((r: any) => ({
+          ...r,
+          companies: { name_ar: r.name_ar, name_en: r.name_en }
+        }));
+      } catch (crErr) {
+        console.error('CockroachDB query fallback to Supabase:', crErr);
       }
     }
 
-    let { data: trades, error: fetchError } = await query.limit(limit);
+    // 2. Fallback Query: Supabase REST API (if DATABASE_URL is not configured)
+    if (trades.length === 0) {
+      let query = supabase
+        .from('recommended_trades')
+        .select('*, companies(name_ar, name_en, sector, is_shariah_compliant)')
+        .order('recommended_at', { ascending: false });
 
-    if (fetchError) {
-      throw fetchError;
+      if (symbol) {
+        query = query.eq('symbol', symbol.toUpperCase());
+      }
+
+      if (tierParam !== 'ALL' && tierParam !== 'ALL_HISTORICAL') {
+        if (['PRODUCTION', 'CLEAN_OOS', 'LEGACY_RESEARCH'].includes(tierParam)) {
+          query = query.eq('classification', tierParam);
+        }
+      }
+
+      const { data: sbTrades } = await query.limit(limit);
+      trades = sbTrades || [];
+
+      const { data: sbClosed } = await supabase
+        .from('recommended_trades')
+        .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, classification, companies(name_ar, name_en)')
+        .eq('status', 'closed');
+      allClosed = sbClosed || [];
+
+      const { data: sbTp1 } = await supabase
+        .from('recommended_trades')
+        .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, classification, companies(name_ar, name_en)')
+        .eq('status', 'tp1_hit');
+      tp1HitTrades = sbTp1 || [];
     }
-
-    if (!trades) {
-      trades = [];
-    }
-
-    // 2. Fetch closed trades & tp1_hit trades for four-tier evaluation breakdown
-    const { data: allClosed, error: closedErr } = await supabase
-      .from('recommended_trades')
-      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, classification, companies(name_ar, name_en)')
-      .eq('status', 'closed');
-
-    if (closedErr) console.error('Error fetching allClosed:', closedErr);
-
-    const { data: tp1HitTrades, error: tp1Err } = await supabase
-      .from('recommended_trades')
-      .select('id, symbol, company_id, entry_price, exit_price, tp1, tp2, sl, pnl_percent, status, exit_reason, direction, ml_probability, features_snapshot, closed_at, recommended_at, classification, companies(name_ar, name_en)')
-      .eq('status', 'tp1_hit');
-
-    if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
-
-    if (tp1Err) console.error('Error fetching tp1HitTrades:', tp1Err);
 
     // 2. Fetch latest prices for ALL active, closed, and tp1_hit companies/symbols
     const activeCompanyIds = Array.from(
