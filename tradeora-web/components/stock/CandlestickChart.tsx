@@ -452,8 +452,8 @@ const CandlestickChartInner = (
 
 
   // ── Advanced Overlays: SMC / ICT / Elliott / Wyckoff / Channels ──
-  // These use lightweight-charts price lines to represent zones and levels
   const overlayLinesRef = useRef<IPriceLine[]>([]);
+  const overlaySeriesRef = useRef<any[]>([]);
 
   // Prepare candle data for algorithms
   const candles: Candle[] = useMemo(() => data
@@ -469,13 +469,19 @@ const CandlestickChartInner = (
   [data]);
 
   useEffect(() => {
-    if (!candlestickSeriesRef.current || candles.length < 5) return;
+    if (!candlestickSeriesRef.current || !chartRef.current || candles.length < 5) return;
 
-    // Clear previous overlay lines
+    // Clear previous overlay price lines
     overlayLinesRef.current.forEach(line => {
       try { candlestickSeriesRef.current?.removePriceLine(line); } catch {}
     });
     overlayLinesRef.current = [];
+
+    // Clear previous overlay series
+    overlaySeriesRef.current.forEach(s => {
+      try { chartRef.current?.removeSeries(s); } catch {}
+    });
+    overlaySeriesRef.current = [];
 
     const addLine = (price: number, color: string, title: string, style: LineStyle = LineStyle.Dashed, width: 1|2|3|4 = 1) => {
       if (!candlestickSeriesRef.current || !price || !isFinite(price)) return;
@@ -492,79 +498,183 @@ const CandlestickChartInner = (
       } catch {}
     };
 
-    // ── SMC / ICT Overlays ──────────────────────────────────────
+    const markers: any[] = [];
+
+    // ── 1. SMC / ICT Overlays ──────────────────────────────────────
     if (showSMC) {
       const obs  = detectOrderBlocks(candles);
       const fvgs = detectFairValueGaps(candles);
       const lzs  = detectLiquidityZones(candles);
 
-      obs.forEach(ob => {
+      // Keep only top 2 most recent active Order Blocks & FVGs to prevent scale clutter
+      const recentOBs = obs.slice(-2);
+      const recentFVGs = fvgs.slice(-2);
+      const recentLZs = lzs.slice(-2);
+
+      recentOBs.forEach(ob => {
         const color = ob.type === 'bullish' ? '#10B981' : '#EF4444';
         addLine(ob.high, color, `🟩 OB ${ob.type === 'bullish' ? '↑' : '↓'} H`, LineStyle.Solid, ob.strength === 'strong' ? 2 : 1);
         addLine(ob.low,  color, `🟩 OB ${ob.type === 'bullish' ? '↑' : '↓'} L`, LineStyle.Dashed, 1);
-        addLine(ob.midpoint, `${color}88`, `⬛ OB Mid`, LineStyle.Dotted, 1);
+        if (ob.time) {
+          markers.push({
+            time: ob.time,
+            position: ob.type === 'bullish' ? 'belowBar' : 'aboveBar',
+            color: ob.type === 'bullish' ? '#10B981' : '#EF4444',
+            shape: ob.type === 'bullish' ? 'arrowUp' : 'arrowDown',
+            text: `OB ${ob.type === 'bullish' ? 'شراء' : 'بيع'}`
+          });
+        }
       });
 
-      fvgs.forEach(fvg => {
+      recentFVGs.forEach(fvg => {
         const color = fvg.type === 'bullish' ? '#06B6D4' : '#F97316';
-        addLine(fvg.gapHigh, color, `◻️ FVG ${fvg.type === 'bullish' ? '↑H' : '↓H'}`, LineStyle.Dashed, 1);
-        addLine(fvg.gapLow,  color, `◻️ FVG ${fvg.type === 'bullish' ? '↑L' : '↓L'}`, LineStyle.Dashed, 1);
+        addLine(fvg.gapHigh, color, `FVG ${fvg.type === 'bullish' ? '↑' : '↓'}`, LineStyle.Dashed, 1);
       });
 
-      lzs.forEach(lz => {
+      recentLZs.forEach(lz => {
         addLine(lz.price,
           lz.type === 'buyside' ? '#A78BFA' : '#F59E0B',
-          `💧 ${lz.type === 'buyside' ? 'BSL' : 'SSL'} (${lz.strength}x)`,
+          `💧 ${lz.type === 'buyside' ? 'BSL' : 'SSL'}`,
           LineStyle.Dotted, 1
         );
       });
     }
 
-    // ── Elliott Wave Overlays ───────────────────────────────────
+    // ── 2. Elliott Wave Overlays (Real Connected Wave Path & Markers) ──
     if (showElliott) {
       const waves = detectElliottWaves(candles);
-      waves.forEach(w => {
-        const color = ['1','3','5'].includes(w.label)
-          ? '#10B981'   // impulse waves — green
-          : ['2','4'].includes(w.label)
-          ? '#F59E0B'   // corrective waves — amber
-          : '#EC4899';  // A, B, C — pink
-        addLine(w.price, color, `🌊 ${w.label}`, LineStyle.Solid, 2);
-      });
+      if (waves.length >= 3) {
+        // Create wave line path series connecting pivot points
+        const waveLineSeries = chartRef.current.addSeries(LineSeries, {
+          color: '#F59E0B',
+          lineWidth: 2,
+          lineStyle: LineStyle.Solid,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+
+        const waveData = waves
+          .filter(w => w.time !== undefined && w.time !== null)
+          .map(w => ({ time: w.time as Time, value: w.price }));
+        
+        if (waveData.length >= 2) {
+          waveLineSeries.setData(waveData);
+          overlaySeriesRef.current.push(waveLineSeries);
+        }
+
+        // Add numerical wave markers (1, 2, 3, 4, 5, A, B, C) directly on candles
+        waves.forEach(w => {
+          if (w.time) {
+            markers.push({
+              time: w.time,
+              position: w.type === 'peak' ? 'aboveBar' : 'belowBar',
+              color: ['1','3','5'].includes(w.label) ? '#10B981' : ['2','4'].includes(w.label) ? '#F59E0B' : '#EC4899',
+              shape: w.type === 'peak' ? 'circle' : 'square',
+              text: `موجة ${w.label}`
+            });
+          }
+        });
+      }
     }
 
-    // ── Wyckoff Overlays ────────────────────────────────────────
+    // ── 3. Wyckoff Overlays ────────────────────────────────────────
     if (showWyckoff) {
       const wyckoff = detectWyckoffStructure(candles);
-      addLine(wyckoff.supportLine,    '#10B981', `🏛️ Wyckoff S`, LineStyle.Solid,  2);
-      addLine(wyckoff.resistanceLine, '#EF4444', `🏛️ Wyckoff R`, LineStyle.Solid,  2);
-      if (wyckoff.spring) {
-        addLine(wyckoff.spring.price,   '#06B6D4', '🌱 Spring', LineStyle.Solid,  2);
+      addLine(wyckoff.supportLine,    '#10B981', `🏛️ وايكوف دعم (Phase C)`, LineStyle.Solid,  2);
+      addLine(wyckoff.resistanceLine, '#EF4444', `🏛️ وايكوف مقاومة (AR)`, LineStyle.Solid,  2);
+      
+      if (wyckoff.spring && wyckoff.spring.time) {
+        markers.push({
+          time: wyckoff.spring.time,
+          position: 'belowBar',
+          color: '#06B6D4',
+          shape: 'arrowUp',
+          text: '🌱 Spring (اختبار قاع كاذب)'
+        });
       }
-      if (wyckoff.upthrust) {
-        addLine(wyckoff.upthrust.price, '#F97316', '🚀 Upthrust', LineStyle.Solid, 2);
+      if (wyckoff.upthrust && wyckoff.upthrust.time) {
+        markers.push({
+          time: wyckoff.upthrust.time,
+          position: 'aboveBar',
+          color: '#F97316',
+          shape: 'arrowDown',
+          text: '🚀 Upthrust (اختراق قمة كاذب)'
+        });
       }
     }
 
-    // ── Trend Channel Overlays ──────────────────────────────────
+    // ── 4. Real Angled Trend Channel Lines ────────────────────────
     if (showChannels) {
       const channel = detectTrendChannel(candles);
       if (channel) {
-        const color = channel.direction === 'ascending' ? '#10B981'
-                    : channel.direction === 'descending' ? '#EF4444' : '#9CA3AF';
-        const breakColor = channel.isBreakout
-          ? (channel.breakoutDirection === 'up' ? '#06B6D4' : '#F97316')
-          : color;
-        addLine(channel.upperLine.endPrice, breakColor, `📊 ${channel.direction === 'ascending' ? '↑' : channel.direction === 'descending' ? '↓' : '↔'} Upper`, LineStyle.Solid, 2);
-        addLine(channel.lowerLine.endPrice, breakColor, `📊 ${channel.direction === 'ascending' ? '↑' : channel.direction === 'descending' ? '↓' : '↔'} Lower`, LineStyle.Dashed, 1);
-        if (channel.isBreakout) {
-          addLine(
-            channel.breakoutDirection === 'up' ? channel.upperLine.endPrice * 1.003 : channel.lowerLine.endPrice * 0.997,
-            '#F59E0B', `⚡ Breakout ${channel.breakoutDirection === 'up' ? '↑' : '↓'}`,
-            LineStyle.Solid, 3
-          );
+        const startIdx = channel.upperLine.startIndex;
+        const endIdx = channel.upperLine.endIndex;
+        const channelSlice = candles.slice(startIdx, endIdx + 1);
+
+        if (channelSlice.length >= 2) {
+          const upperSeries = chartRef.current.addSeries(LineSeries, {
+            color: channel.direction === 'ascending' ? '#10B981' : channel.direction === 'descending' ? '#EF4444' : '#3B82F6',
+            lineWidth: 2,
+            lineStyle: LineStyle.Solid,
+            lastValueVisible: true,
+            priceLineVisible: false,
+          });
+
+          const lowerSeries = chartRef.current.addSeries(LineSeries, {
+            color: channel.direction === 'ascending' ? '#10B981' : channel.direction === 'descending' ? '#EF4444' : '#3B82F6',
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            lastValueVisible: true,
+            priceLineVisible: false,
+          });
+
+          const total = channelSlice.length - 1;
+          const upperData = channelSlice.map((c, i) => ({
+            time: c.time as Time,
+            value: channel.upperLine.startPrice + (channel.upperLine.endPrice - channel.upperLine.startPrice) * (i / total)
+          })).filter(d => d.time);
+
+          const lowerData = channelSlice.map((c, i) => ({
+            time: c.time as Time,
+            value: channel.lowerLine.startPrice + (channel.lowerLine.endPrice - channel.lowerLine.startPrice) * (i / total)
+          })).filter(d => d.time);
+
+          upperSeries.setData(upperData);
+          lowerSeries.setData(lowerData);
+          overlaySeriesRef.current.push(upperSeries, lowerSeries);
+
+          // Add Channel Breakout Marker if applicable
+          if (channel.isBreakout && candles.length > 0) {
+            const lastCandle = candles[candles.length - 1];
+            if (lastCandle.time) {
+              markers.push({
+                time: lastCandle.time,
+                position: channel.breakoutDirection === 'up' ? 'aboveBar' : 'belowBar',
+                color: '#F59E0B',
+                shape: channel.breakoutDirection === 'up' ? 'arrowUp' : 'arrowDown',
+                text: `⚡ كسر القناة (${channel.breakoutDirection === 'up' ? 'صاعد' : 'هابط'})`
+              });
+            }
+          }
         }
       }
+    }
+
+    // Apply markers to candlestick series if any
+    if (markers.length > 0) {
+      try {
+        // Sort markers by time
+        const sortedMarkers = markers.sort((a, b) => {
+          const tA = typeof a.time === 'number' ? a.time : new Date(a.time).getTime();
+          const tB = typeof b.time === 'number' ? b.time : new Date(b.time).getTime();
+          return (isNaN(tA) ? 0 : tA) - (isNaN(tB) ? 0 : tB);
+        });
+        (candlestickSeriesRef.current as any).setMarkers(sortedMarkers);
+      } catch (e) {
+        console.error('Error setting markers:', e);
+      }
+    } else {
+      try { (candlestickSeriesRef.current as any).setMarkers([]); } catch {}
     }
 
   }, [candles, showSMC, showElliott, showWyckoff, showChannels]);
