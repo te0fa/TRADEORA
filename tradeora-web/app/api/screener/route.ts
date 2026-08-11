@@ -4,6 +4,7 @@ import { normalizeEgxSector, isSmeStock } from '@/lib/egx-sectors';
 import { fetchCanonicalLatestPrices } from '@/lib/canonical-price';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Statistical sample threshold: at least 30 closed trades required to display win rate
 const MIN_SAMPLE_SIZE_THRESHOLD = 30;
