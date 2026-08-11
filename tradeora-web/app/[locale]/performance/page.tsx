@@ -583,74 +583,125 @@ export default function PerformancePage() {
                 </div>
 
                 {/* Quality Metrics: TP1 vs TP2 vs SL (Interactive Drill-down) */}
-                {activeQualityMetrics && activeQualityMetrics.total_decided > 0 && (
-                  <motion.div variants={itemVariants} className="mb-6">
-                    <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-lg">🎯</span>
-                        <h3 className="text-sm font-black text-white uppercase tracking-wider">مقياس جودة الإشارات — دقة الأهداف (اضغط للتفاصيل والتعلم)</h3>
-                        <span className="text-xs text-zinc-500 font-medium mr-auto">{activeQualityMetrics.total_decided} صفقة محسومة</span>
+                {(() => {
+                  const qm = activeQualityMetrics || {
+                    total_decided: 0,
+                    tp1_hit_rate: 0,
+                    tp1_hit_count: 0,
+                    avg_tp1_pnl: 0,
+                    tp2_hit_rate: 0,
+                    tp2_hit_count: 0,
+                    avg_tp2_pnl: 0,
+                    trailing_count: 0,
+                    breakeven_count: 0,
+                    sl_hit_rate: 0,
+                    sl_hit_count: 0,
+                    avg_sl_pnl: 0
+                  };
+                  const totalDecided = qm.total_decided || 0;
+
+                  return (
+                    <motion.div variants={itemVariants} className="mb-6">
+                      <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-lg">🎯</span>
+                          <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                            {isAr ? 'مقياس جودة الإشارات — دقة الأهداف (اضغط للتفاصيل والتعلم)' : 'Signal Quality Metrics — Target Precision'}
+                          </h3>
+                          <span className="text-xs text-zinc-500 font-medium mr-auto">
+                            {totalDecided} {isAr ? 'صفقة محسومة' : 'decided trades'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div 
+                            onClick={() => {
+                              setDrilldownFilter('tp1');
+                              setDrilldownTitle(isAr ? '🎯 صفقات تحقيق الهدف الأول TP1 (تحليل نجاح النموذج)' : 'TP1 Hit Trades');
+                              setDrilldownModalOpen(true);
+                            }}
+                            className="bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                          >
+                            <span className="text-[10px] font-bold text-emerald-400 group-hover:underline">
+                              🎯 {isAr ? 'هدف أول TP1 ➔' : 'Target 1 (TP1) ➔'}
+                            </span>
+                            <div className="text-2xl font-black text-emerald-400 font-mono">{qm.tp1_hit_rate || 0}%</div>
+                            <div className="text-[10px] text-zinc-500">
+                              {qm.tp1_hit_count || 0} {isAr ? 'صفقة' : 'trades'}
+                              {Number(qm.avg_tp1_pnl || 0) > 0 && <span className="text-emerald-400 font-bold"> · +{qm.avg_tp1_pnl}%</span>}
+                            </div>
+                            <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: (qm.tp1_hit_rate || 0) + '%' }} />
+                            </div>
+                          </div>
+
+                          <div 
+                            onClick={() => {
+                              setDrilldownFilter('tp2');
+                              setDrilldownTitle(isAr ? '🏆 صفقات تحقيق الهدف الثاني TP2 (تحليل الأهداف العالية)' : 'TP2 Hit Trades');
+                              setDrilldownModalOpen(true);
+                            }}
+                            className="bg-blue-500/10 border border-blue-500/25 hover:border-blue-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                          >
+                            <span className="text-[10px] font-bold text-blue-400 group-hover:underline">
+                              🏆 {isAr ? 'هدف ثاني TP2 ➔' : 'Target 2 (TP2) ➔'}
+                            </span>
+                            <div className="text-2xl font-black text-blue-400 font-mono">{qm.tp2_hit_rate || 0}%</div>
+                            <div className="text-[10px] text-zinc-500">
+                              {qm.tp2_hit_count || 0} {isAr ? 'صفقة' : 'trades'}
+                              {Number(qm.avg_tp2_pnl || 0) > 0 && <span className="text-blue-400 font-bold"> · +{qm.avg_tp2_pnl}%</span>}
+                            </div>
+                            <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: (qm.tp2_hit_rate || 0) + '%' }} />
+                            </div>
+                          </div>
+
+                          <div 
+                            onClick={() => {
+                              setDrilldownFilter('trailing');
+                              setDrilldownTitle(isAr ? '🛡 صفقات الخروج المحمي وحماية الأرباح (Trailing / Breakeven)' : 'Protected Exit Trades');
+                              setDrilldownModalOpen(true);
+                            }}
+                            className="bg-yellow-500/10 border border-yellow-500/25 hover:border-yellow-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                          >
+                            <span className="text-[10px] font-bold text-yellow-400 group-hover:underline">
+                              🛡 {isAr ? 'خروج محمي ➔' : 'Protected Exit ➔'}
+                            </span>
+                            <div className="text-2xl font-black text-yellow-400 font-mono">
+                              {totalDecided > 0 ? ((( (qm.trailing_count || 0) + (qm.breakeven_count || 0) ) / totalDecided) * 100).toFixed(1) : 0}%
+                            </div>
+                            <div className="text-[10px] text-zinc-500">
+                              {(qm.trailing_count || 0) + (qm.breakeven_count || 0)} {isAr ? 'صفقة' : 'trades'}
+                            </div>
+                            <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-yellow-500 rounded-full" style={{ width: (totalDecided > 0 ? (((qm.trailing_count || 0) + (qm.breakeven_count || 0)) / totalDecided) * 100 : 0) + '%' }} />
+                            </div>
+                          </div>
+
+                          <div 
+                            onClick={() => {
+                              setDrilldownFilter('sl');
+                              setDrilldownTitle(isAr ? '🔴 صفقات وقف الخسارة SL (تحليل وتطوير النموذج)' : 'Stop Loss Hit Trades');
+                              setDrilldownModalOpen(true);
+                            }}
+                            className="bg-red-500/10 border border-red-500/25 hover:border-red-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
+                          >
+                            <span className="text-[10px] font-bold text-red-400 group-hover:underline">
+                              🔴 {isAr ? 'وقف خسارة SL ➔' : 'Stop Loss (SL) ➔'}
+                            </span>
+                            <div className="text-2xl font-black text-red-400 font-mono">{qm.sl_hit_rate || 0}%</div>
+                            <div className="text-[10px] text-zinc-500">
+                              {qm.sl_hit_count || 0} {isAr ? 'صفقة' : 'trades'}
+                              {Number(qm.avg_sl_pnl || 0) < 0 && <span className="text-red-400 font-bold"> · {qm.avg_sl_pnl}%</span>}
+                            </div>
+                            <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-red-500 rounded-full" style={{ width: (qm.sl_hit_rate || 0) + '%' }} />
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div 
-                          onClick={() => {
-                            setDrilldownFilter('tp1');
-                            setDrilldownTitle('🎯 صفقات تحقيق الهدف الأول TP1 (تحليل نجاح النموذج)');
-                            setDrilldownModalOpen(true);
-                          }}
-                          className="bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
-                        >
-                          <span className="text-[10px] font-bold text-emerald-400 group-hover:underline">🎯 هدف أول TP1 ➔</span>
-                          <div className="text-2xl font-black text-emerald-400 font-mono">{activeQualityMetrics.tp1_hit_rate}%</div>
-                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.tp1_hit_count} صفقة{activeQualityMetrics.avg_tp1_pnl > 0 && <span className="text-emerald-400 font-bold"> · +{activeQualityMetrics.avg_tp1_pnl}%</span>}</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{width:activeQualityMetrics.tp1_hit_rate+"%"}} /></div>
-                        </div>
-
-                        <div 
-                          onClick={() => {
-                            setDrilldownFilter('tp2');
-                            setDrilldownTitle('🏆 صفقات تحقيق الهدف الثاني TP2 (تحليل الأهداف العالية)');
-                            setDrilldownModalOpen(true);
-                          }}
-                          className="bg-blue-500/10 border border-blue-500/25 hover:border-blue-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
-                        >
-                          <span className="text-[10px] font-bold text-blue-400 group-hover:underline">🏆 هدف ثاني TP2 ➔</span>
-                          <div className="text-2xl font-black text-blue-400 font-mono">{activeQualityMetrics.tp2_hit_rate}%</div>
-                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.tp2_hit_count} صفقة{activeQualityMetrics.avg_tp2_pnl > 0 && <span className="text-blue-400 font-bold"> · +{activeQualityMetrics.avg_tp2_pnl}%</span>}</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:activeQualityMetrics.tp2_hit_rate+"%"}} /></div>
-                        </div>
-
-                        <div 
-                          onClick={() => {
-                            setDrilldownFilter('trailing');
-                            setDrilldownTitle('🛡 صفقات الخروج المحمي وحماية الأرباح (Trailing / Breakeven)');
-                            setDrilldownModalOpen(true);
-                          }}
-                          className="bg-yellow-500/10 border border-yellow-500/25 hover:border-yellow-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
-                        >
-                          <span className="text-[10px] font-bold text-yellow-400 group-hover:underline">🛡 خروج محمي ➔</span>
-                          <div className="text-2xl font-black text-yellow-400 font-mono">{activeQualityMetrics.total_decided>0?(((activeQualityMetrics.trailing_count+activeQualityMetrics.breakeven_count)/activeQualityMetrics.total_decided)*100).toFixed(1):0}%</div>
-                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.trailing_count+activeQualityMetrics.breakeven_count} صفقة</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-yellow-500 rounded-full" style={{width:(activeQualityMetrics.total_decided>0?((activeQualityMetrics.trailing_count+activeQualityMetrics.breakeven_count)/activeQualityMetrics.total_decided)*100:0)+"%"}} /></div>
-                        </div>
-
-                        <div 
-                          onClick={() => {
-                            setDrilldownFilter('sl');
-                            setDrilldownTitle('🔴 صفقات وقف الخسارة SL (تحليل وتطوير النموذج)');
-                            setDrilldownModalOpen(true);
-                          }}
-                          className="bg-red-500/10 border border-red-500/25 hover:border-red-400/50 rounded-xl p-3 flex flex-col gap-1 cursor-pointer transition-all hover:scale-[1.02] group"
-                        >
-                          <span className="text-[10px] font-bold text-red-400 group-hover:underline">🔴 وقف خسارة SL ➔</span>
-                          <div className="text-2xl font-black text-red-400 font-mono">{activeQualityMetrics.sl_hit_rate}%</div>
-                          <div className="text-[10px] text-zinc-500">{activeQualityMetrics.sl_hit_count} صفقة{activeQualityMetrics.avg_sl_pnl<0 && <span className="text-red-400 font-bold"> · {activeQualityMetrics.avg_sl_pnl}%</span>}</div>
-                          <div className="mt-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{width:activeQualityMetrics.sl_hit_rate+"%"}} /></div>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+                    </motion.div>
+                  );
+                })()}
 
                 {/* Strategy Factors & Analysis Schools Evaluation Card */}
                 <motion.div variants={itemVariants} className="mb-6">
