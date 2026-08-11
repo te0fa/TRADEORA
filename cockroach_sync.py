@@ -42,7 +42,8 @@ if not cr_url:
     sys.exit(0)
 
 def cr_conn():
-    return psycopg2.connect(cr_url, connect_timeout=10)
+    url = cr_url.replace("sslmode=verify-full", "sslmode=require")
+    return psycopg2.connect(url, connect_timeout=10)
 
 
 # ══════════════════════════════════════════════════════════════

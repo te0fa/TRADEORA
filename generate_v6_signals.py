@@ -1,23 +1,34 @@
-import os, random, datetime
+import os, random, datetime, json
+from dotenv import load_dotenv
+import psycopg2, psycopg2.extras
 from supabase import create_client
 
-SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://kdjsguozssxvtmlmqhpz.supabase.co"
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+load_dotenv('.env', override=True)
+load_dotenv('tradeora-web/.env.production.local')
+load_dotenv('tradeora-web/.env.local')
 
-sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://kdjsguozssxvtmlmqhpz.supabase.co"
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+
+CR_URL = (os.getenv("DATABASE_URL") or "").replace("sslmode=verify-full", "sslmode=require")
+
+sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_KEY else None
 today = datetime.date.today()
 now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-print("🚀 Starting AI Model v6 Signal Generation Engine...")
+print("🚀 Starting AI Model v6 Signal Generation Engine (CockroachDB Direct)...")
 
-# 1. Fetch active companies
-comp_res = sb.table("companies").select("id, symbol, name_ar, name_en, sector, is_shariah_compliant").eq("status", "active").execute()
-companies = comp_res.data or []
-print(f"  ✓ {len(companies)} active companies loaded.")
+conn = psycopg2.connect(CR_URL, connect_timeout=10)
+cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-# 2. Fetch latest market prices
-prices_res = sb.table("market_prices").select("company_id, open_price, close_price, high_price, low_price, volume, price_date").order("price_date", desc=True).limit(4000).execute()
-prices = prices_res.data or []
+# 1. Fetch active companies from CockroachDB
+cur.execute("SELECT id, symbol, name_ar, name_en, sector, is_shariah_compliant FROM companies WHERE status = 'active' OR status IS NULL;")
+companies = [dict(r) for r in cur.fetchall()]
+print(f"  ✓ {len(companies)} active companies loaded from CockroachDB.")
+
+# 2. Fetch latest market prices from CockroachDB
+cur.execute("SELECT company_id, open_price, close_price, high_price, low_price, volume, price_date FROM market_prices ORDER BY price_date DESC LIMIT 4000;")
+prices = [dict(r) for r in cur.fetchall()]
 
 price_map = {}
 for p in prices:
@@ -28,9 +39,9 @@ for p in prices:
 print(f"  ✓ Latest price records mapped for {len(price_map)} companies.")
 
 # 3. Model v6 Signal Generation Algorithm
-# Clear previous active trades to prevent duplicate signals per symbol and keep clean total signal count (~100 signals)
 print("  🧹 Cleaning previous active signals to prevent duplicates...")
-sb.table("recommended_trades").delete().eq("status", "active").execute()
+cur.execute("DELETE FROM recommended_trades WHERE status = 'active';")
+conn.commit()
 
 signals_to_insert = []
 
@@ -148,18 +159,41 @@ for i, co in enumerate(selected_companies):
 
 print(f"\n  ✓ Generated {len(signals_to_insert)} high-precision v6 active signals.")
 
-# 4. Insert signals in chunks into recommended_trades
-chunk_size = 40
-inserted_count = 0
-for i in range(0, len(signals_to_insert), chunk_size):
-    chunk = signals_to_insert[i:i+chunk_size]
-    res = sb.table("recommended_trades").insert(chunk).execute()
-    if res.data:
-        inserted_count += len(res.data)
-        print(f"  ✓ Inserted chunk {i//chunk_size + 1} ({len(res.data)} signals)")
+# 4. Insert signals directly into CockroachDB recommended_trades
+if CR_URL:
+    try:
+        conn = psycopg2.connect(CR_URL, connect_timeout=10)
+        cur = conn.cursor()
+        
+        insert_sql = """
+            INSERT INTO recommended_trades 
+            (company_id, symbol, direction, entry_price, tp1, tp2, sl, timeframe, status, ml_probability, win_rate_hist, features_snapshot, recommended_at, classification)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'PRODUCTION');
+        """
+        
+        inserted_count = 0
+        for sig in signals_to_insert:
+            cur.execute(insert_sql, (
+                sig["company_id"],
+                sig["symbol"],
+                sig["direction"],
+                sig["entry_price"],
+                sig["tp1"],
+                sig["tp2"],
+                sig["sl"],
+                sig["timeframe"],
+                sig["status"],
+                sig["ml_probability"],
+                sig["win_rate_hist"],
+                json.dumps(sig["features_snapshot"]),
+                sig["recommended_at"]
+            ))
+            inserted_count += 1
+            
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"\n🎉 Successfully inserted {inserted_count} AI Model v6 PRODUCTION signals directly into CockroachDB!")
+    except Exception as e:
+        print(f"❌ CockroachDB Insertion Error: {e}")
 
-print(f"\n🎉 Successfully seeded {inserted_count} AI Model v6 active signals into recommended_trades!")
-
-# Final Verification
-final_cnt = sb.table("recommended_trades").select("*", count="exact", head=True).execute().count
-print(f"📊 Current active signals in database: {final_cnt}")

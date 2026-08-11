@@ -668,11 +668,62 @@ export async function GET(req: NextRequest) {
     // Tier 3: LEGACY_RESEARCH (Pre-remediation trades - reference/audit only, not certified)
     const legacyActive = buyTrades.filter((t: any) => t.classification === 'LEGACY_RESEARCH');
     const legacyClosed = allClosedList.filter((t: any) => t.classification === 'LEGACY_RESEARCH');
-    const legacyWins = legacyClosed.filter((t: any) => Number(t.pnl_percent || 0) > 0).length;
-    const legacyLosses = legacyClosed.filter((t: any) => Number(t.pnl_percent || 0) < 0).length;
+    const legacyWins = legacyClosed.filter((t: any) => Number(t.pnl_percent || 0) > 0).length + legacyActive.filter((t: any) => Number(t.pnl_percent || 0) > 0 || t.status === 'tp1_hit' || t.status === 'tp2_hit').length;
+    const legacyLosses = legacyClosed.filter((t: any) => Number(t.pnl_percent || 0) < 0).length + legacyActive.filter((t: any) => Number(t.pnl_percent || 0) < 0 || t.status === 'sl_hit').length;
     const legacyTotalPnl = legacyClosed.reduce((sum: number, t: any) => sum + Number(t.pnl_percent || 0), 0);
-    const legacyWinRate = legacyClosed.length > 0 ? parseFloat(((legacyWins / legacyClosed.length) * 100).toFixed(1)) : 0;
-    const legacyAvgPnl = legacyClosed.length > 0 ? parseFloat((legacyTotalPnl / legacyClosed.length).toFixed(2)) : 0;
+    const legacyWinRate = (legacyWins + legacyLosses) > 0 ? parseFloat(((legacyWins / (legacyWins + legacyLosses)) * 100).toFixed(1)) : 0;
+    const legacyAvgPnl = (legacyActive.length + legacyClosed.length) > 0 ? parseFloat((legacyTotalPnl / (legacyActive.length + legacyClosed.length)).toFixed(2)) : 0;
+
+    // ── Strategy Attribution Engine ─────────────────────────────────────────
+    const factorStatsMap: Record<string, { key: string; name_ar: string; wins: number; losses: number; total_pnl: number; total_trades: number }> = {};
+    const addFactor = (key: string, nameAr: string, pnl: number) => {
+      if (!factorStatsMap[key]) {
+        factorStatsMap[key] = { key, name_ar: nameAr, wins: 0, losses: 0, total_pnl: 0, total_trades: 0 };
+      }
+      const item = factorStatsMap[key];
+      item.total_trades += 1;
+      item.total_pnl += pnl;
+      if (pnl > 0) item.wins += 1;
+      else if (pnl < 0) item.losses += 1;
+    };
+
+    [...processedTrades, ...allClosedList].forEach((t: any) => {
+      const snap = t.features_snapshot || {};
+      const pnl = Number(t.pnl_percent || 0);
+
+      if (snap.is_wyckoff_spring || snap.wyckoff_badge_ar) {
+        addFactor('wyckoff_spring', '🏛️ تجميع وايكوف المؤسسي (Wyckoff Spring)', pnl);
+      }
+      if (snap.ict_smc_badge_ar || (snap.confirmation_sources || []).includes('ict_smc')) {
+        addFactor('ict_smc_sweep', '🎯 كُتلة أوامر وسحب سيولة (SMC/ICT)', pnl);
+      }
+      if (snap.pattern_badge_ar) {
+        addFactor('chart_pattern', '🚩 النماذج الفنية القاطعة (Chart Patterns)', pnl);
+      }
+      if (t.is_shariah_compliant) {
+        addFactor('shariah_compliant', '☪️ الأسهم المتوافقة مع الشريعة (Shariah Compliant)', pnl);
+      }
+      if (snap.vol_ratio != null && snap.vol_ratio >= 1.5) {
+        addFactor('volume_surge', '📊 انفجار حجم التداول (Volume Surge > 1.5x)', pnl);
+      }
+      if (snap.rsi_14 != null && snap.rsi_14 >= 55 && snap.rsi_14 <= 70) {
+        addFactor('rsi_momentum', '🚀 زخم مؤشر القوة النسبية (RSI 55-70)', pnl);
+      }
+    });
+
+    const strategyAttribution = Object.values(factorStatsMap).map(f => {
+      const winRate = f.total_trades > 0 ? parseFloat(((f.wins / f.total_trades) * 100).toFixed(1)) : 0;
+      const avgPnl = f.total_trades > 0 ? parseFloat((f.total_pnl / f.total_trades).toFixed(2)) : 0;
+      return {
+        ...f,
+        win_rate: winRate,
+        avg_pnl: avgPnl,
+        score: winRate * 0.7 + avgPnl * 0.3
+      };
+    });
+
+    const topWinningStrategies = [...strategyAttribution].sort((a, b) => b.score - a.score).slice(0, 3);
+    const topLosingStrategies  = [...strategyAttribution].sort((a, b) => a.score - b.score).slice(0, 3);
 
     // Tier 4: ALL_HISTORICAL (Complete uncurated archive for full transparency)
     const allHistoricalTradesCount = processedTrades.length + allClosedList.length;
@@ -746,6 +797,11 @@ export async function GET(req: NextRequest) {
       top_picks:       topPicks,              // Top 20 premier picks
       other_signals:   otherSignals,          // Remaining signals
       sell_signals:    sellTrades,
+
+      // ── Strategy Attribution Metadata ──────────────────────────────────
+      strategy_attribution: strategyAttribution,
+      top_winning_strategies: topWinningStrategies,
+      top_losing_strategies: topLosingStrategies,
 
       // ── Quality Metrics: TP1 vs TP2 vs SL breakdown ──────────────────────
       quality_metrics: combinedQualityMetrics,
