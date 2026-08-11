@@ -1,23 +1,16 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { normalizeEgxSector, isSmeStock } from '@/lib/egx-sectors';
 import { fetchCanonicalLatestPrices } from '@/lib/canonical-price';
 
 export const dynamic = 'force-dynamic';
-
-function getSb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
-  );
-}
 
 // Statistical sample threshold: at least 30 closed trades required to display win rate
 const MIN_SAMPLE_SIZE_THRESHOLD = 30;
 
 export async function GET() {
   try {
-    const sb = getSb();
+    const sb = supabase;
     // 1. Fetch all active companies
     const { data: companies, error: compError } = await sb
       .from('companies')
@@ -25,7 +18,7 @@ export async function GET() {
       .order('symbol');
 
     if (compError) throw compError;
-    const ids = companies.map(c => c.id);
+    const ids = companies.map((c: any) => c.id);
 
     // 2. Fetch authoritative canonical latest prices with fallback query
     const canonicalPriceMap = await fetchCanonicalLatestPrices(sb, ids);
@@ -82,7 +75,7 @@ export async function GET() {
 
     // 5. Combine data with strict truthfulness & statistical significance checks
     const result = companies
-      .map(c => {
+      .map((c: any) => {
         const p = priceMap[c.id];
         if (!p) return null;
 
